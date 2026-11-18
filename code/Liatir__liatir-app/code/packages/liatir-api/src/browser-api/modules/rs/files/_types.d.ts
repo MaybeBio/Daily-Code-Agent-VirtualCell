@@ -1,0 +1,47 @@
+/**
+ * Results of the native file dialogs. `OpenResultWithBytes` is the variant that carries the file's contents
+ * along with its path, saving a second round trip for small files.
+ */
+import type { U64, U8 } from "../../../utils/utils/_integerUtils";
+export type FileWithBytes = {
+    path: string;
+    bytes: U8[];
+};
+export type OpenResult = {
+    paths: string[];
+};
+export type OpenResultWithBytes = {
+    files: FileWithBytes[];
+};
+export type FileIdentity = {
+    sizeBytes: U64;
+    sha256: string;
+    prefixHex: string;
+};
+export type FileBase64 = {
+    sizeBytes: U64;
+    dataBase64: string;
+};
+export type FileRangeBase64 = {
+    totalBytes: U64;
+    dataBase64: string;
+};
+export interface FilesInterface {
+    open: (options?: {
+        multi?: boolean;
+        allowed?: string[];
+        maxBytes?: U64;
+    }) => Promise<OpenResult>;
+    openWithBytes: (options?: {
+        multi?: boolean;
+        allowed?: string[];
+        maxBytes?: U64;
+    }) => Promise<OpenResultWithBytes>;
+    save: (defaultName?: string | null) => Promise<string>;
+    /** Stream a local file to compute its content identity without loading it into the webview. */
+    identity: (path: string) => Promise<FileIdentity>;
+    /** Read a bounded local binary only after the user requests an interactive viewer. */
+    readBase64: (path: string, maxBytes: number) => Promise<FileBase64>;
+    /** Read one byte range (the rest of the file without `length`), for a viewer seeking into an indexed file. */
+    readRange: (path: string, offset: number, length?: number) => Promise<FileRangeBase64>;
+}

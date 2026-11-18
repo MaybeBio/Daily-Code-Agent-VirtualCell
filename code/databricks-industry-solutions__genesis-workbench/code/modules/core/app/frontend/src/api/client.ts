@@ -1,0 +1,680 @@
+import type {
+  AdminDashboardResponse,
+  AssistantQueryResponse,
+  AvailableModelsResponse,
+  CanvasCatalogResponse,
+  CanvasGenerateRequest,
+  CanvasGenerateResponse,
+  CanvasRunRequest,
+  CanvasRunResponse,
+  CanvasRunResultResponse,
+  CanvasNodeJobErrorResponse,
+  CanvasInterpretErrorResponse,
+  CanvasRunStatusResponse,
+  CanvasRunsResponse,
+  CanvasSaveWorkflowRequest,
+  CanvasSaveWorkflowResponse,
+  CanvasWorkflowDetail,
+  CanvasWorkflowListResponse,
+  TransformSuggestRequest,
+  TransformSuggestResponse,
+  BatchModelsResponse,
+  BionemoDefaultsResponse,
+  BionemoDispatchResponse,
+  BionemoFinetuneRequest,
+  BionemoFinetuneRunDetails,
+  BionemoInferenceRequest,
+  BionemoVariantsResponse,
+  BionemoWeightsResponse,
+  BootstrapResponse,
+  DBSearchResponse,
+  DeployedModelsResponse,
+  KermtDefaults,
+  KermtDispatchResponse,
+  KermtFinetuneRequest,
+  KermtWeight,
+  Rfd4Defaults,
+  Rfd4DispatchResponse,
+  Rfd4FinetuneRequest,
+  Rfd4Weight,
+  GenomicsDefaultsResponse,
+  DockingExampleResponse,
+  DocsResponse,
+  AntibodyDefaultsResponse,
+  AntibodyDesignStartRequest,
+  AntibodyDesignStartResponse,
+  AntibodyStatusResponse,
+  AntibodyTopKResponse,
+  AntibodyColorRequest,
+  AntibodyColorResponse,
+  VaccineImmunogenDefaultsResponse,
+  VaccineImmunogenStartRequest,
+  VaccineImmunogenStartResponse,
+  VaccineImmunogenStatusResponse,
+  VaccineTopKResponse,
+  VaccineColorRequest,
+  VaccineColorResponse,
+  EnzymeDefaultsResponse,
+  EnzymeOptimizationStartRequest,
+  EnzymeOptimizationStartResponse,
+  EnzymeSearchResponse,
+  EnzymeSmokeTestResponse,
+  EnzymeStatusResponse,
+  EnzymeTopKResponse,
+  GwasResultsResponse,
+  GwasStartRequest,
+  JobDispatchResponse,
+  RunDetailsResponse,
+  VariantAnnotationDashboardResponse,
+  VariantAnnotationResultsResponse,
+  VariantAnnotationStartRequest,
+  VariantCallingPickerResponse,
+  VariantCallingStartRequest,
+  VcfIngestionPickerResponse,
+  VcfIngestionStartRequest,
+  EndpointStatusResponse,
+  HealthResponse,
+  MeResponse,
+  MlflowTestResponse,
+  ModuleBatchModelsResponse,
+  ModuleName,
+  AlphaFoldResultResponse,
+  AlphaFoldSearchResponse,
+  AlphaFoldStartResponse,
+  AnnotateResponse,
+  InverseFoldingResponse,
+  ResolveGeneResponse,
+  OrganismResponse,
+  PerturbationResponse,
+  ProfileResponse,
+  ProteinDesignResponse,
+  ColorPointsResponse,
+  DENarrativeRequest,
+  DEResponse,
+  EnrichmentNarrativeRequest,
+  GenesetDbsResponse,
+  GenesetTermsResponse,
+  NarrativeResponse,
+  PerturbationNarrativeRequest,
+  TrajectoryNarrativeRequest,
+  DotplotResponse,
+  EnrichmentResponse,
+  RawDataResponse,
+  RunInfoResponse,
+  RunSummaryResponse,
+  SavedAnnotationsResponse,
+  SeedMotifsResponse,
+  MoleculeOptimizeStartResponse,
+  MolOptStatus,
+  MolOptTopKResponse,
+  SequenceSearchResponse,
+  TrajectoryResponse,
+  SimilarityResponse,
+  MarkGenesRequest,
+  MarkGenesResponse,
+  SingleCellRunsResponse,
+  StartProcessingRequest,
+  StartProcessingResponse,
+  StructurePredictionResponse,
+  TeddyAnnotateResponse,
+  ProfileSaveRequest,
+  StartEndpointsStatusResponse,
+  SystemSettingsResponse,
+  WorkflowRunsResponse,
+} from '@/types/api'
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  })
+  // Read body as text once, then optionally parse as JSON. Avoids
+  // 'body stream already read' when the initial .json() throws on
+  // non-JSON / empty responses (e.g. auth redirects, plain-text errors).
+  const text = await res.text()
+  if (!res.ok) {
+    let detail: unknown = text
+    try {
+      detail = JSON.parse(text)
+    } catch {
+      // fall through with the raw text
+    }
+    const summary = typeof detail === 'string' ? detail : JSON.stringify(detail)
+    throw new Error(`HTTP ${res.status} ${path}: ${summary}`)
+  }
+  return (text ? JSON.parse(text) : ({} as T)) as T
+}
+
+export const api = {
+  health: () => request<HealthResponse>('/api/health'),
+  me: () => request<MeResponse>('/api/me'),
+  bootstrap: () => request<BootstrapResponse>('/api/bootstrap'),
+
+  getProfile: () => request<ProfileResponse>('/api/profile'),
+  saveProfile: (body: ProfileSaveRequest) =>
+    request<ProfileResponse>('/api/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  saveTheme: (theme: 'dark' | 'light') =>
+    request<ProfileResponse>('/api/profile/theme', {
+      method: 'PUT',
+      body: JSON.stringify({ theme }),
+    }),
+  testMlflow: (mlflow_experiment_folder: string) =>
+    request<MlflowTestResponse>('/api/mlflow/test', {
+      method: 'POST',
+      body: JSON.stringify({ mlflow_experiment_folder }),
+    }),
+
+  systemSettings: () => request<SystemSettingsResponse>('/api/settings/system'),
+  endpointStatuses: () => request<EndpointStatusResponse>('/api/settings/endpoints'),
+  batchModels: () => request<BatchModelsResponse>('/api/settings/batch-models'),
+  startEndpointsStatus: () =>
+    request<StartEndpointsStatusResponse>('/api/settings/start-endpoints/status'),
+  startEndpointsTrigger: (num_hours: number) =>
+    request<{ run_id: string }>('/api/settings/start-endpoints/trigger', {
+      method: 'POST',
+      body: JSON.stringify({ num_hours }),
+    }),
+
+  monitoringRuns: (days_back: number) =>
+    request<WorkflowRunsResponse>(`/api/monitoring/runs?days_back=${days_back}`),
+  adminDashboard: () => request<AdminDashboardResponse>('/api/monitoring/admin-dashboard'),
+
+  assistantQuery: (query: string) =>
+    request<AssistantQueryResponse>('/api/assistant/query', {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    }),
+
+  docs: () => request<DocsResponse>('/api/docs'),
+
+  availableModels: (module: ModuleName) =>
+    request<AvailableModelsResponse>(`/api/models/available?module=${module}`),
+  deployedModelsByModule: (module: ModuleName) =>
+    request<DeployedModelsResponse>(`/api/models/deployed?module=${module}`),
+  batchModelsByModule: (module: ModuleName) =>
+    request<ModuleBatchModelsResponse>(`/api/models/batch?module=${module}`),
+
+  esmfold: (sequence: string, experiment_name = '', run_name = '') =>
+    request<StructurePredictionResponse>('/api/large_molecule/esmfold', {
+      method: 'POST',
+      body: JSON.stringify({ sequence, experiment_name, run_name }),
+    }),
+  boltz: (sequence: string, experiment_name = '', run_name = '') =>
+    request<StructurePredictionResponse>('/api/large_molecule/boltz', {
+      method: 'POST',
+      body: JSON.stringify({ sequence, experiment_name, run_name }),
+    }),
+
+  alphafoldStart: (body: { sequence: string; experiment_name: string; run_name: string }) =>
+    request<AlphaFoldStartResponse>('/api/large_molecule/alphafold/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  alphafoldSearch: (by: 'experiment_name' | 'run_name', text: string) =>
+    request<AlphaFoldSearchResponse>(
+      `/api/large_molecule/alphafold/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  alphafoldResult: (run_id: string, run_name: string) =>
+    request<AlphaFoldResultResponse>(
+      `/api/large_molecule/alphafold/result?run_id=${encodeURIComponent(run_id)}&run_name=${encodeURIComponent(run_name)}`,
+    ),
+
+  sequenceSearch: (sequence: string, top_k: number) =>
+    request<SequenceSearchResponse>('/api/large_molecule/sequence_search', {
+      method: 'POST',
+      body: JSON.stringify({ sequence, top_k }),
+    }),
+  sequenceOrganism: (description: string) =>
+    request<OrganismResponse>('/api/large_molecule/sequence_search/organism', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    }),
+
+  resolveGene: (gene: string) =>
+    request<ResolveGeneResponse>(
+      `/api/large_molecule/resolve_gene?gene=${encodeURIComponent(gene)}`,
+    ),
+
+  genmolSeedMotifs: (p: { gene?: string; sequence?: string }) =>
+    request<SeedMotifsResponse>(
+      `/api/small_molecule/genmol/seed_motifs?gene=${encodeURIComponent(
+        p.gene || '',
+      )}&sequence=${encodeURIComponent(p.sequence || '')}`,
+    ),
+
+  molOptStart: (body: {
+    seed_smiles: string[]
+    num_samples: number
+    num_iterations: number
+    select_top: number
+    dock_top_k: number
+    qed_min: number
+    tox_max: number
+    temperature: number
+    randomness: number
+    target_sequence?: string
+    target_label?: string
+    dock_per_iter?: number
+    dock_samples?: number
+    mlflow_experiment?: string
+    mlflow_run_name: string
+  }) =>
+    request<MoleculeOptimizeStartResponse>('/api/small_molecule/molecule_optimization/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  molOptStatus: (run_id: string) =>
+    request<MolOptStatus>(
+      `/api/small_molecule/molecule_optimization/status?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  molOptTopK: (run_id: string) =>
+    request<MolOptTopKResponse>(
+      `/api/small_molecule/molecule_optimization/top-k?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  molOptSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/small_molecule/molecule_optimization/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+
+  inverseFolding: (args: { pdb: string; experiment_name?: string; run_name?: string }) =>
+    request<InverseFoldingResponse>('/api/large_molecule/inverse_folding', {
+      method: 'POST',
+      body: JSON.stringify(args),
+    }),
+
+  proteinDesign: (body: {
+    sequence: string
+    experiment_name: string
+    run_name: string
+    n_rfdiffusion_hits: number
+  }) =>
+    request<ProteinDesignResponse>('/api/large_molecule/protein_design', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  singleCellRuns: () => request<SingleCellRunsResponse>('/api/single_cell/runs'),
+  singleCellMarkGenes: (body: MarkGenesRequest) =>
+    request<MarkGenesResponse>('/api/single_cell/runs/mark-genes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellAnnotate: (body: {
+    run_id: string
+    cells_per_cluster: number
+    k_neighbors: number
+  }) =>
+    request<AnnotateResponse>('/api/single_cell/annotate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellAnnotateTeddy: (body: {
+    run_id: string
+    cells_per_cluster: number
+    k_neighbors: number
+    bias_correct: boolean
+  }) =>
+    request<TeddyAnnotateResponse>('/api/single_cell/annotate-teddy', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellSavedAnnotations: (run_id: string) =>
+    request<SavedAnnotationsResponse>(
+      `/api/single_cell/annotations?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  singleCellPerturbationNarrative: (body: PerturbationNarrativeRequest) =>
+    request<NarrativeResponse>('/api/single_cell/perturbation/narrative', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellDENarrative: (body: DENarrativeRequest) =>
+    request<NarrativeResponse>('/api/single_cell/de/narrative', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellEnrichmentNarrative: (body: EnrichmentNarrativeRequest) =>
+    request<NarrativeResponse>('/api/single_cell/enrichment/narrative', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellTrajectoryNarrative: (body: TrajectoryNarrativeRequest) =>
+    request<NarrativeResponse>('/api/single_cell/trajectory/narrative', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellGenesetDbs: () => request<GenesetDbsResponse>('/api/single_cell/geneset-dbs'),
+  singleCellGenesetTerms: (db: string, q: string) =>
+    request<GenesetTermsResponse>(
+      `/api/single_cell/geneset-terms?db=${encodeURIComponent(db)}&q=${encodeURIComponent(q)}`,
+    ),
+  singleCellRunInfo: (run_id: string, top_genes_per_cluster = 50) =>
+    request<RunInfoResponse>('/api/single_cell/run-info', {
+      method: 'POST',
+      body: JSON.stringify({ run_id, top_genes_per_cluster }),
+    }),
+  singleCellSimilarity: (body: {
+    run_id: string
+    cluster: string
+    k_neighbors: number
+    cells_per_cluster: number
+  }) =>
+    request<SimilarityResponse>('/api/single_cell/similarity', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellPerturbation: (body: {
+    run_id: string
+    cluster: string
+    perturbation_type: 'knockout' | 'overexpress'
+    genes_to_perturb: string[]
+  }) =>
+    request<PerturbationResponse>('/api/single_cell/perturbation', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellStart: (body: StartProcessingRequest) =>
+    request<StartProcessingResponse>('/api/single_cell/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellRunSummary: (run_id: string, max_umap_points = 10_000) =>
+    request<RunSummaryResponse>('/api/single_cell/run-summary', {
+      method: 'POST',
+      body: JSON.stringify({ run_id, max_umap_points }),
+    }),
+  singleCellColorPoints: (body: { run_id: string; color_column: string; max_points?: number }) =>
+    request<ColorPointsResponse>('/api/single_cell/run-color-points', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellDotplot: (body: {
+    run_id: string
+    n_top_genes_per_cluster?: number
+    selected_genes?: string[] | null
+    scale_data?: boolean
+  }) =>
+    request<DotplotResponse>('/api/single_cell/run-dotplot', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellDE: (body: { run_id: string; cluster_a: string; cluster_b: string }) =>
+    request<DEResponse>('/api/single_cell/run-de', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellEnrichment: (body: { run_id: string; cluster: string; dbs: string[] }) =>
+    request<EnrichmentResponse>('/api/single_cell/run-enrichment', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellTrajectory: (body: { run_id: string; gene?: string | null }) =>
+    request<TrajectoryResponse>('/api/single_cell/run-trajectory', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  singleCellRawData: (body: { run_id: string; columns: string[]; limit?: number }) =>
+    request<RawDataResponse>('/api/single_cell/run-rawdata', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  diffdockExample: () =>
+    request<DockingExampleResponse>('/api/small_molecule/diffdock/example'),
+
+  enzymeOptDefaults: () =>
+    request<EnzymeDefaultsResponse>('/api/large_molecule/enzyme_optimization/defaults'),
+  enzymeOptStart: (body: EnzymeOptimizationStartRequest) =>
+    request<EnzymeOptimizationStartResponse>(
+      '/api/large_molecule/enzyme_optimization/start',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  enzymeOptSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<EnzymeSearchResponse>(
+      `/api/large_molecule/enzyme_optimization/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  enzymeOptStatus: (run_id: string) =>
+    request<EnzymeStatusResponse>(
+      `/api/large_molecule/enzyme_optimization/status?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  enzymeOptTopK: (run_id: string) =>
+    request<EnzymeTopKResponse>(
+      `/api/large_molecule/enzyme_optimization/top_k?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  enzymeOptSmokeTest: () =>
+    request<EnzymeSmokeTestResponse>(
+      '/api/large_molecule/enzyme_optimization/smoke_test',
+      { method: 'POST' },
+    ),
+
+  // Antibody Design (VHH) — RFD4-Proteina in-process reward-weighted loop
+  antibodyDesignDefaults: () =>
+    request<AntibodyDefaultsResponse>('/api/antibody_design/defaults'),
+  antibodyDesignStart: (body: AntibodyDesignStartRequest) =>
+    request<AntibodyDesignStartResponse>('/api/antibody_design/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  antibodyDesignSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/antibody_design/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  antibodyDesignStatus: (run_id: string) =>
+    request<AntibodyStatusResponse>(
+      `/api/antibody_design/status?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  antibodyDesignTopK: (run_id: string) =>
+    request<AntibodyTopKResponse>(
+      `/api/antibody_design/top_k?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  antibodyDesignColorStructure: (body: AntibodyColorRequest) =>
+    request<AntibodyColorResponse>('/api/antibody_design/color_structure', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Vaccine Immunogen Design (VHH) — RFD4-Proteina in-process motif-scaffolding loop
+  vaccineImmunogenDefaults: () =>
+    request<VaccineImmunogenDefaultsResponse>('/api/vaccine_immunogen/defaults'),
+  vaccineImmunogenStart: (body: VaccineImmunogenStartRequest) =>
+    request<VaccineImmunogenStartResponse>('/api/vaccine_immunogen/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  vaccineImmunogenSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/vaccine_immunogen/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  vaccineImmunogenStatus: (run_id: string) =>
+    request<VaccineImmunogenStatusResponse>(
+      `/api/vaccine_immunogen/status?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  vaccineImmunogenTopK: (run_id: string) =>
+    request<VaccineTopKResponse>(
+      `/api/vaccine_immunogen/top_k?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  vaccineImmunogenColorStructure: (body: VaccineColorRequest) =>
+    request<VaccineColorResponse>('/api/vaccine_immunogen/color_structure', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // ─── Genomics ────────────────────────────────────────────────────
+
+  variantCallingStart: (body: VariantCallingStartRequest) =>
+    request<JobDispatchResponse>('/api/genomics/variant_calling/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  variantCallingSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/genomics/variant_calling/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  variantCallingSuccessful: () =>
+    request<VariantCallingPickerResponse>('/api/genomics/variant_calling/successful'),
+
+  gwasStart: (body: GwasStartRequest) =>
+    request<JobDispatchResponse>('/api/genomics/gwas/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  gwasSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/genomics/gwas/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  gwasResults: (run_id: string) =>
+    request<GwasResultsResponse>(
+      `/api/genomics/gwas/results?run_id=${encodeURIComponent(run_id)}`,
+    ),
+
+  vcfIngestionStart: (body: VcfIngestionStartRequest) =>
+    request<JobDispatchResponse>('/api/genomics/vcf_ingestion/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  vcfIngestionSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/genomics/vcf_ingestion/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  vcfIngestionSuccessful: () =>
+    request<VcfIngestionPickerResponse>('/api/genomics/vcf_ingestion/successful'),
+
+  variantAnnotationStart: (body: VariantAnnotationStartRequest) =>
+    request<JobDispatchResponse>('/api/genomics/variant_annotation/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  variantAnnotationSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/genomics/variant_annotation/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  variantAnnotationResults: (run_id: string) =>
+    request<VariantAnnotationResultsResponse>(
+      `/api/genomics/variant_annotation/results?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  variantAnnotationDashboard: (run_name?: string) =>
+    request<VariantAnnotationDashboardResponse>(
+      `/api/genomics/variant_annotation/dashboard${run_name ? `?run_name=${encodeURIComponent(run_name)}` : ''}`,
+    ),
+
+  diseaseBiologyRunDetails: (run_id: string) =>
+    request<RunDetailsResponse>(
+      `/api/genomics/run/details?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  diseaseBiologyDefaults: () =>
+    request<GenomicsDefaultsResponse>('/api/genomics/defaults'),
+
+  // NVIDIA BioNeMo
+  bionemoVariants: () => request<BionemoVariantsResponse>('/api/bionemo/variants'),
+  bionemoDefaults: () => request<BionemoDefaultsResponse>('/api/bionemo/defaults'),
+  bionemoWeights: () => request<BionemoWeightsResponse>('/api/bionemo/weights'),
+  bionemoFinetune: (body: BionemoFinetuneRequest) =>
+    request<BionemoDispatchResponse>('/api/bionemo/finetune', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  bionemoInference: (body: BionemoInferenceRequest) =>
+    request<BionemoDispatchResponse>('/api/bionemo/inference', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  bionemoFinetuneSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/bionemo/finetune/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  bionemoFinetuneRunDetails: (run_id: string) =>
+    request<BionemoFinetuneRunDetails>(
+      `/api/bionemo/finetune/run-details?run_id=${encodeURIComponent(run_id)}`,
+    ),
+  bionemoInferenceSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/bionemo/inference/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  bionemoInferenceRunDetails: (run_id: string) =>
+    request<BionemoFinetuneRunDetails>(
+      `/api/bionemo/inference/run-details?run_id=${encodeURIComponent(run_id)}`,
+    ),
+
+  // KERMT (fine-tune + deploy a small-molecule ADMET model)
+  kermtDefaults: () => request<KermtDefaults>('/api/kermt/defaults'),
+  kermtWeights: () => request<{ weights: KermtWeight[] }>('/api/kermt/weights'),
+  kermtFinetune: (body: KermtFinetuneRequest) =>
+    request<KermtDispatchResponse>('/api/kermt/finetune', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  kermtFinetuneSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/kermt/finetune/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  kermtDeploy: (body: { ft_id: string; model_name?: string; workload_type?: string }) =>
+    request<KermtDispatchResponse>('/api/kermt/deploy', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // RFD4-Proteina (fine-tune + deploy a protein-design model)
+  rfd4Defaults: () => request<Rfd4Defaults>('/api/rfd4/defaults'),
+  rfd4Weights: () => request<{ weights: Rfd4Weight[] }>('/api/rfd4/weights'),
+  rfd4Finetune: (body: Rfd4FinetuneRequest) =>
+    request<Rfd4DispatchResponse>('/api/rfd4/finetune', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  rfd4FinetuneSearch: (by: 'run_name' | 'experiment_name', text: string) =>
+    request<DBSearchResponse>(
+      `/api/rfd4/finetune/search?by=${by}&text=${encodeURIComponent(text)}`,
+    ),
+  rfd4Deploy: (body: { ft_id: string; model_name?: string; workload_type?: string }) =>
+    request<Rfd4DispatchResponse>('/api/rfd4/deploy', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Vortex (ai_canvas)
+  aiCanvasCatalog: () =>
+    request<CanvasCatalogResponse>('/api/ai_canvas/catalog'),
+  aiCanvasGenerate: (body: CanvasGenerateRequest) =>
+    request<CanvasGenerateResponse>('/api/ai_canvas/generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  aiCanvasSaveWorkflow: (body: CanvasSaveWorkflowRequest) =>
+    request<CanvasSaveWorkflowResponse>('/api/ai_canvas/workflows', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  aiCanvasListWorkflows: () =>
+    request<CanvasWorkflowListResponse>('/api/ai_canvas/workflows'),
+  aiCanvasSuggestTransform: (body: TransformSuggestRequest) =>
+    request<TransformSuggestResponse>('/api/ai_canvas/transform-suggest', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  aiCanvasGetWorkflow: (id: string) =>
+    request<CanvasWorkflowDetail>(`/api/ai_canvas/workflows/${id}`),
+  aiCanvasDeleteWorkflow: (id: string) =>
+    request<{ ok: boolean }>(`/api/ai_canvas/workflows/${id}`, { method: 'DELETE' }),
+  aiCanvasRun: (body: CanvasRunRequest) =>
+    request<CanvasRunResponse>('/api/ai_canvas/run', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  aiCanvasRunStatus: (runId: string) =>
+    request<CanvasRunStatusResponse>(`/api/ai_canvas/run/${encodeURIComponent(runId)}/status`),
+  aiCanvasRunResult: (runId: string) =>
+    request<CanvasRunResultResponse>(`/api/ai_canvas/run/${encodeURIComponent(runId)}/result`),
+  aiCanvasNodeJobError: (runId: string, nodeId: string) =>
+    request<CanvasNodeJobErrorResponse>(
+      `/api/ai_canvas/run/${encodeURIComponent(runId)}/node/${encodeURIComponent(nodeId)}/job-error`,
+    ),
+  aiCanvasInterpretError: (body: { error_trace: string; context?: string }) =>
+    request<CanvasInterpretErrorResponse>('/api/ai_canvas/interpret-error', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  aiCanvasRuns: (text = '', page = 1) =>
+    request<CanvasRunsResponse>(
+      `/api/ai_canvas/runs?page=${page}${text ? `&text=${encodeURIComponent(text)}` : ''}`,
+    ),
+}

@@ -1,0 +1,8 @@
+site_name: scMusketeers
+theme: readthedocs
+repo_url: https://github.com/AntoineCollin/scMusketeers
+site_url: https://scMusketeers.readthedocs.io/
+
+nav:
+  - Home: "index.md"
+  - Contributing: "contributing.md"

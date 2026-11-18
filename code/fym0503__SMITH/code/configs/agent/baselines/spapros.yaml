@@ -1,0 +1,8 @@
+id: spapros
+backend: spapros
+stage: baseline
+description: SPAPROS baseline. Install or place the external baseline under the configured root before running.
+runtime:
+  root: external/SMITH_baselines/GPS_tools-main/baselines/spapros
+metadata:
+  data_status: external_not_packaged

@@ -1,0 +1,76 @@
+name: Native Tools Scrollcase box
+
+# Builds the one signed Native Tools box on the two platforms that can link its
+# conda payload. Windows consumes the Linux target inside WSL2; the Linux job
+# also builds the static Rust Scrollcase consumer that performs verification and
+# extraction there without requiring anything from the user.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'runtime-boxes/native-tools/**'
+      - 'runtime-boxes/scrolls/native-tools/**'
+      - 'runtime-boxes/legal/audits/native-tools-*-conda.json'
+      - 'tools/native-tools-box-consumer/**'
+      - 'scripts/build-native-tools-box.mjs'
+      - 'scripts/build-native-tools-wsl-consumer.mjs'
+      - '.github/actions/native-tools-box/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/native-tools-box.yml'
+
+concurrency:
+  group: native-tools-scrollcase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.target-id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target-id: linux-x86_64-cpu
+          - runner: macos-15
+            target-id: macos-aarch64-cpu
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the pinned Scrollcase package
+        run: npm ci
+
+      - uses: ./.github/actions/native-tools-box
+        with:
+          target-id: ${{ matrix.target-id }}
+
+      - name: Upload the macOS Scrollcase box
+        if: matrix.target-id == 'macos-aarch64-cpu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tools-${{ matrix.target-id }}
+          path: |
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.zip
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.release.json
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.trusted-key.json
+          if-no-files-found: error
+
+      - name: Upload the Linux and WSL2 Scrollcase box
+        if: matrix.target-id == 'linux-x86_64-cpu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-tools-${{ matrix.target-id }}
+          path: |
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.zip
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.release.json
+            src-tauri/resources/native-tools/native-tools-${{ matrix.target-id }}.trusted-key.json
+            src-tauri/resources/native-tools/native-tools-box-consumer
+          if-no-files-found: error

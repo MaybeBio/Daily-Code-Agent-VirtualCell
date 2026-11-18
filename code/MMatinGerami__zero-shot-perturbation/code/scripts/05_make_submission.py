@@ -1,0 +1,203 @@
+"""Build a challenge submission from the organisers' control bundle.
+
+Format (manifest.json in the bundle): one .h5ad covering contexts A, B, C with
+obs["target_gene"] (no control cells), obs["context"], exactly `cells_per_pert` cells per
+(context, target), raw integer counts, var indexed by the official gene list
+(gene_names.csv, 18,533 symbols, in order). `vcc prep` validates all of this locally.
+
+Model: any of the benchmark models, fitted on every built public context (data/processed);
+hyper-parameters default to the leave-one-source-out choice pooled over the local held-out
+lines (results/tables/loso_grid.csv, the pre-registered selection rule). The prediction is
+streamed to disk block by block (~2 billion nonzeros do not fit in memory as one matrix).
+Per-target uncertainty and source coverage are written beside the output.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import anndata as ad
+import numpy as np
+import pandas as pd
+import scipy.sparse as sp
+
+from zsp.config import load_config
+from zsp.data import align_union, cp10k
+from zsp.emit import emit_cells
+from zsp.models import (
+    AgreementTransfer,
+    BasalModulatedTransfer,
+    CalibratedTransfer,
+    DepthAwareTransfer,
+    GeneScaledTransfer,
+    MedianTransfer,
+    NormRestoredTransfer,
+    ScaledTransfer,
+    WeightedTransfer,
+    decompose,
+    lfc_to_counts,
+    predict_mean_transfer,
+)
+from zsp.store import load_context
+from zsp.submission_io import StreamingH5ad
+
+
+def load_sources(cfg, extra_sources=()):
+    proc = cfg.path("processed")
+    names = cfg.context_names(extra_sources)
+    contexts = align_union([load_context(n, proc) for n in names])
+    symbols = contexts[0].symbols.loc[contexts[0].genes].to_numpy()
+    return contexts, [decompose(c) for c in contexts], symbols
+
+
+PARAMETRIC = {
+    "calibrated": CalibratedTransfer,
+    "weighted": WeightedTransfer,
+    "scaled": ScaledTransfer,
+    "gene_scaled": GeneScaledTransfer,
+    "norm_restored": NormRestoredTransfer,
+    "median": MedianTransfer,
+    "depth_aware": DepthAwareTransfer,
+    "basal_modulated": BasalModulatedTransfer,
+    "agreement": AgreementTransfer,
+}
+
+
+def loso_pooled(res: Path, name: str, overrides: dict, table: str = "loso_grid.csv"):
+    """The model's hyper-parameters maximising the pre-registered LOSO score averaged over
+    the local held-out lines (results/tables/<table>), with CLI overrides on top. A table made
+    with `06_fit_loso.py --challenge` has every context as a pseudo-target in one row set."""
+    if name == "mean_transfer":
+        return predict_mean_transfer, {}
+    params = {}
+    path = res / "tables" / table
+    if path.exists():
+        g = pd.read_csv(path)
+        g = g[g.model == name].groupby("params")["mean_oriented"].mean()
+        if len(g):
+            params = json.loads(g.idxmax())
+    params.update(overrides)
+    return PARAMETRIC[name](**params), params
+
+
+def read_genes(path) -> pd.Index:
+    """gene_names.csv, with or without a header line."""
+    col = pd.read_csv(path, header=None)[0].astype(str)
+    if col.iloc[0].lower() in ("gene_name", "gene", "symbol"):
+        col = col.iloc[1:]
+    return pd.Index(col.to_numpy(), name="gene")
+
+
+def read_perts(path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    target_col = next(
+        c for c in df.columns if c.lower() in ("target_gene", "target", "perturbation", "gene")
+    )
+    return df.rename(columns={target_col: "target_gene"})
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--bundle", required=True, help="unpacked controls bundle directory")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--cells", type=int, default=None, help="override cells per perturbation")
+    ap.add_argument("--n-perts", type=int, default=None, help="debug: only the first N targets")
+    ap.add_argument("--model", choices=["mean_transfer", *PARAMETRIC], default="mean_transfer")
+    ap.add_argument(
+        "--param",
+        nargs="*",
+        default=[],
+        help="override a hyper-parameter, e.g. --param alpha=1.0 gate_cp10k=0",
+    )
+    ap.add_argument("--extra-sources", nargs="*", default=[], help="round 9 sources, e.g. h1 cd4")
+    ap.add_argument(
+        "--loso-table",
+        default="loso_grid.csv",
+        help="LOSO grid to take hyper-parameters from, e.g. loso_grid_h1_cd4_challenge.csv",
+    )
+    args = ap.parse_args()
+    cfg = load_config()
+    rng = np.random.default_rng(cfg.seed)
+    bundle = Path(args.bundle)
+
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    pert_col, ctx_col = manifest["pert_col"], manifest["context_col"]
+    n_cells = args.cells or int(manifest["cells_per_pert"])
+    panel = read_genes(bundle / "gene_names.csv")
+    perts = read_perts(bundle / "pert_counts.csv")
+    if args.n_perts:
+        perts = perts.head(args.n_perts)
+    if len(panel) != manifest["n_genes"]:
+        raise ValueError(f"gene list has {len(panel)} genes, manifest says {manifest['n_genes']}")
+
+    contexts, sources, src_symbols = load_sources(cfg, args.extra_sources)
+    overrides = {k: float(v) for k, v in (kv.split("=") for kv in args.param)}
+    model, params = loso_pooled(cfg.path("results"), args.model, overrides, args.loso_table)
+    if hasattr(model, "fit"):
+        model.fit(sources)
+    print(f"sources: {[c.name for c in contexts]}; model={args.model} params={params}")
+
+    sym_pos = pd.Series(np.arange(len(src_symbols)), index=src_symbols)
+    sym_pos = sym_pos[~sym_pos.index.duplicated()]
+    hit = panel.isin(sym_pos.index)
+    src_idx = sym_pos.loc[panel[hit]].to_numpy()
+    coverage = pd.DataFrame(
+        {s.name: perts["target_gene"].isin(s.specific.index).to_numpy() for s in sources},
+        index=perts["target_gene"],
+    )
+
+    n_total = len(manifest["contexts"]) * len(perts) * n_cells
+    writer = StreamingH5ad(args.out, pd.DataFrame(index=panel), n_total)
+    unc_rows = []
+    for ctx in manifest["contexts"]:
+        a = ad.read_h5ad(bundle / f"context_{ctx}.h5ad")
+        a = a[a.obs[pert_col].astype(str) == manifest["control_label"]]
+        if a.var_names.tolist() != panel.tolist():
+            raise ValueError(f"context {ctx} genes are not in the official order")
+        cells = sp.csr_matrix(a.X)
+        control_mean = np.asarray(cells.mean(0)).ravel()
+        ctx_perts = perts[perts[ctx_col] == ctx] if ctx_col in perts else perts
+        targets = ctx_perts["target_gene"].astype(str).tolist()
+        counts = (
+            ctx_perts["n_cells"].astype(int).tolist()
+            if "n_cells" in ctx_perts
+            else [n_cells] * len(targets)
+        )
+
+        # the model works on the full source gene set; basal state for source genes the
+        # panel lacks is 0, so they are gated and then dropped when mapping back to the panel
+        basal_src = np.zeros(len(src_symbols))
+        basal_src[src_idx] = cp10k(control_mean)[0][hit]
+        pred = model(sources, basal_src, targets, contexts[0].genes, src_symbols)
+        lfc_panel = np.zeros((len(targets), len(panel)))
+        lfc_panel[:, hit] = pred.lfc.to_numpy()[:, src_idx]
+        means = lfc_to_counts(lfc_panel, control_mean)
+        for i, (t, n) in enumerate(zip(targets, counts, strict=True)):
+            block = emit_cells(cells, control_mean, means[i], n, rng)
+            writer.append(block, pd.DataFrame({pert_col: [t] * n, ctx_col: [ctx] * n}))
+        if len(pred.uncertainty):
+            unc_rows.append(pred.uncertainty.rename("uncertainty").to_frame().assign(context=ctx))
+        print(
+            f"context {ctx}: {len(targets)} targets x {n_cells} cells "
+            f"from {cells.shape[0]} controls; nnz so far {writer.nnz:,}",
+            flush=True,
+        )
+        del a, cells
+
+    obs = writer.close()
+    if unc_rows:
+        pd.concat(unc_rows).to_csv(args.out + ".uncertainty.csv")
+    coverage.to_csv(args.out + ".coverage.csv")
+    print(
+        f"wrote {len(obs):,} cells x {len(panel):,} genes, {writer.nnz:,} nonzeros; "
+        f"{hit.sum():,}/{len(panel):,} panel genes covered by sources; "
+        f"targets with a specific effect from >=1 source: "
+        f"{int(coverage.any(axis=1).sum())}/{len(perts)}",
+        flush=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

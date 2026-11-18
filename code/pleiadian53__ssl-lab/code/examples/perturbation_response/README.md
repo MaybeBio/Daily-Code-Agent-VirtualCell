@@ -1,0 +1,221 @@
+# Perturbation response: single-cell genetic perturbation
+
+This is the biological application of the generative-JEPA toolkit. A genetic perturbation switches a gene on or off inside a cell, and the cell's gene-expression profile, the activity level of each of its thousands of genes, shifts in response. The shift is not the same in every cell. Genetically identical cells respond differently, so a perturbation produces a population of expression profiles rather than a single answer. The task is to predict that population: the **distribution of gene-expression profiles** across perturbed cells, given the unperturbed control population and the identity of the perturbation. The case that matters most is a perturbation the model has never seen, here a combination of two genes whose single-gene effects it has only seen separately. Success is graded on **effect size**: the Pearson correlation between the predicted and the true change in expression, computed over each perturbation's most strongly responding genes. This places the work in the scGen, CPA, GEARS and scPPDM lineage. It is the case study the [generative-JEPA design-space series](https://github.com/pleiadian53/ssl-lab/blob/HEAD/docs/generative_jepa/13-choosing-a-route.md) chose for validating the conditional flow prior, the route that series recommends building first.
+
+**The method** has three stages, each trained separately so that its contribution can be measured on its own:
+
+1. **Stage A, the encoder.** A JEPA encoder is pretrained on cells with no labels at all. It masks some groups of genes in a cell and learns to predict their embeddings from the rest. After pretraining it is frozen and maps every cell to a latent vector.
+2. **Stage B, the transition.** A conditional generative model in that latent space turns a perturbation into a cloud of outcome latents. The main version is a conditional flow that transports control-cell latents toward the perturbed population. Variants replace the flow with a learned linear operator.
+3. **Stage C, the readout.** A negative-binomial count decoder turns each latent back into gene counts, because effect size is measured on genes, not on latents.
+
+The stack is compared against two references. The first is a from-scratch conditional NB-VAE, which has no JEPA and no flow and is conditioned on the same perturbation embedding. It is the strongest learned baseline, and since round 6 of the [results ledger](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-06-conditioned-encoder.md) it is the stronger form of that VAE, whose encoder reads the perturbation as well as the cell. The second, since round 7, is the **additive reference**, which needs no training: it predicts a pair's effect as the sum of its two single-gene effects, measured on the training cells. It is the current reference for effect size. It predicts a mean profile and no cells, though, so it says nothing about the other half of the task, generating a realistic population, and there the VAE remains the reference.
+
+**Dataset:** Norman et al. 2019, K562 cells under CRISPR activation, with both single-gene and two-gene perturbations. The combinatorial structure is the headline test. Models train on single-gene perturbations and some pairs, then must **predict twenty held-out two-gene combinations** they have never seen.
+
+## Where it stands
+
+The full scoreboard is in the [results ledger](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/index.md), and every experiment has its own page there with its settings, its pre-committed endpoint and its result. The short version follows, with Δr meaning the effect-size correlation on the twenty held-out combinations.
+
+| | Δr | e_p | what it says |
+|---|---|---|---|
+| Additive reference, the sum of the two single-gene effects | **0.961** | **0.289** | the reference on effect size since round 7; no training, a mean profile and no population |
+| Conditional NB-VAE whose encoder reads the perturbation | **0.939** | 0.455 | the strongest learned model, with round 11's corrected likelihood |
+| Transport flow on an encoder trained jointly with the decoder from random weights | 0.921 | 0.461 | the best full pipeline, round 13 |
+| Transport flow on the JEPA encoder fine-tuned jointly with the decoder | 0.900 | 0.472 | round 12 |
+| Conditional NB-VAE with a condition-blind encoder | 0.880 | 0.609 | the learned baseline of rounds 1 to 5, re-read under the corrected likelihood |
+| Action operator on the frozen JEPA encoder | 0.848 | 0.579 | round 3's operator, re-read under the corrected decoder; within the flow family's cluster, not contrasted with the flow since round 3's tie |
+| Transport flow on the frozen JEPA encoder | 0.837 | 0.591 | the method as first built, read through the corrected decoder |
+| Readout ceiling: real held-out cells through encoder and decoder | *0.865 / 0.936 / 0.948–0.961* | | the frozen JEPA encoder, round 12's jointly trained encoder, and round 13's two random-start ones; a diagnostic, not a model |
+
+Δr is the effect-size correlation and e_p the size-aware error of the predicted change, where predicting no change scores 1. Every number is under the corrected conventions of [round 11](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-11-library-size.md) and the measured control, averaged over three seeds; the published numbers from before that correction are kept in the ledger.
+
+Three recent rounds changed the picture, and they lead the findings:
+
+- **The decoder's loss had one cause, and fixing it lifted every model.** [Round 11](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-11-library-size.md) found that the count decoder's likelihood counted each cell's library size over all measured genes rather than the 5,000 it models. Counting it over the modeled genes removed the decoder's offset and raised every decoder-based model by 0.08 to 0.20 in Δr, with the order of the models unchanged ([the re-baseline](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/rebaseline-after-round-11.md)). The same round found that the populations' apparent under-dispersion came mostly from how sampled counts were normalized; normalized like the data, coverage sits near its nominal 0.80.
+- **Training the encoder together with the decoder raises the ceiling.** [Round 12](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-12-coadaptation.md) fine-tuned the JEPA encoder jointly with a fresh decoder by reconstruction. The readout ceiling rose from 0.865 to 0.936, and a flow retrained on the new latents reached 0.900, level with the conditioned NB-VAE on the size-aware error but still below it in Δr.
+- **The JEPA pretraining is not shown to contribute.** [Round 13](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-13-random-start.md) ran the same joint training from random weights and reached a readout ceiling of 0.948 to 0.961 and a full pipeline of 0.909 to 0.921. The pretrained start is not established to help, and every seed of the random start scored above it. The JEPA encoder was pretrained on the same training cells, so the premise that pretraining pays off when labels or data are scarce is still untested here.
+
+The findings below were measured before round 11's correction and keep their published numbers. Where a later round changed one, the finding says so.
+
+- **No learned model has yet predicted mean effects better than additivity.** Round 7 scored the additive reference with the same harness as every model. It reaches 0.961, significantly above the conditioned NB-VAE (by 0.103) and the transport flow (by 0.313). The flow also falls below a reference that ignores which combination it is asked about, predicting one average training effect for every pair (0.711, exploratory). The finding is scoped to these twenty combinations, to correlation on each pair's top 20 genes, and to additivity in log1p-CP10K expression. It does not mean the pairs do not interact: an earlier round measured interactions of 17% to 54% of the effect on these same pairs, which the correlation metric largely cannot see because it ignores the size of the change. And it does not settle whether a model can generate useful, calibrated populations of cells, which the additive reference cannot do at all.
+- **The method loses to its learned baseline, by more than first measured.** Every generative configuration lands between 0.61 and 0.65. In round 1 that put the best flow 0.118 below the condition-blind NB-VAE, a gap that survived simultaneous confidence intervals over the whole family of comparisons. Round 6 then let the baseline's encoder read the perturbation, which added a significant 0.083 and raised the bar to 0.858. Read across rounds through the bar, the transport flow now trails it by about 0.21.
+- **The transition was never the bottleneck.** A Stage B that is perfect by construction reaches only 0.679 through the current decoder, so improving the flow could gain at most 0.03. Three rounds spent on the transition (the flow variants, the action operator, the operator algebra) were bounded by that ceiling from the start.
+- **The decoder is where the effect is lost.** A plain linear readout of the frozen latents scores 0.852, above the original baseline's 0.766, just below the conditioned VAE's 0.858, and 0.11 below the additive reference. It is a diagnostic handed real latents, not a model. The representation holds the signal, and the trained count decoder throws away 0.173 of it. [Round 10](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/round-10-control-reference.md) qualified this: the 0.173 appears only when every predicted change is taken against the measured control mean. Against the decoder's own control prediction, no gap is established, and what the decoder gets wrong is an offset in absolute expression shared by every condition. Under that convention every learned model sits much closer to the data, the conditioned NB-VAE's size-aware error falling from 1.05 to 0.50, though still above additivity's 0.29. Round 11 then removed the offset at its cause, and the decoder now reads the frozen latents slightly better than the linear map does (0.865 against 0.852).
+- **The operator-algebra hypothesis is refuted.** The idea that how far two single-gene operators fail to commute predicts the pair's genetic interaction failed every test it was given.
+- **On the size of the change, additivity is far ahead.** Correlation ignores how large the predicted change is, so round 8 scored the error of the predicted change relative to the measured one, where predicting no change at all scores 1. Additivity scores 0.29, the conditioned NB-VAE 1.05 and the transport flow 1.26, and additivity is better on every one of the twenty pairs. The learned models predict only about 60% of the change along the direction the single genes point.
+- **Two further levers did not help.** A non-additive DeepSets embedding of the gene pair (round 7b) did not improve interaction prediction in the flow and made the conditioned NB-VAE about 13% worse. Replacing the encoder's VICReg regularizer with SIGReg from LeJEPA (round 9) left the representation with about twenty dimensions of variance instead of over two hundred, and lowered its linear readout from 0.853 to about 0.75.
+- **Two flow design choices are settled.** Transporting from a real control latent beats generating from noise (+0.036, significant). Optimal-transport coupling of the pairs makes things worse (−0.021, significant), even though it lowers the training loss.
+
+**What comes next** is open, and the options pull in different directions. The best full pipeline sits 0.017 below the conditioned NB-VAE and 0.039 below additivity in Δr, with about 0.04 of headroom between its flow and its readout ceiling. A condition-aware decoder, as the NB-VAE has, aims at the first gap. A data-efficiency ladder, comparing a pretrained and a random start as the training cells shrink, is the test of what the pretraining is for, and the same question can be put to a large pretrained single-cell model's embeddings in place of Stage A. The [co-adaptation](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/co-adaptation/README.md) program and the ledger's open items keep the list.
+
+## Where to read
+
+All the written material lives under [docs/](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/index.md). Pick by the question you have.
+
+| if you want to know... | read |
+|---|---|
+| what a Perturb-seq experiment measures, how a cell becomes tokens, and how success is scored | [Reading Perturb-seq](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/reading-perturb-seq/index.md), a four-part primer on the data with real numbers throughout |
+| what the method is, how it was built, what it scored, and why it fell short | [The conditional-flow + JEPA method](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/conditional-flow-jepa/index.md) |
+| what each experiment tested, how it was run, and what it found | the [results ledger](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/results/index.md), one page per round with its settings and verdict, and the standing scoreboard |
+| what an action operator is and why it was a natural candidate for the transition | [Action operators: a development](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/action-operator/index.md), written after the refutation and honest about which premises failed |
+| how to reproduce the headline result, command by command | [Running the pipeline](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/running-the-pipeline.md), the runbook |
+| which script answers which question | [Workflows](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/workflows/index.md), the map of all the scripts by the kind of work they do |
+| how the comparisons were made trustworthy | [Running an experiment you can trust](https://github.com/pleiadian53/ssl-lab/blob/HEAD/docs/experimental-method/index.md), the general methodology, with this project as its worked example |
+| why this method was chosen in the first place | the [generative-JEPA design-space survey](https://github.com/pleiadian53/ssl-lab/blob/HEAD/docs/generative_jepa/index.md) |
+
+A first-time reader is best served by the data primer, then the method series up to its results chapter, then the ledger.
+
+## The scripts
+
+The scripts are numbered `00` to `17` in the order they were written, which is not the order anyone runs them in. They fall into five kinds of workflow, and the [Workflows](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/workflows/index.md) map explains each kind in depth. There is no `07`; the gap is kept so that existing references to script numbers stay valid.
+
+**Build** an artifact that later steps depend on. These are the only scripts that train anything, and apart from `00` they belong on the GPU pod.
+
+| script | produces |
+|---|---|
+| `00_process_norman.py` | the data cache: gene panel, tokens, splits, and the genes each perturbation is scored on |
+| `01_pretrain_stage_a.py` | Stage A, the JEPA cell encoder, frozen from then on |
+| `03_train_count_decoder.py` | Stage C, the negative-binomial count decoder on frozen latents |
+| `04_train_cond_flow.py` | Stage B, the conditional flow, either from noise (`--flow-base gaussian`) or from control latents (`--flow-base control`) |
+| `08_train_cvae_baseline.py` | the from-scratch conditional NB-VAE baseline |
+| `13_train_operator.py` | Stage B as an action operator, `A_p = exp(M(e(p)))`, carrying control latents to perturbed ones |
+| `16_train_operator_algebra.py` | Stage B with one generator per gene, so that pairs compose inside the operator group |
+
+**Score** a trained model on the standing benchmark. These run on CPU in minutes.
+
+| script | produces |
+|---|---|
+| `05_sample_perturbed.py` | a generated population for one perturbation, for inspection |
+| `06_eval_effect_size.py` | the primary benchmark, Δr on the held-out combinations; `--stage-b` picks which Stage B to grade |
+| `09_eval_cvae_baseline.py` | the same metric through the same harness, for the baseline |
+| `18_eval_additive_baseline.py` | the same metric for the training-free additive reference, Δ(A) + Δ(B) from the training singles |
+| `10_eval_calibration.py` | the distributional axis: spread correlation, interval coverage, Wasserstein and energy distance |
+| `19_score_interaction.py` | the same predictions on the size of the change and on its departure from additivity, including the size-aware error e_p |
+
+**Diagnose** where the loss lives. These train nothing, run in minutes, and several of them changed the direction of the project.
+
+| script | answers |
+|---|---|
+| `00a_probe_hvg_coverage.py` | does the gene panel already contain the genes that respond? |
+| `00b_data_card.py` | how many cells are in each split, per target gene (`--gene CEBPE`) or per perturbation (`--perturbation CEBPE+RUNX1T1`, or `--as-table --kind combo --in-split test` for the holdout as rows)? |
+| `00c_show_architecture.py` | what does a component (encoder, predictor, time or condition embedding, flow, decoder, ...) do, step by step, and what shape is the data after each step? Run with no arguments for the list of components; `--from-experiment NAME` shows a trained run with its own settings and weights |
+| `02_probe_cell_encoder.py` | is the frozen encoder any good, judged by a linear probe? |
+| `11_diagnose_variance.py` | how much of the predicted spread comes from the latent distribution, and how much from the decoder? |
+| `14_ceiling_analysis.py` | what is the best any Stage B could do with this encoder and decoder? |
+| `15_empirical_epistasis.py` | how far does each pair's response depart from the sum of its two singles? |
+
+**Decide** whether a difference is real. These take seconds.
+
+| script | produces |
+|---|---|
+| `12_compare_arms.py` | a verdict on a family of comparisons, from a joint bootstrap with simultaneous intervals |
+| `17_eval_bracket_epistasis.py` | the pre-registered test of whether operator non-commutativity predicts epistasis, against a permutation null |
+| `20_compare_composition.py` to `27_score_round13.py` | one script per round from 7b on, whose docstring is that round's protocol, frozen before any run; each checks its inputs against the stored reports, then writes the round's verdict and secondaries |
+
+**Vary** one lever at a time on the GPU pod. Each `run_*_pod.sh` wrapper reuses every artifact it can and retrains only the stage under test. The decoder and operator wrappers also open with a preflight that checks their staged inputs and stops within seconds, naming whatever is missing, before any training starts.
+
+| wrapper | runs |
+|---|---|
+| `run_stage_a_pod.sh` | process the data if the cache is absent, then pretrain and probe the encoder |
+| `run_full_pipeline_pod.sh` | the whole chain, encoder through effect-size evaluation, on the in-distribution split |
+| `run_combo_generalization_pod.sh` | decoder, flow and evaluation on held-out combinations, plus the NB-VAE baseline |
+| `run_flow_compare_pod.sh` | the noise-source flow against the control-source flow |
+| `run_seed_sweep_pod.sh` | three flow configurations across three seeds, for confidence intervals |
+| `run_decoder_ablation_pod.sh`, `run_decoder_seed_sweep_pod.sh` | the decoder levers, once and across seeds |
+| `run_operator_pod.sh` | the action operator, deterministic and stochastic |
+| `run_operator_algebra_pod.sh` | the per-gene operator algebra |
+| `sweep_action_weight_pod.sh` | the strength of the penalty that keeps operators near the identity |
+| `run_vae_encoder_ablation_pod.sh` | the baseline's two encoder forms, condition-blind $q(z \mid x)$ and conditioned $q(z \mid x, c)$, at three seeds each |
+
+## 0 · Process Norman 2019 into a cache
+
+Processing needs a few heavy single-cell libraries (`anndata`, `scanpy`, `pertpy`). Only this step uses them; the loader and every later script read the cache without them.
+
+```bash
+pip install -e ".[perturb]"
+```
+
+```bash
+# tiny synthetic smoke run (no network, seconds) — verifies the whole pipeline
+python examples/perturbation_response/00_process_norman.py --smoke
+
+# real run: pertpy auto-fetch, 5000-gene HVG panel (multi-GB download, CPU, no pod)
+python examples/perturbation_response/00_process_norman.py --source pertpy --n-hvg 5000
+
+# or from a pinned local .h5ad instead of pertpy
+python examples/perturbation_response/00_process_norman.py --source h5ad --h5ad <path>.h5ad
+```
+
+If pertpy stores the perturbation label under a non-standard column, or joins combinations with a different separator, inspect `adata.obs` and pass `--pert-col` or `--combo-sep`. To rebuild only the list of scored genes without touching the splits, pass `--de-only`. Before changing the gene panel, the token layout, or the dataset, read [Preparing a dataset](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/workflows/01a-preparing-a-dataset.md): a new cache invalidates the encoder and everything trained on it.
+
+### Staging the cache in the data lake
+
+The processed cache is several gigabytes, so it lives in the project-neutral data lake rather than under `data/` in the repository. The `ops` helper links it in:
+
+```bash
+export DATA_LAKE_ROOT=~/work/data
+python -c "from ops.datasets import link_dataset; link_dataset('scrna/perturb_seq/norman2019')"
+# -> data/norman2019 -> $DATA_LAKE_ROOT/scrna/perturb_seq/norman2019
+```
+
+The lake is organized as `<modality>/<sub-topic>/<dataset>`, and the nested lake path becomes a flat local alias, `data/norman2019`, which is what the loader reads.
+
+### Cache contents (`data/norman2019/`)
+
+| File | What |
+|---|---|
+| `tokens_meta.npz` | the arrays read at train time, with no anndata needed: `hvg_X`, raw `counts`, `libsize`, `pert_id`, `is_control`, `ctrl_group`, per-cell split codes, `gene_ids`, `pert_names` |
+| `processed.h5ad` | the canonical AnnData, for inspection and re-derivation |
+| `splits.json` | perturbation-level splits: `combo` holds out unseen combinations, `cells` is an in-distribution sanity split |
+| `de_genes.json` | the top differentially expressed genes per perturbation, which is the set every metric scores; [chapter 3e](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/conditional-flow-jepa/03e-the-genes-the-metric-scores.md) explains how they are chosen and why the choice matters |
+| `manifest.json` | provenance and every processing setting, including the seed of the token partition |
+
+### Consuming the cache
+
+```python
+from ssllab.data import get_perturbseq_dataloaders
+
+train, val, test = get_perturbseq_dataloaders(data_dir="data", split="combo", seed=0)
+batch = next(iter(train))
+# batch: tokens (B, n_tokens, token_dim), counts (B, n_hvg), libsize, pert_id,
+#        is_control, ctrl_group ; plus train.control_sampler and train.meta
+```
+
+The `tokens` field follows the toolkit's universal `(B, n_tokens, token_dim)` contract, so it feeds `build_jepa(token_dim=..., n_tokens=...)` unchanged, exactly as MNIST patches do. `counts` and `libsize` are kept for the count decoder, and `control_sampler` draws baseline cells from the matched control population.
+
+## Running the pipeline
+
+The order of operations is cache, then encoder, then decoder and flow on the frozen latents, then evaluation; the baseline needs only the cache. [Running the pipeline](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/running-the-pipeline.md) gives the exact commands, what each step reads and writes, and how every number in the results traces back to a script and a report.
+
+Data preparation, tests and smoke runs happen locally on CPU. Training happens on a RunPod GPU pod, driven from `examples/ops/`: provision a pod, stage the cache and any reused checkpoints to the persistent volume once, launch a `run_*_pod.sh` wrapper, then bring the outputs back. **Evaluate locally**, against the local `de_genes.json`. A scored-gene list on a pod volume can be out of date, and grading against it silently produces wrong numbers. Section 4 of the runbook walks through the pod workflow step by step.
+
+## Co-adaptation
+
+[`co-adaptation/`](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/co-adaptation/README.md) trains the encoder with the stages that read it. Every round before 12 froze the encoder, which is what made a difference between two arms attributable to the one thing that changed. Co-adaptation relaxes that freeze one stage at a time, and its results join the same ledger as Round 5 onward, on the same twenty held-out combinations and against the same NB-VAE bar.
+
+| script | phase | trained jointly with the encoder |
+|---|---|---|
+| `01_koopman_linearity_probe.py` | Phase 0, diagnostic, done | nothing; it measures whether the frozen latents respond affinely |
+| `02_coadapt_decoder.py` | Phase 1, done in rounds 12 and 13 | the count decoder, with the transition retrained afterwards; `--init random` starts the encoder from fresh weights |
+| `03_coadapt_operator.py` | Phase 2, planned, now lower priority | the operator, under a linearizing objective |
+
+Its narrative companion is [co-adaptation/docs](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/co-adaptation/docs/index.md).
+
+### Understanding the data and the metrics
+
+[`data-science/`](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/data-science/README.md) holds runnable explainers: one script per conceptual question, each importing the production implementation from `src/ssllab` rather than restating it, so an explanation cannot drift from the code it explains. Nothing there trains a model or feeds a result into the ledger.
+
+| script | answers |
+|---|---|
+| `01_metric_energy_distance.py` | how is energy distance computed, what does the joint view buy over per-gene marginals, and why are there two estimators of it in the codebase? |
+| `02_metric_effect_size_and_ep.py` | how do Δr and `e_p` turn two populations into one number, what do the scale terms mean, and how well can a perfect predictor score? |
+| `03_holdout_power.py` | what is in the holdout, how unequal are the twenty contributions, and when is a wide simultaneous interval about the arms rather than about the family? |
+| `04_collapse_effective_rank.py` | what does effective rank measure that a standard deviation does not, and why does a random-slice isotropy penalty tolerate a rank-20 embedding? |
+
+Its narrative companion is [data-science/docs](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/data-science/docs/index.md), which sets the four endpoint families side by side.
+
+## Design notes
+
+- **Tokenization** splits the 5000-gene panel into a fixed random partition of gene groups. It is a sensible default and can be revisited, for example with pathway or co-expression groups. [The tokenization design space](https://github.com/pleiadian53/ssl-lab/blob/HEAD/examples/perturbation_response/docs/conditional-flow-jepa/06a-the-tokenization-design-space.md) lays out the alternatives.
+- **Latent extraction** is shared with the image examples. `extract_latents` in `src/ssllab/extract.py` takes an optional `prepare` callable that turns a Perturb-seq batch into tokens, and falls back to MNIST patchify when none is given. The diagnostics encode cells through `encode_rows` in `src/ssllab/latents.py`.
+- **One frozen encoder, one grading harness.** Every Stage B and Stage C variant sits on the same frozen latents, and every model, including the baseline and the oracle arms of the ceiling, is scored through the same `run_effect_size_eval` function. That is what lets arms from different rounds be compared at all. Co-adaptation is the declared exception to the first rule, and it re-measures its own ceiling for that reason.

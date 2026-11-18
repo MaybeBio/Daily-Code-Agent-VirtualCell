@@ -1,0 +1,147 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+"""LangChain **Runnable** and the **LangChain Expression Language (LCEL)**.
+
+The LangChain Expression Language (LCEL) offers a declarative method to build
+production-grade programs that harness the power of LLMs.
+
+Programs created using LCEL and LangChain Runnables inherently support
+synchronous, asynchronous, batch, and streaming operations.
+
+Support for **async** allows servers hosting LCEL based programs to scale better
+for higher concurrent loads.
+
+**Batch** operations allow for processing multiple inputs in parallel.
+
+**Streaming** of intermediate outputs, as they're being generated, allows for
+creating more responsive UX.
+
+This module contains schema and implementation of LangChain Runnables primitives.
+"""
+
+from typing import TYPE_CHECKING
+
+from langchain_core._import_utils import import_attr
+
+if TYPE_CHECKING:
+    from langchain_core.runnables.base import (
+        Runnable,
+        RunnableBinding,
+        RunnableGenerator,
+        RunnableLambda,
+        RunnableMap,
+        RunnableParallel,
+        RunnableSequence,
+        RunnableSerializable,
+        chain,
+    )
+    from langchain_core.runnables.branch import RunnableBranch
+    from langchain_core.runnables.config import (
+        RunnableConfig,
+        ensure_config,
+        get_config_list,
+        patch_config,
+        run_in_executor,
+    )
+    from langchain_core.runnables.fallbacks import RunnableWithFallbacks
+    from langchain_core.runnables.history import RunnableWithMessageHistory
+    from langchain_core.runnables.passthrough import (
+        RunnableAssign,
+        RunnablePassthrough,
+        RunnablePick,
+    )
+    from langchain_core.runnables.router import RouterInput, RouterRunnable
+    from langchain_core.runnables.utils import (
+        AddableDict,
+        ConfigurableField,
+        ConfigurableFieldMultiOption,
+        ConfigurableFieldSingleOption,
+        ConfigurableFieldSpec,
+        aadd,
+        add,
+    )
+
+__all__ = (
+    "AddableDict",
+    "ConfigurableField",
+    "ConfigurableFieldMultiOption",
+    "ConfigurableFieldSingleOption",
+    "ConfigurableFieldSpec",
+    "RouterInput",
+    "RouterRunnable",
+    "Runnable",
+    "RunnableAssign",
+    "RunnableBinding",
+    "RunnableBranch",
+    "RunnableConfig",
+    "RunnableGenerator",
+    "RunnableLambda",
+    "RunnableMap",
+    "RunnableParallel",
+    "RunnablePassthrough",
+    "RunnablePick",
+    "RunnableSequence",
+    "RunnableSerializable",
+    "RunnableWithFallbacks",
+    "RunnableWithMessageHistory",
+    "aadd",
+    "add",
+    "chain",
+    "ensure_config",
+    "get_config_list",
+    "patch_config",
+    "run_in_executor",
+)
+
+_dynamic_imports = {
+    "chain": "base",
+    "Runnable": "base",
+    "RunnableBinding": "base",
+    "RunnableGenerator": "base",
+    "RunnableLambda": "base",
+    "RunnableMap": "base",
+    "RunnableParallel": "base",
+    "RunnableSequence": "base",
+    "RunnableSerializable": "base",
+    "RunnableBranch": "branch",
+    "RunnableConfig": "config",
+    "ensure_config": "config",
+    "get_config_list": "config",
+    "patch_config": "config",
+    "run_in_executor": "config",
+    "RunnableWithFallbacks": "fallbacks",
+    "RunnableWithMessageHistory": "history",
+    "RunnableAssign": "passthrough",
+    "RunnablePassthrough": "passthrough",
+    "RunnablePick": "passthrough",
+    "RouterInput": "router",
+    "RouterRunnable": "router",
+    "AddableDict": "utils",
+    "ConfigurableField": "utils",
+    "ConfigurableFieldMultiOption": "utils",
+    "ConfigurableFieldSingleOption": "utils",
+    "ConfigurableFieldSpec": "utils",
+    "aadd": "utils",
+    "add": "utils",
+}
+
+
+def __getattr__(attr_name: str) -> object:
+    module_name = _dynamic_imports.get(attr_name)
+    result = import_attr(attr_name, module_name, __spec__.parent)
+    globals()[attr_name] = result
+    return result
+
+
+def __dir__() -> list[str]:
+    return list(__all__)
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

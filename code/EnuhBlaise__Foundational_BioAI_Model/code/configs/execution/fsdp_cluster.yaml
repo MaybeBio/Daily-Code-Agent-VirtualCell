@@ -1,0 +1,7 @@
+# Placeholder for multi-node runs. The training loop marks the two call sites
+# that a Fabric/FSDP wrapper replaces (src/runners/pretrain.py).
+device: cuda
+strategy: fsdp
+precision: amp
+sharding: full
+activation_checkpointing: true

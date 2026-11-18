@@ -1,0 +1,53 @@
+experiment:
+  name: chr78-11b_1p
+  description: CARTANA Human Reproductive Tract Early (dataset-id 78) | 11 batch | 1 panel | Preprocess to silver
+  study: ISS CARTANA by Valentina
+
+paths:
+  data_directory_path: /lustre/scratch126/cellgen/team361/DATASETS
+
+dataset:
+  overwrite: false
+  source: offline
+  download_params:
+    redownload: false
+    urls: []
+  file_names:
+    - CM008_annotated
+    - CM013_annotated
+    - CM015_annotated
+    - CM016_annotated
+    - CM018_annotated
+    - CM017_annotated
+    - CM019_annotated
+    - CM007_annotated
+    - CM009_annotated
+    - CM011_annotated
+    - CM020_annotated
+
+harmonization:
+  uns:
+    dataset_id: 78
+    assay: cartana
+    species: homo_sapiens
+    tissue: male_reproductive_system
+    sample_condition_map: {
+      'CM008_annotated': 'healthy',
+      'CM013_annotated': 'healthy',
+      'CM015_annotated': 'healthy',
+      'CM016_annotated': 'healthy',
+      'CM018_annotated': 'healthy',
+      'CM017_annotated': 'healthy',
+      'CM019_annotated': 'healthy',
+      'CM007_annotated': 'healthy',
+      'CM009_annotated': 'healthy',
+      'CM011_annotated': 'healthy',
+      'CM020_annotated': 'healthy'
+      }
+  batch:
+    split_by_batch: false
+    sample_batch_map: {}
+  key_mappings: {}
+  misc:
+    min_genes: 10
+

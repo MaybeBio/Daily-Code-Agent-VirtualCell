@@ -1,0 +1,13 @@
+# @package _global_
+# Real data. Requires `pip install cellxgene-census` and network access.
+defaults:
+  - override /data: census
+  - override /model: base
+  - override /execution: local_gpu
+
+seed: 0
+train:
+  epochs: 10
+  lr: 2e-4
+  amp: true
+  accumulate_grad_batches: 2

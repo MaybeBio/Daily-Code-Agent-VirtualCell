@@ -1,0 +1,62 @@
+resources:
+  jobs:
+    register_proteinmpnn:
+      name: register_proteinmpnn
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        # Serverless GPU (GPU_1xA10). ProteinMPNN is tiny and runs on modern torch;
+        # this bypasses the classic-cluster EC2 GPU vCPU quota. (was a 14.3 LTS T4
+        # single-node job_cluster.) Mirrors esm2_embeddings / esmfold / boltz.
+        - task_key: register_proteinmpnn_task
+          disable_auto_optimization: true
+          environment_key: gpu_env
+          max_retries: 0
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../notebooks/01_register_proteinmpnn.py
+          compute:
+            hardware_accelerator: GPU_1xA10
+
+        #this task needs serverless runtime with python 3.11
+        - task_key: import_protein_mpnn_task
+          max_retries: 0
+          disable_auto_optimization: true
+          environment_key: default
+          depends_on:
+            - task_key: register_proteinmpnn_task
+          notebook_task:
+            notebook_path: ../notebooks/02_import_model_gwb.py
+
+      environments:
+        - environment_key: default
+          spec:
+            # py3.11: import_protein_mpnn_task installs genesis_workbench, which fails to resolve
+            # under the py3.12 (client '4') serverless immutable constraints (same fix as rfdiffusion).
+            client: '2'
+        - environment_key: gpu_env
+          spec:
+            client: '4'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: proteinmpnn
+        - name: cache_dir
+          default: ${resources.volumes.proteinmpnn_cache_dir.name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          default: ${var.gpu_small_setting}
+
+      tags: ${var.common_resource_tags}

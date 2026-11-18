@@ -1,0 +1,55 @@
+bundle:
+  name: genesis_workbench_parabricks
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/*.yml
+
+# Packages the airt/ code (run_parabricks.py + command.sh) into ./dist/code.tgz, which the
+# run_parabricks ai_runtime_task references as code_source_path. The bundle builds the tarball
+# — no air CLI / hand-built tarball needed (Databricks AI Runtime productionizing docs).
+artifacts:
+  parabricks_code:
+    type: tgz
+    path: .
+    include:
+      - airt
+    files:
+      - source: ./dist/code.tgz
+
+sync:
+  paths:
+    - .
+
+targets:
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}

@@ -1,0 +1,1138 @@
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Component, Path, PathBuf},
+};
+use tauri::{AppHandle, Manager};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use super::python_env::{
+    env_dir, prepare_env, spawn_in_env, status_env, PythonEnvLock, PythonEnvPackage,
+    PythonEnvStatus, PythonRequirement,
+};
+
+#[path = "plugin_subprocess.rs"]
+mod subprocess;
+type BundleArchive = zip::ZipArchive<std::io::Cursor<std::sync::Arc<[u8]>>>;
+
+const SIG: &str = "LIATIR/1";
+const PYTHON_PLUGIN_ENV_ROOT: &str = "plugin-runtimes";
+pub(crate) const PYTHON_PLUGIN_DEV_ENV_ROOT: &str = "plugin-dev-runtimes";
+
+// Signature-related zip entries. Excluded from the signed digest and, together,
+// carry an Ed25519 signature over the rest of the bundle.
+const SIG_ENTRY_ALG: &str = "_sig_alg";
+const SIG_ENTRY_PUBKEY: &str = "_pubkey";
+const SIG_ENTRY_SIGNATURE: &str = "_signature";
+const SIG_ALG_ED25519: &str = "ed25519";
+
+const RUNNER: &str = r#"import * as _mod from './index.js';
+// definePlugin(...) returns an object with .run; legacy shapes are accepted for older bundles.
+const _m = _mod.default ?? _mod;
+const _run = typeof _m === 'function' ? _m : (_m && (_m.run ?? _mod.run));
+if (typeof _run !== 'function') {
+  process.stderr.write('[liatir] plugin must `export default definePlugin(...)`\n');
+  process.exit(1);
+}
+const _inputs = JSON.parse(process.argv[2] ?? '{}');
+try {
+  const _result = await _run(_inputs);
+  if (_result !== undefined && _result !== null) {
+    process.stdout.write('__LIATIR_RESULT__' + JSON.stringify(_result) + '\n');
+  }
+} catch (err) {
+  process.stderr.write('[liatir] ' + (err?.message ?? String(err)) + '\n');
+  process.exit(1);
+}
+"#;
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct PythonPluginSpec {
+    entry: Option<String>,
+    packages: Option<Vec<PythonEnvPackage>>,
+    requirements: Option<Vec<String>>,
+    python_requirement: Option<PythonRequirement>,
+}
+
+#[derive(Debug, Clone)]
+struct PythonPluginRuntimeContext {
+    manifest: Value,
+    spec: PythonPluginSpec,
+    entry: String,
+    env_id: String,
+}
+
+fn open_validated(path: &str) -> Result<BundleArchive, String> {
+    let size = std::fs::metadata(path).map_err(|e| format!("Cannot open: {e}"))?.len();
+    if size > 512 * 1024 * 1024 { return Err("Plugin bundle exceeds the 512 MiB limit".into()); }
+    let bytes = std::fs::read(path).map_err(|e| format!("Cannot open: {e}"))?;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(std::sync::Arc::<[u8]>::from(bytes)))
+        .map_err(|_| "Not a valid .lia plugin (not a zip)".to_string())?;
+
+    let mut names = std::collections::HashSet::new();
+    let mut expanded_size = 0u64;
+    for index in 0..zip.len() {
+        let entry = zip.by_index(index).map_err(|e| e.to_string())?;
+        validate_relative_path(entry.name().trim_end_matches('/'))?;
+        if !names.insert(entry.name().to_string()) { return Err("Duplicate Plugin bundle entry".into()); }
+        if entry.unix_mode().map(|mode| mode & 0o170000 == 0o120000).unwrap_or(false) {
+            return Err("Plugin bundle symlinks are not allowed".into());
+        }
+        expanded_size = expanded_size.checked_add(entry.size()).ok_or("Plugin size overflow")?;
+        if expanded_size > 1024 * 1024 * 1024 { return Err("Expanded Plugin bundle exceeds 1 GiB".into()); }
+    }
+    // Validate signature
+    let mut sig_entry = zip.by_name("_sig")
+        .map_err(|_| "Not a valid .lia plugin (missing signature)".to_string())?;
+    let mut sig = String::new();
+    sig_entry.read_to_string(&mut sig).map_err(|e| e.to_string())?;
+    if sig.trim() != SIG {
+        return Err("Not a valid .lia plugin (wrong signature)".to_string());
+    }
+    drop(sig_entry);
+
+    // Verify the Ed25519 signature when present. Unsigned bundles (dev/legacy)
+    // are allowed; a *signed* bundle whose content was altered is rejected.
+    verify_bundle_signature(&mut zip)?;
+
+    Ok(zip)
+}
+
+fn read_zip_entry_bytes(
+    zip: &mut BundleArchive,
+    name: &str,
+) -> Result<Option<Vec<u8>>, String> {
+    match zip.by_name(name) {
+        Ok(mut entry) => {
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+            Ok(Some(buf))
+        }
+        Err(zip::result::ZipError::FileNotFound) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Canonical digest signed by the CLI and re-derived here. Deterministic across
+/// implementations: for every entry except the signature-meta entries, sorted
+/// by name, append `"{name}\n{sha256hex(content)}\n"`, then SHA-256 the whole.
+fn bundle_signing_digest(zip: &mut BundleArchive) -> Result<Vec<u8>, String> {
+    let mut rows: Vec<(String, Vec<u8>)> = Vec::new();
+    for index in 0..zip.len() {
+        let mut entry = zip.by_index(index).map_err(|e| e.to_string())?;
+        let name = entry.name().to_string();
+        if matches!(
+            name.as_str(),
+            SIG_ENTRY_ALG | SIG_ENTRY_PUBKEY | SIG_ENTRY_SIGNATURE
+        ) || name.ends_with('/')
+        {
+            continue;
+        }
+        let mut buf = Vec::new();
+        entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        rows.push((name, buf));
+    }
+    Ok(canonical_digest_from_rows(&rows))
+}
+
+/// Pure canonical digest — kept in sync with `bundleSigningDigest` in the CLI's
+/// signing.ts. Split out from zip reading so it can be tested directly.
+fn canonical_digest_from_rows(rows: &[(String, Vec<u8>)]) -> Vec<u8> {
+    use sha2::{Digest, Sha256};
+
+    let mut hashed: Vec<(String, String)> = rows
+        .iter()
+        .map(|(name, content)| {
+            let mut hasher = Sha256::new();
+            hasher.update(content);
+            (name.clone(), hex_lower(&hasher.finalize()))
+        })
+        .collect();
+    hashed.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut outer = Sha256::new();
+    for (name, content_hash) in hashed {
+        outer.update(name.as_bytes());
+        outer.update(b"\n");
+        outer.update(content_hash.as_bytes());
+        outer.update(b"\n");
+    }
+    outer.finalize().to_vec()
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out
+}
+
+/// Verify the bundle's Ed25519 signature if it carries one.
+/// - no signature entries  → Ok (unsigned/dev/legacy bundle, allowed)
+/// - complete + valid       → Ok
+/// - incomplete or invalid  → Err (tamper-evident)
+fn verify_bundle_signature(zip: &mut BundleArchive) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+    let signature_b64 = read_zip_entry_bytes(zip, SIG_ENTRY_SIGNATURE)?;
+    let pubkey_b64 = read_zip_entry_bytes(zip, SIG_ENTRY_PUBKEY)?;
+
+    match (signature_b64, pubkey_b64) {
+        (None, None) => return Ok(()), // Unsigned bundle.
+        (Some(_), None) | (None, Some(_)) => {
+            return Err("Malformed .lia signature (missing public key or signature).".to_string());
+        }
+        (Some(sig_raw), Some(pub_raw)) => {
+            if let Some(alg) = read_zip_entry_bytes(zip, SIG_ENTRY_ALG)? {
+                let alg = String::from_utf8_lossy(&alg).trim().to_string();
+                if alg != SIG_ALG_ED25519 {
+                    return Err(format!("Unsupported .lia signature algorithm: {alg}"));
+                }
+            }
+
+            let sig_bytes = STANDARD
+                .decode(sig_raw.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect::<Vec<u8>>())
+                .map_err(|e| format!("Invalid .lia signature encoding: {e}"))?;
+            let pub_bytes = STANDARD
+                .decode(pub_raw.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect::<Vec<u8>>())
+                .map_err(|e| format!("Invalid .lia public key encoding: {e}"))?;
+
+            let pub_arr: [u8; 32] = pub_bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| "Invalid .lia public key length.".to_string())?;
+            let sig_arr: [u8; 64] = sig_bytes
+                .as_slice()
+                .try_into()
+                .map_err(|_| "Invalid .lia signature length.".to_string())?;
+
+            let verifying_key = VerifyingKey::from_bytes(&pub_arr)
+                .map_err(|e| format!("Invalid .lia public key: {e}"))?;
+            let signature = Signature::from_bytes(&sig_arr);
+
+            let digest = bundle_signing_digest(zip)?;
+            verifying_key
+                .verify(&digest, &signature)
+                .map_err(|_| "This .lia plugin's signature is invalid — it may be corrupted or tampered with.".to_string())
+        }
+    }
+}
+
+fn validate_relative_path(value: &str) -> Result<PathBuf, String> {
+    let path = Path::new(value);
+    if value.trim().is_empty() || path.is_absolute() || value.contains('\\') || value.contains(':') || value.split('/').any(|part| part.is_empty() || part == "." || part == "..") {
+        return Err(format!("unsafe plugin payload path: {value}"));
+    }
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            _ => return Err(format!("unsafe plugin payload path: {value}")),
+        }
+    }
+    Ok(path.to_path_buf())
+}
+
+fn sanitize_env_part(value: &str, max_len: usize) -> String {
+    let mut clean = value
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect::<String>();
+    while clean.contains("--") {
+        clean = clean.replace("--", "-");
+    }
+    clean = clean.trim_matches('-').to_string();
+    if clean.is_empty() {
+        clean = "plugin".to_string();
+    }
+    // Trim again after truncating: cutting mid-word can leave a trailing separator, which would
+    // then collide with the one this part is joined by and read as `name--version`.
+    clean
+        .chars()
+        .take(max_len)
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+
+fn stable_hash_hex(bytes: &[u8]) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// Hash of the dependency-defining parts of the Python spec ONLY. Keying the
+/// venv on this (instead of the whole bundle bytes) lets code-only edits reuse
+/// the same environment — critical for `liatir dev`, where every save produces
+/// a new bundle. Only a change in packages/requirements/pythonRequirement
+/// yields a new env. serde_json objects serialize with sorted keys, so the
+/// fingerprint is deterministic.
+fn python_spec_hash(spec: &PythonPluginSpec) -> String {
+    let fingerprint = serde_json::json!({
+        "packages": spec.packages,
+        "requirements": spec.requirements,
+        "pythonRequirement": spec.python_requirement,
+    });
+    stable_hash_hex(
+        serde_json::to_string(&fingerprint)
+            .unwrap_or_default()
+            .as_bytes(),
+    )
+}
+
+fn python_plugin_env_id(manifest: &Value, spec: &PythonPluginSpec) -> String {
+    let name = manifest
+        .get("name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("plugin");
+    let version = manifest
+        .get("version")
+        .and_then(|value| value.as_str())
+        .unwrap_or("0");
+    let spec_hash = python_spec_hash(spec);
+    // Kept deliberately short. This directory sits under the app data root and a plugin venv then
+    // adds `venv/Lib/site-packages/` plus whatever pip installs; setuptools alone ships a
+    // `pkg_resources/tests/data/...` path of about 113 characters, which pushed a real install past
+    // the 260-character Windows limit and failed the environment bootstrap outright. The name and
+    // version are here for a human reading the directory listing; the hash is what makes it unique,
+    // so they are the parts that can afford to be trimmed. A venv is rebuildable cache, not user
+    // data, so shortening this only causes the environment to be recreated once.
+    format!(
+        "plugin-{}-{}-{}",
+        sanitize_env_part(name, 14),
+        sanitize_env_part(version, 10),
+        &spec_hash[..12.min(spec_hash.len())]
+    )
+}
+
+fn parse_python_spec(manifest: &Value) -> Result<PythonPluginSpec, String> {
+    let mut spec = match manifest.get("python") {
+        Some(value) => serde_json::from_value::<PythonPluginSpec>(value.clone())
+            .map_err(|e| format!("Invalid python runtime spec in manifest: {e}"))?,
+        None => PythonPluginSpec::default(),
+    };
+
+    if spec.entry.is_none() {
+        spec.entry = Some("python/main.py".to_string());
+    }
+    Ok(spec)
+}
+
+fn read_manifest(zip: &mut BundleArchive) -> Result<Value, String> {
+    let mut entry = zip
+        .by_name("manifest.json")
+        .map_err(|_| "manifest.json not found in bundle".to_string())?;
+    let mut buf = String::new();
+    entry.read_to_string(&mut buf).map_err(|e| e.to_string())?;
+    drop(entry);
+    let manifest: Value = serde_json::from_str(&buf).map_err(|e| format!("Invalid manifest JSON: {e}"))?;
+    subprocess::runtime(&manifest)?;
+    if !manifest.is_object() { return Err("Plugin manifest must be an object".into()); }
+    subprocess::validate_manifest(zip, &manifest)?;
+    Ok(manifest)
+}
+
+pub(crate) fn read_manifest_from_bundle(path: &str) -> Result<Value, String> {
+    let mut zip = open_validated(path)?;
+    read_manifest(&mut zip)
+}
+
+pub(crate) fn python_env_id_for_manifest(manifest: &Value) -> Result<String, String> {
+    let spec = parse_python_spec(manifest)?;
+    Ok(python_plugin_env_id(manifest, &spec))
+}
+
+fn python_runtime_context(manifest: Value) -> Result<PythonPluginRuntimeContext, String> {
+    let runtime = subprocess::runtime(&manifest)?;
+    if runtime != "python" {
+        return Err("This .lia plugin does not declare the Python runtime.".to_string());
+    }
+
+    let spec = parse_python_spec(&manifest)?;
+    let entry = spec
+        .entry
+        .clone()
+        .unwrap_or_else(|| "python/main.py".to_string());
+    validate_relative_path(&entry)?;
+    let env_id = python_plugin_env_id(&manifest, &spec);
+
+    Ok(PythonPluginRuntimeContext {
+        manifest,
+        spec,
+        entry,
+        env_id,
+    })
+}
+
+fn status_python_plugin_env(
+    app: AppHandle,
+    env_id: String,
+    spec: &PythonPluginSpec,
+) -> Result<PythonEnvStatus, String> {
+    status_env(
+        app,
+        PYTHON_PLUGIN_ENV_ROOT.to_string(),
+        env_id,
+        spec.packages.clone().unwrap_or_default(),
+        Vec::new(),
+    )
+}
+
+fn prepare_python_plugin_env(
+    app: AppHandle,
+    env_id: String,
+    spec: &PythonPluginSpec,
+) -> Result<super::python_env::PythonEnvPrepareResult, String> {
+    prepare_env(
+        app,
+        PYTHON_PLUGIN_ENV_ROOT.to_string(),
+        env_id,
+        spec.requirements.clone(),
+        spec.packages.clone(),
+        None,
+        spec.python_requirement.clone(),
+    )
+}
+
+fn extract_python_payload(
+    zip: &mut BundleArchive,
+    target_root: &Path,
+) -> Result<(), String> {
+    std::fs::create_dir_all(target_root).map_err(|e| e.to_string())?;
+    let mut extracted = 0usize;
+
+    for index in 0..zip.len() {
+        let mut entry = zip.by_index(index).map_err(|e| e.to_string())?;
+        let name = entry.name().to_string();
+        if !name.starts_with("python/") || name.ends_with('/') {
+            continue;
+        }
+        let relative = validate_relative_path(&name)?;
+        let target = target_root.join(relative);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let mut buf = Vec::new();
+        entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        std::fs::write(target, buf).map_err(|e| e.to_string())?;
+        extracted += 1;
+    }
+
+    if extracted == 0 {
+        return Err("Python .lia bundle has no python/ payload files".to_string());
+    }
+    Ok(())
+}
+
+fn python_plugin_runner(plugin_root: &Path, entry: &str) -> String {
+    format!(
+        r#"
+import asyncio
+import importlib.util
+import inspect
+import json
+import pathlib
+import sys
+import traceback
+
+plugin_root = pathlib.Path({plugin_root:?})
+entry_path = plugin_root / {entry:?}
+
+try:
+    payload = json.load(sys.stdin)
+    sys.path.insert(0, str(plugin_root))
+    sys.path.insert(0, str(entry_path.parent))
+    spec = importlib.util.spec_from_file_location("_liatir_python_plugin", entry_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load Python plugin entry: {{entry_path}}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    handler = getattr(module, "main", None)
+    if not callable(handler):
+        raise TypeError("Python .lia plugin must define a callable main(input) function.")
+    result = handler(payload)
+    if inspect.isawaitable(result):
+        result = asyncio.run(result)
+    if result is not None:
+        print("__LIATIR_RESULT__" + json.dumps(result))
+except Exception:
+    traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
+"#,
+        plugin_root = plugin_root.to_string_lossy().to_string(),
+        entry = entry,
+    )
+}
+
+const SCRIPT_INPUT_TYPES: &[&str] = &["string", "number", "boolean", "file"];
+const SCRIPT_OUTPUT_TYPES: &[&str] = &["string", "number", "boolean", "file", "json", "stats"];
+const SCRIPT_MAX_SOURCE_BYTES: usize = 1_000_000;
+
+/// Checks the parts of a Script request the native side relies on. The frontend validates the same
+/// shared contract first; this is the boundary, so it never trusts that.
+fn validate_script_request(request: &Value) -> Result<(String, String), String> {
+    let workspace = request["workspaceId"].as_str().ok_or("Script workspace is required")?;
+    if workspace.is_empty() || !workspace.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err("Invalid Script workspace".into());
+    }
+    let run_id = request["runId"].as_str().ok_or("Script run ID is required")?;
+    uuid::Uuid::parse_str(run_id).map_err(|_| "Invalid Script run ID")?;
+    let script = &request["script"];
+    let code_ok = script["code"]
+        .as_str()
+        .is_some_and(|code| !code.trim().is_empty() && code.len() <= SCRIPT_MAX_SOURCE_BYTES);
+    if script["language"] != "python" || !code_ok {
+        return Err("A Python Script needs source code (at most 1 MB)".into());
+    }
+    for (name, allowed) in [("inputSchema", SCRIPT_INPUT_TYPES), ("outputSchema", SCRIPT_OUTPUT_TYPES)] {
+        let fields = script[name].as_object().ok_or("Declare both Script input and output contracts")?;
+        for (key, field) in fields {
+            if key.is_empty() || !field["type"].as_str().is_some_and(|kind| allowed.contains(&kind)) {
+                return Err(format!("Invalid Script contract field: {key}"));
+            }
+        }
+    }
+    if !request["inputs"].is_object() {
+        return Err("Script inputs must be an object".into());
+    }
+    Ok((workspace.to_string(), run_id.to_string()))
+}
+
+/// Runs an unpackaged workspace Script through the Python Plugin SDK and dependency environments.
+/// The run's own directory keeps an immutable copy of what ran, so later edits cannot alter it and
+/// deleting the run's Result removes it too.
+#[tauri::command]
+pub async fn lia_script_run(app: AppHandle, request: Value) -> Result<Value, String> {
+    let (workspace, run_id) = validate_script_request(&request)?;
+    let script = request["script"].clone();
+    let name = script["name"].as_str().ok_or("Script name is required")?.to_string();
+    let mut python = script["python"].as_object().ok_or("Declare Script Python dependencies")?.clone();
+    python.insert("entry".into(), Value::String("main.py".into()));
+    let context = python_runtime_context(serde_json::json!({ "name": script["id"], "runtime": "python", "python": python }))?;
+
+    let run_dir = super::fs::lia_fs_safe_join_data(&app, &format!("workspaces/{workspace}/runs/{run_id}"))?;
+    let source_dir = run_dir.join("script");
+    let output_dir = run_dir.join("output");
+    std::fs::create_dir_all(&run_dir).map_err(|e| e.to_string())?;
+    // create_dir (not _all) fails if the copy exists: one run ID never gets a second source.
+    std::fs::create_dir(&source_dir).map_err(|e| format!("Cannot create immutable Script snapshot: {e}"))?;
+    let code = script["code"].as_str().unwrap_or_default();
+    let snapshot = serde_json::to_vec(&script).map_err(|e| e.to_string())?;
+    for (file, contents) in [
+        ("main.py", code.as_bytes()),
+        ("snapshot.json", snapshot.as_slice()),
+        ("liatir.py", include_str!("../../../packages/liatir-cli/src/assets/liatir.py").as_bytes()),
+        ("runner.py", include_str!("script_runner.py").as_bytes()),
+    ] {
+        std::fs::write(source_dir.join(file), contents).map_err(|e| e.to_string())?;
+    }
+    std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
+
+    let prepare_app = app.clone();
+    let env_id = context.env_id.clone();
+    let spec = context.spec.clone();
+    let runtime_lock = tauri::async_runtime::spawn_blocking(move || {
+        let status = status_python_plugin_env(prepare_app.clone(), env_id.clone(), &spec)?;
+        if status.installed {
+            Ok::<_, String>(status.lock)
+        } else {
+            Ok(prepare_python_plugin_env(prepare_app, env_id, &spec)?.lock)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    let mut metadata = request["metadata"].as_object().cloned().unwrap_or_default();
+    metadata.insert("scriptSnapshot".into(), script);
+    metadata.insert("runtimeLock".into(), serde_json::to_value(runtime_lock).map_err(|e| e.to_string())?);
+    let mut env = HashMap::new();
+    env.insert("LIATIR_SCRIPT_OUTPUT_DIR".into(), output_dir.to_string_lossy().to_string());
+    if let Ok(root) = app.path().app_data_dir() {
+        env.insert("LIATIR_IPC_FILE".into(), root.join(".ipc").to_string_lossy().to_string());
+    }
+    let runner = serde_json::to_string(&source_dir.join("runner.py").to_string_lossy()).map_err(|e| e.to_string())?;
+    spawn_in_env(
+        app,
+        PYTHON_PLUGIN_ENV_ROOT.into(),
+        context.env_id,
+        format!("import runpy\nrunpy.run_path({runner}, run_name='__main__')\n"),
+        Vec::new(),
+        request["inputs"].clone(),
+        Some(workspace),
+        Some(env),
+        Some(format!("Script: {name}")),
+        "python-script".into(),
+        Some(Value::Object(metadata)),
+    )
+    .await
+}
+
+/// Read manifest.json from a .lia plugin, validating the signature first.
+#[tauri::command]
+pub async fn lia_liatir_read_manifest(path: String) -> Result<Value, String> {
+    read_manifest_from_bundle(&path)
+}
+
+#[tauri::command]
+pub async fn lia_liatir_python_runtime_status(
+    app: AppHandle,
+    path: String,
+) -> Result<PythonEnvStatus, String> {
+    let mut zip = open_validated(&path)?;
+    let manifest = read_manifest(&mut zip)?;
+    let context = python_runtime_context(manifest)?;
+    let app_for_status = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        status_python_plugin_env(app_for_status, context.env_id, &context.spec)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn lia_liatir_python_runtime_prepare(
+    app: AppHandle,
+    path: String,
+) -> Result<super::python_env::PythonEnvPrepareResult, String> {
+    let mut zip = open_validated(&path)?;
+    let manifest = read_manifest(&mut zip)?;
+    let context = python_runtime_context(manifest)?;
+    let app_for_prepare = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        prepare_python_plugin_env(app_for_prepare, context.env_id, &context.spec)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Readiness for first-class R and Native Plugins. Never executes analysis code.
+#[tauri::command]
+pub async fn lia_liatir_runtime_status(app: AppHandle, path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || subprocess::status(&app, &path)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn lia_liatir_runtime_prepare(app: AppHandle, path: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        subprocess::prepare(&app, &path, &LiaPluginRunOptions::default())?;
+        subprocess::status(&app, &path)
+    }).await.map_err(|e| e.to_string())?
+}
+
+/// User consent is desktop-only. Plugin IPC deliberately has no trust-grant route.
+#[tauri::command]
+pub async fn lia_liatir_native_trust(app: AppHandle, path: String) -> Result<Value, String> {
+    subprocess::trust(&app, &path)?;
+    subprocess::status(&app, &path)
+}
+
+/// Run a .lia plugin with the runtime declared by its manifest.
+/// Returns the same {jobId} value as lia_jobs_spawn.
+#[tauri::command]
+pub async fn lia_liatir_run(
+    app: AppHandle,
+    path: String,
+    inputs: Value,
+    workspace_id: Option<String>,
+    job_label: Option<String>,
+    job_kind: Option<String>,
+    metadata: Option<Value>,
+) -> Result<Value, String> {
+    run_lia_plugin_bundle(
+        app,
+        path,
+        inputs,
+        LiaPluginRunOptions {
+            workspace_id,
+            job_label,
+            job_kind: job_kind.unwrap_or_else(|| "lia-plugin".to_string()),
+            metadata,
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LiaPluginRunOptions {
+    pub python_env_root: String,
+    pub workspace_id: Option<String>,
+    pub env: Option<HashMap<String, String>>,
+    pub job_label: Option<String>,
+    pub job_kind: String,
+    pub metadata: Option<Value>,
+    pub wasm_storage_name: Option<String>,
+}
+
+impl Default for LiaPluginRunOptions {
+    fn default() -> Self {
+        Self {
+            python_env_root: PYTHON_PLUGIN_ENV_ROOT.to_string(),
+            workspace_id: None,
+            env: None,
+            job_label: None,
+            job_kind: "lia-plugin".to_string(),
+            metadata: None,
+            wasm_storage_name: None,
+        }
+    }
+}
+
+pub(crate) async fn run_lia_plugin_bundle(
+    app: AppHandle,
+    path: String,
+    mut inputs: Value,
+    options: LiaPluginRunOptions,
+) -> Result<Value, String> {
+    let mut zip = open_validated(&path)?;
+
+    // Read the manifest to pick the runtime (node | python | wasm). Default: node.
+    let manifest = read_manifest(&mut zip)?;
+    let runtime = subprocess::runtime(&manifest)?;
+
+    if runtime == "r" || runtime == "native" {
+        return subprocess::run(app, zip, manifest, inputs, options).await;
+    }
+
+    // ── WASM runtime: extract plugin.wasm and run it in the sandbox ─────────
+    if runtime == "wasm" {
+        let wasm_bytes = {
+            const PLUGIN_WASM_ENTRY: &str = "plugin.wasm";
+            const LEGACY_WASM_ENTRY: &str = "module.wasm";
+            let wasm_entry_name = if zip.by_name(PLUGIN_WASM_ENTRY).is_ok() {
+                PLUGIN_WASM_ENTRY
+            } else {
+                LEGACY_WASM_ENTRY
+            };
+            let mut entry = zip
+                .by_name(wasm_entry_name)
+                .map_err(|_| "plugin.wasm not found in bundle (runtime: wasm)".to_string())?;
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+            buf
+        };
+
+        // Auto-expose the directory of each "file" input read-only, so the
+        // sandboxed plugin can open it — wasm has no host fs access otherwise.
+        let mut host_read_paths: Vec<String> = Vec::new();
+        if let Some(schema) = manifest.get("inputSchema").and_then(|s| s.as_object()) {
+            for (key, def) in schema {
+                if def.get("type").and_then(|t| t.as_str()) == Some("file") {
+                    if let Some(p) = inputs.get(key).and_then(|v| v.as_str()) {
+                        if let Some(parent) = std::path::Path::new(p).parent() {
+                            let dir = parent.to_string_lossy().to_string();
+                            if !dir.is_empty() && !host_read_paths.contains(&dir) {
+                                host_read_paths.push(dir);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Hand the plugin the paths the sandbox actually exposes.
+        super::plugins::rewrite_host_paths(&mut inputs, &host_read_paths);
+
+        // Persistent /storage scope name, derived from the manifest name
+        // (sanitized + ".wasm" so it passes the plugin-name validation).
+        let storage_name = options.wasm_storage_name.unwrap_or_else(|| manifest
+            .get("name")
+            .and_then(|n| n.as_str())
+            .map(|n| {
+                let safe: String = n
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .collect();
+                format!("{safe}.wasm")
+            })
+            .unwrap_or_else(|| "plugin.wasm".to_string()));
+
+        let (job_id, cancelled) = super::jobs::create_in_process_job(
+            &app,
+            "liatir-wasm".to_string(),
+            vec![path],
+            options.workspace_id,
+            options.job_label.or_else(|| Some("Liatir WASM plugin run".to_string())),
+            Some(options.job_kind),
+            options.metadata,
+        );
+        let _ = super::plugin_progress::lia_plugin_progress(
+            app.clone(),
+            job_id.clone(),
+            Some(0),
+            Some(1),
+            Some("Running WASM plugin".to_string()),
+            None,
+            Some(false),
+        );
+
+        let background_app = app.clone();
+        let background_job_id = job_id.clone();
+        tauri::async_runtime::spawn(async move {
+            let result = tauri::async_runtime::spawn_blocking(move || {
+                super::plugins::run_wasm_bundle(
+                    background_app.clone(),
+                    storage_name,
+                    wasm_bytes,
+                    inputs,
+                    None,
+                    host_read_paths,
+                    cancelled,
+                )
+                .map_err(|e| e.to_string())
+            })
+            .await;
+
+            let response = match result {
+                Ok(Ok(response)) => response,
+                Ok(Err(error)) => serde_json::json!({ "ok": false, "error": error }),
+                Err(error) => serde_json::json!({
+                    "ok": false,
+                    "error": format!("WASM plugin runtime failed: {error}")
+                }),
+            };
+            let ok = response.get("ok").and_then(Value::as_bool).unwrap_or(false);
+            if let Some(stdout) = response.get("stdout").and_then(Value::as_str) {
+                for line in stdout.lines().filter(|line| !line.is_empty()) {
+                    super::jobs::append_in_process_output(
+                        &app,
+                        &background_job_id,
+                        "stdout",
+                        line.to_string(),
+                    );
+                }
+            }
+            if let Some(value) = response.get("value").filter(|value| !value.is_null()) {
+                super::jobs::append_in_process_output(
+                    &app,
+                    &background_job_id,
+                    "stdout",
+                    format!("__LIATIR_RESULT__{value}"),
+                );
+            }
+            if let Some(stderr) = response.get("stderr").and_then(Value::as_str) {
+                for line in stderr.lines().filter(|line| !line.is_empty()) {
+                    super::jobs::append_in_process_output(
+                        &app,
+                        &background_job_id,
+                        "stderr",
+                        line.to_string(),
+                    );
+                }
+            }
+            if let Some(error) = response.get("error").and_then(Value::as_str) {
+                super::jobs::append_in_process_output(
+                    &app,
+                    &background_job_id,
+                    "stderr",
+                    error.to_string(),
+                );
+            }
+            let _ = super::plugin_progress::lia_plugin_progress(
+                app.clone(),
+                background_job_id.clone(),
+                Some(1),
+                Some(1),
+                Some(if ok { "Completed" } else { "Failed" }.to_string()),
+                None,
+                Some(true),
+            );
+            super::jobs::finish_in_process_job(&app, &background_job_id, ok);
+        });
+
+        return Ok(serde_json::json!({ "jobId": job_id }));
+    }
+
+    if runtime == "python" {
+        let context = python_runtime_context(manifest)?;
+        let app_for_prepare = app.clone();
+        let env_id_for_prepare = context.env_id.clone();
+        let spec_for_prepare = context.spec.clone();
+        let python_env_root = options.python_env_root.clone();
+        let python_env_root_for_prepare = python_env_root.clone();
+        let workspace_id = options.workspace_id.clone();
+        // Point the Python process at the app's IPC server so `ctx.liatir.*`
+        // can reach it. The path mirrors what ipc_server writes
+        // ({app_data_dir}/.ipc); the Python SDK also has an app-data fallback,
+        // but injecting it here makes discovery deterministic. A caller-provided
+        // LIATIR_IPC_FILE wins.
+        let mut env_map = options.env.clone().unwrap_or_default();
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            let ipc_file = app_data_dir.join(".ipc");
+            env_map
+                .entry("LIATIR_IPC_FILE".to_string())
+                .or_insert_with(|| ipc_file.to_string_lossy().to_string());
+        }
+        let extra_env = Some(env_map);
+        let job_label = options.job_label.clone();
+        let job_kind = options.job_kind.clone();
+        let extra_metadata = options.metadata.clone();
+        let runtime_lock = tauri::async_runtime::spawn_blocking(move || {
+            let status = status_env(
+                app_for_prepare.clone(),
+                python_env_root_for_prepare.clone(),
+                env_id_for_prepare.clone(),
+                spec_for_prepare.packages.clone().unwrap_or_default(),
+                Vec::new(),
+            )?;
+            if status.installed {
+                return Ok::<Option<PythonEnvLock>, String>(status.lock);
+            }
+            let prepared = prepare_env(
+                app_for_prepare,
+                python_env_root_for_prepare.clone(),
+                env_id_for_prepare,
+                spec_for_prepare.requirements.clone(),
+                spec_for_prepare.packages.clone(),
+                None,
+                spec_for_prepare.python_requirement.clone(),
+            )?;
+            Ok::<Option<PythonEnvLock>, String>(prepared.lock)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+
+        // Source dirs are content-addressed by the bundle hash: the venv is
+        // shared across code edits (env id = dependency spec), but each bundle
+        // content gets its own immutable source snapshot. This avoids both
+        // stale files from older bundles and races between concurrent runs.
+        let bundle_hash = stable_hash_hex(&std::fs::read(&path).map_err(|e| e.to_string())?);
+        let source_root = env_dir(&app, &python_env_root, &context.env_id)?
+            .join("plugin-source")
+            .join(&bundle_hash[..12.min(bundle_hash.len())]);
+        extract_python_payload(&mut zip, &source_root)?;
+
+        let plugin_name = context
+            .manifest
+            .get("name")
+            .and_then(|value| value.as_str())
+            .unwrap_or("Python plugin")
+            .to_string();
+        let plugin_version = context
+            .manifest
+            .get("version")
+            .and_then(|value| value.as_str())
+            .unwrap_or("0")
+            .to_string();
+        let mut metadata_map = serde_json::Map::new();
+        metadata_map.insert("runtime".to_string(), Value::String("python".to_string()));
+        metadata_map.insert("pluginName".to_string(), Value::String(plugin_name.clone()));
+        metadata_map.insert("pluginVersion".to_string(), Value::String(plugin_version.clone()));
+        metadata_map.insert("runtimeLock".to_string(), serde_json::to_value(runtime_lock).unwrap_or(Value::Null));
+        if let Some(Value::Object(extra)) = extra_metadata {
+            for (key, value) in extra {
+                metadata_map.insert(key, value);
+            }
+        } else if let Some(extra) = extra_metadata {
+            metadata_map.insert("extra".to_string(), extra);
+        }
+        let metadata = Value::Object(metadata_map);
+
+        return spawn_in_env(
+            app,
+            python_env_root,
+            context.env_id.clone(),
+            python_plugin_runner(&source_root, &context.entry),
+            Vec::new(),
+            inputs,
+            workspace_id,
+            extra_env,
+            job_label.or_else(|| Some(format!("Liatir Python plugin: {plugin_name}"))),
+            job_kind,
+            Some(metadata),
+        )
+        .await;
+    }
+
+    // ── Node runtime (default): extract index.js and spawn node ────────────
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let temp_dir = std::env::temp_dir().join(format!("liatir-run-{run_id}"));
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    // Extract index.js
+    {
+        let mut entry = zip.by_name("index.js")
+            .map_err(|_| "index.js not found in bundle".to_string())?;
+        let mut buf = Vec::new();
+        entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        std::fs::write(temp_dir.join("index.js"), buf).map_err(|e| e.to_string())?;
+    }
+
+    // Write runner shim
+    std::fs::write(temp_dir.join("_runner.mjs"), RUNNER)
+        .map_err(|e| e.to_string())?;
+
+    let inputs_json = serde_json::to_string(&inputs).map_err(|e| e.to_string())?;
+    let cwd = temp_dir.to_string_lossy().to_string();
+
+    super::jobs::lia_jobs_spawn_with_cleanup(
+        app,
+        "node".to_string(),
+        vec!["_runner.mjs".to_string(), inputs_json],
+        Some(cwd),
+        options.workspace_id,
+        options.env,
+        options.job_label.or_else(|| Some("Liatir plugin run".to_string())),
+        Some(options.job_kind),
+        options.metadata,
+        None,
+        Some(temp_dir.to_string_lossy().to_string()),
+    ).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn manifest(python: Value) -> Value {
+        json!({
+            "name": "Demo Plugin",
+            "version": "1.0.0",
+            "runtime": "python",
+            "python": python,
+        })
+    }
+
+    #[test]
+    fn python_env_id_is_stable_across_code_only_changes() {
+        // The env id is keyed on the dependency spec, NOT on bundle bytes, so
+        // code-only edits (different entry, different sources) reuse the venv.
+        let a = python_env_id_for_manifest(&manifest(json!({
+            "entry": "python/main.py",
+            "requirements": ["colorama==0.4.6"],
+        })))
+        .unwrap();
+        let b = python_env_id_for_manifest(&manifest(json!({
+            "entry": "python/other.py",
+            "requirements": ["colorama==0.4.6"],
+        })))
+        .unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn python_env_id_changes_when_dependencies_change() {
+        let base = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.6"],
+        })))
+        .unwrap();
+        let bumped = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.5"],
+        })))
+        .unwrap();
+        let with_packages = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.6"],
+            "packages": [{ "package": "numpy" }],
+        })))
+        .unwrap();
+        let with_python_requirement = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.6"],
+            "pythonRequirement": { "minVersion": "3.11" },
+        })))
+        .unwrap();
+        assert_ne!(base, bumped);
+        assert_ne!(base, with_packages);
+        assert_ne!(base, with_python_requirement);
+    }
+
+    #[test]
+    fn canonical_digest_matches_cli_signing_digest() {
+        // Fixed input; expected hex computed by the CLI's bundleSigningDigest
+        // (signing.ts). If either side changes the formula, this breaks.
+        let rows = vec![
+            ("_sig".to_string(), b"LIATIR/1".to_vec()),
+            ("manifest.json".to_string(), b"{}".to_vec()),
+            ("python/main.py".to_string(), b"x=1\n".to_vec()),
+        ];
+        assert_eq!(
+            hex_lower(&canonical_digest_from_rows(&rows)),
+            "efa4ba1296535072c771119a233b874990c006d8deda526e4390cbbb5e4a82b6"
+        );
+    }
+
+    #[test]
+    fn canonical_digest_is_order_independent() {
+        let a = vec![
+            ("b.txt".to_string(), b"two".to_vec()),
+            ("a.txt".to_string(), b"one".to_vec()),
+        ];
+        let b = vec![
+            ("a.txt".to_string(), b"one".to_vec()),
+            ("b.txt".to_string(), b"two".to_vec()),
+        ];
+        assert_eq!(canonical_digest_from_rows(&a), canonical_digest_from_rows(&b));
+    }
+
+    /// Joins path segments the way Windows does, counting the separators.
+    fn windows_path_len(segments: &[&str]) -> usize {
+        segments.iter().map(|s| s.len()).sum::<usize>() + segments.len().saturating_sub(1)
+    }
+
+    /// The Windows path budget, measured end to end rather than assumed.
+    ///
+    /// A managed environment lives at `<local app data>/<root>/<env id>/venv/Lib/site-packages/`,
+    /// and the deepest file pip installs into it is setuptools' bundled test data. Windows caps a
+    /// user name at 20 characters, so the budget has to cover that with room to spare. Under the
+    /// roaming data root it allowed seven, which is why creating an environment failed for most
+    /// real profiles.
+    #[test]
+    fn python_env_paths_fit_the_windows_limit_for_any_real_user_name() {
+        const WINDOWS_MAX_PATH: usize = 259;
+        const MAX_WINDOWS_USER_NAME: usize = 20;
+
+        let id = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.6"],
+        })))
+        .unwrap();
+
+        // The empty segment stands in for the user name, whose length is what this measures.
+        let without_user_name = windows_path_len(&[
+            "C:",
+            "Users",
+            "",
+            "AppData",
+            "Local",
+            "app.liatir.app",
+            crate::bridge::python_env::env_root_segment(PYTHON_PLUGIN_ENV_ROOT, true),
+            &id,
+            "venv",
+            "Lib",
+            "site-packages",
+            "pkg_resources",
+            "tests",
+            "data",
+            "my-test-package_unpacked-egg",
+            "my_test_package-1.0-py3.7.egg",
+            "EGG-INFO",
+            "dependency_links.txt",
+        ]);
+        let room_for_user_name = WINDOWS_MAX_PATH - without_user_name;
+
+        assert!(
+            room_for_user_name >= MAX_WINDOWS_USER_NAME,
+            "only {room_for_user_name} characters left for the user name; Windows allows up to {MAX_WINDOWS_USER_NAME}",
+        );
+    }
+
+    #[test]
+    fn python_env_id_stays_within_env_id_limits() {
+        // env ids must pass python_env::validate_env_id (alnum/-/_, len <= 80).
+        let id = python_env_id_for_manifest(&manifest(json!({
+            "requirements": ["colorama==0.4.6"],
+        })))
+        .unwrap();
+        assert!(id.len() <= 80, "env id too long: {id}");
+        // Windows MAX_PATH is a shared budget and this segment is one of the few the product owns.
+        assert!(id.len() <= 46, "env id spends too much of the Windows path budget: {id}");
+        assert!(id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+    }
+}

@@ -1,0 +1,55 @@
+resources:
+  apps:
+    genesis_workbench_app:
+      name: ${var.app_name}
+      description: 'UI For Genesis Workbench'
+
+      # The location of the source code for the app
+      source_code_path: ../app
+
+      # The resources in the bundle which this app has access to. This binds the resource in the app with the bundle resource.
+      resources:
+        - name: "sql_warehouse"
+          sql_warehouse:
+            id: ${var.sql_warehouse_id}
+            permission: "CAN_USE"
+
+        - name: "core_catalog_name"
+          secret:
+            key: "core_catalog_name"
+            scope: ${var.secret_scope_name}
+            permission: "READ"
+
+        - name: "core_schema_name"
+          secret:
+            key: "core_schema_name"
+            scope: ${var.secret_scope_name}
+            permission: "READ"
+
+        - name: "dev_user_prefix"
+          secret:
+            key: "dev_user_prefix"
+            scope: ${var.secret_scope_name}
+            permission: "READ"
+
+        - name: "deploy_model_job"
+          job:
+            id: ${resources.jobs.deploy_model_job.id}
+            permission: "CAN_MANAGE_RUN"
+
+        - name: "start_all_endpoints_job"
+          job:
+            id: ${resources.jobs.start_all_endpoints_job.id}
+            permission: "CAN_MANAGE"
+
+        - name: "llm_endpoint"
+          serving_endpoint:
+            name: ${var.llm_endpoint_name}
+            permission: "CAN_QUERY"
+
+        - name: "narrative_llm_endpoint"
+          serving_endpoint:
+            name: ${var.narrative_llm_endpoint_name}
+            permission: "CAN_QUERY"
+
+

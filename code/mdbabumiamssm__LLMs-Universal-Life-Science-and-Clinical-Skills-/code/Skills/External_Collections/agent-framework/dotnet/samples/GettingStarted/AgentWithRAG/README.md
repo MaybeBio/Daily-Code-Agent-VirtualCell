@@ -1,0 +1,26 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Agent Framework Retrieval Augmented Generation (RAG)
+
+These samples show how to create an agent with the Agent Framework that uses Retrieval Augmented Generation (RAG) to enhance its responses with information from a knowledge base.
+
+|Sample|Description|
+|---|---|
+|[Basic Text RAG](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentWithRAG/AgentWithRAG_Step01_BasicTextRAG)|This sample demonstrates how to create and run a basic agent with simple text Retrieval Augmented Generation (RAG).|
+|[RAG with Vector Store and custom schema](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentWithRAG/AgentWithRAG_Step02_CustomVectorStoreRAG)|This sample demonstrates how to create and run an agent that uses Retrieval Augmented Generation (RAG) with a vector store. It also uses a custom schema for the documents stored in the vector store.|
+|[RAG with custom RAG data source](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentWithRAG/AgentWithRAG_Step03_CustomRAGDataSource)|This sample demonstrates how to create and run an agent that uses Retrieval Augmented Generation (RAG) with a custom RAG data source.|
+|[RAG with Foundry VectorStore service](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentWithRAG/AgentWithRAG_Step04_FoundryServiceRAG)|This sample demonstrates how to create and run an agent that uses Retrieval Augmented Generation (RAG) with the Foundry VectorStore service.|
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

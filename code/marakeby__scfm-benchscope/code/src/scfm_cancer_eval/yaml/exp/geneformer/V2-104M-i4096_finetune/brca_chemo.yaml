@@ -1,0 +1,9 @@
+run_id: 'geneformer_V2-104M-i4096_finetune_brca_chemo'
+dataset:
+  - datasets/brca/chemo/cancer_cells.yaml
+model:
+  - models/geneformer/V2-104M-i4096_finetune.yaml
+embedding:
+    skip: True # dont excute this (embedding) step
+    viz: False
+    eval: False

@@ -1,0 +1,238 @@
+import { createHash } from 'node:crypto';
+
+const SEGMENT = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+const SHA256 = /^[a-f0-9]{64}$/;
+const VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/;
+const CUDA_VERSION = /^[1-9][0-9]*\.[0-9]+$/;
+const HOST_ENVIRONMENTS = new Set(['native', 'windows-wsl2']);
+const TARGET_ACCELERATORS = {
+  macos: { aarch64: ['metal', 'cpu'] },
+  linux: { x86_64: ['cpu', 'cuda'] },
+  windows: { x86_64: ['cpu', 'cuda'] },
+};
+
+function requireValue(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+/** Recursively sorts object keys so the fingerprint depends on content, not formatting or order. */
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+/**
+ * A content fingerprint of a signing policy.
+ *
+ * The deployed signer bakes `policy.json` into its running container at deploy time, so committing
+ * a new policy does not change the live service — only a redeploy does. Comparing this fingerprint
+ * from the live `/health` against the committed policy is how a release detects that the deployed
+ * policy is stale before it wastes a run on a `signing_rejected`. Both sides canonicalize first, so
+ * whitespace or key-order differences never produce a false mismatch.
+ */
+export function runtimeBoxPolicyFingerprint(policy) {
+  return createHash('sha256').update(JSON.stringify(canonicalize(policy))).digest('hex');
+}
+
+/** Returns the canonical target slug after enforcing the production target matrix. */
+export function runtimeBoxTargetId(target) {
+  requireValue(target && typeof target === 'object', 'target must be an object');
+  for (const field of ['platform', 'arch', 'accelerator']) {
+    requireValue(SEGMENT.test(target[field] ?? ''), `invalid target ${field}`);
+  }
+  requireValue(
+    TARGET_ACCELERATORS[target.platform]?.[target.arch]?.includes(target.accelerator),
+    'unsupported Runtime Box target',
+  );
+  if (target.accelerator === 'cuda') {
+    requireValue(typeof target.cudaVersion === 'string' && CUDA_VERSION.test(target.cudaVersion), 'invalid CUDA version');
+    return `${target.platform}-${target.arch}-cuda${target.cudaVersion}`;
+  }
+  requireValue(target.cudaVersion === undefined, 'CUDA version requires the CUDA accelerator');
+  return `${target.platform}-${target.arch}-${target.accelerator}`;
+}
+
+function allowedBox(policy, boxId) {
+  const box = policy.boxes.find((candidate) => candidate.boxId === boxId);
+  requireValue(box, `box is not approved: ${boxId}`);
+  return box;
+}
+
+function exactAssetUrl(policy, value, expectedPath) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('invalid asset URL');
+  }
+  requireValue(url.origin === policy.assetOrigin, 'asset URL origin is not approved');
+  requireValue(url.username === '' && url.password === '' && url.search === '' && url.hash === '', 'asset URL must not contain credentials, query, or fragment');
+  requireValue(url.pathname === `/${policy.objectPrefix}/${expectedPath}`, 'asset URL path does not match the immutable object identity');
+}
+
+function validateHostEnvironments(payload) {
+  const environments = payload.compatibility?.hostEnvironments;
+  if (environments === undefined) return;
+  requireValue(Array.isArray(environments) && environments.length > 0, 'host environments must be a non-empty array');
+  requireValue(new Set(environments).size === environments.length, 'host environments must be unique');
+  requireValue(environments.every((environment) => HOST_ENVIRONMENTS.has(environment)), 'invalid host environment');
+  requireValue(
+    !environments.includes('windows-wsl2') || payload.target.platform === 'linux',
+    'windows-wsl2 is only valid for Linux payloads',
+  );
+}
+
+/**
+ * A release may name files the installer downloads beside its archive (Scrollcase `embed: false`).
+ * Installations trust them as far as the signature goes, so the signer signs only the exact files the
+ * policy approves for the box — address, path, size, digest and mode — and no others.
+ */
+function validateOnDemandAssets(box, assets) {
+  if (assets === undefined) return;
+  requireValue(Array.isArray(assets) && assets.length > 0, 'on-demand assets must be a non-empty array');
+  const paths = new Set();
+  for (const asset of assets) {
+    const approved = (box.onDemandAssets ?? []).some((candidate) => candidate.url === asset?.url
+      && candidate.relativePath === asset.relativePath && candidate.sizeBytes === asset.sizeBytes
+      && candidate.sha256 === asset.sha256 && Boolean(candidate.executable) === Boolean(asset.executable));
+    requireValue(approved, `on-demand asset is not approved for this box: ${asset?.url}`);
+    requireValue(!paths.has(asset.relativePath), 'on-demand asset paths must be unique');
+    paths.add(asset.relativePath);
+  }
+}
+
+function validateRelease(policy, payload) {
+  const box = allowedBox(policy, payload.boxId);
+  // Scrollcase v3 carries a publisher's own identities as labels; Liatir signs both of its own.
+  requireValue(payload.labels?.model === box.modelId, 'model ID does not match signing policy');
+  requireValue(payload.labels?.runtime === box.runtimeId, 'runtime ID does not match signing policy');
+  requireValue(VERSION.test(payload.version ?? ''), 'invalid release version');
+  const target = runtimeBoxTargetId(payload.target);
+  requireValue(box.targets.includes(target), 'target is not approved for this box');
+  requireValue(payload.archive?.format === 'zip', 'only ZIP Runtime Boxes are approved');
+  requireValue(SHA256.test(payload.archive?.sha256 ?? ''), 'invalid archive SHA-256');
+  requireValue(Number.isSafeInteger(payload.archive?.sizeBytes) && payload.archive.sizeBytes > 0, 'invalid archive size');
+  if (payload.installedSizeBytes !== undefined) {
+    requireValue(
+      Number.isSafeInteger(payload.installedSizeBytes) && payload.installedSizeBytes > 0,
+      'invalid installed size',
+    );
+  }
+  validateHostEnvironments(payload);
+  validateOnDemandAssets(box, payload.assets);
+  exactAssetUrl(policy, payload.archive.url, `boxes/${payload.boxId}/${payload.version}/${target}/${payload.archive.sha256}.zip`);
+  requireValue(payload.provenance?.sourceTreeDirty === false, 'dirty source trees cannot be signed for production');
+  for (const field of ['scrollId', 'scrollVersion', 'builderRevision', 'sourceRevision', 'runtimeVersion', 'pixiVersion', 'dependencyLockSha256', 'builtAt']) {
+    requireValue(typeof payload.provenance?.[field] === 'string' && payload.provenance[field].length > 0, `missing provenance ${field}`);
+  }
+  requireValue(SHA256.test(payload.provenance.dependencyLockSha256), 'invalid dependency lock SHA-256');
+  requireValue(typeof payload.runtime?.entryPoint === 'string' && payload.runtime.entryPoint.length > 0, 'missing Python entry point');
+  requireValue(typeof payload.cacheSubdir === 'string' && payload.cacheSubdir.length > 0, 'missing model cache directory');
+  requireValue(Array.isArray(payload.selfTest?.probe?.imports) && payload.selfTest.probe.imports.length > 0, 'missing self-test imports');
+}
+
+function validateChannel(policy, payload) {
+  const box = allowedBox(policy, payload.boxId);
+  requireValue(policy.allowedChannels.includes(payload.channel), 'channel is not approved');
+  const target = runtimeBoxTargetId(payload.target);
+  requireValue(box.targets.includes(target), 'target is not approved for this box');
+  requireValue(typeof payload.updatedAt === 'string' && payload.updatedAt.length > 0, 'missing channel update time');
+  requireValue(typeof payload.cohortSalt === 'string' && /^[a-f0-9]{32}$/.test(payload.cohortSalt), 'invalid cohort salt');
+  requireValue(Array.isArray(payload.releases) && payload.releases.length > 0 && payload.releases.length <= 10, 'channel must contain 1 to 10 releases');
+  const versions = new Set();
+  for (const release of payload.releases) {
+    requireValue(VERSION.test(release?.version ?? ''), 'invalid channel release version');
+    requireValue(!versions.has(release.version), 'channel release versions must be unique');
+    versions.add(release.version);
+    requireValue(Number.isInteger(release.rolloutPercentage) && release.rolloutPercentage >= 1 && release.rolloutPercentage <= 100, 'invalid rollout percentage');
+    let releaseUrl;
+    try {
+      releaseUrl = new URL(release.releaseManifestUrl);
+    } catch {
+      throw new Error('invalid release manifest URL');
+    }
+    const prefix = `boxes/${payload.boxId}/${release.version}/${target}/`;
+    requireValue(releaseUrl.pathname.startsWith(`/${policy.objectPrefix}/${prefix}`), 'release manifest path does not match channel identity');
+    const name = releaseUrl.pathname.slice(`/${policy.objectPrefix}/${prefix}`.length);
+    requireValue(/^[a-f0-9]{64}\.release\.json$/.test(name), 'release manifest URL is not immutable');
+    exactAssetUrl(policy, release.releaseManifestUrl, `${prefix}${name}`);
+  }
+}
+
+function validateRevocations(policy, payload) {
+  requireValue(typeof payload.updatedAt === 'string' && payload.updatedAt.length > 0, 'missing revocations update time');
+  requireValue(Array.isArray(payload.revocations) && payload.revocations.length > 0 && payload.revocations.length <= 100, 'revocations must contain 1 to 100 entries');
+  for (const revocation of payload.revocations) {
+    const box = allowedBox(policy, revocation?.boxId);
+    requireValue(VERSION.test(revocation.version ?? ''), 'invalid revoked version');
+    requireValue(typeof revocation.reason === 'string' && revocation.reason.trim().length >= 8, 'revocation reason is too short');
+    requireValue(typeof revocation.revokedAt === 'string' && revocation.revokedAt.length > 0, 'missing revocation time');
+    if (revocation.target) requireValue(box.targets.includes(runtimeBoxTargetId(revocation.target)), 'revocation target is not approved');
+  }
+}
+
+function validateReferenceIndexCatalog(policy, payload) {
+  requireValue(typeof payload.updatedAt === 'string' && payload.updatedAt.length > 0, 'missing index catalog update time');
+  requireValue(Array.isArray(payload.indexes) && payload.indexes.length > 0 && payload.indexes.length <= 200, 'index catalog must contain 1 to 200 entries');
+  const identities = new Set();
+  for (const entry of payload.indexes) {
+    const approved = policy.referenceIndexes?.find((candidate) =>
+      candidate.id === entry?.id && candidate.version === entry?.version);
+    requireValue(approved, `reference index is not approved: ${entry?.id} ${entry?.version}`);
+    const identity = `${entry.id}@${entry.version}`;
+    requireValue(!identities.has(identity), 'reference index versions must be unique');
+    identities.add(identity);
+    requireValue(entry.label === approved.label, 'reference index label does not match signing policy');
+    requireValue(entry.species?.commonName === approved.commonName, 'reference index common name does not match signing policy');
+    requireValue(entry.species?.scientificName === approved.scientificName, 'reference index scientific name does not match signing policy');
+    requireValue(entry.species?.taxonId === approved.taxonId, 'reference index species does not match signing policy');
+    requireValue(entry.genome?.assembly === approved.assembly, 'reference index assembly does not match signing policy');
+    requireValue(entry.annotation?.provider === approved.annotationProvider, 'reference index annotation provider does not match signing policy');
+    requireValue(entry.annotation?.release === approved.annotationRelease, 'reference index annotation release does not match signing policy');
+    requireValue(entry.annotation?.format === approved.annotationFormat, 'reference index annotation format is not approved');
+    requireValue(entry.referenceType === approved.referenceType, 'reference index construction does not match signing policy');
+    requireValue(entry.readLength === approved.readLength, 'reference index read length does not match signing policy');
+    requireValue(entry.genome?.source?.url === approved.genomeUrl, 'reference genome URL does not match signing policy');
+    requireValue(entry.genome?.source?.checksum?.value === approved.genomeChecksum, 'reference genome checksum does not match signing policy');
+    requireValue(entry.genome?.source?.checksum?.algorithm === approved.genomeChecksumAlgorithm, 'reference genome checksum algorithm does not match signing policy');
+    requireValue(entry.annotation?.source?.url === approved.annotationUrl, 'reference annotation URL does not match signing policy');
+    requireValue(entry.annotation?.source?.checksum?.value === approved.annotationChecksum, 'reference annotation checksum does not match signing policy');
+    requireValue(entry.annotation?.source?.checksum?.algorithm === approved.annotationChecksumAlgorithm, 'reference annotation checksum algorithm does not match signing policy');
+    requireValue(entry.toolchain?.simpleafVersion === approved.simpleafVersion, 'simpleaf version does not match signing policy');
+    requireValue(entry.toolchain?.piscemVersion === approved.piscemVersion, 'piscem version does not match signing policy');
+    requireValue(entry.toolchain?.nativeToolsLockSha256 === approved.nativeToolsLockSha256, 'Native Tools lock does not match signing policy');
+    requireValue(entry.provenance?.recipeSha256 === approved.recipeSha256, 'reference-index recipe does not match signing policy');
+    requireValue(typeof entry.provenance?.sourceRevision === 'string' && /^[a-f0-9]{40}$/.test(entry.provenance.sourceRevision), 'invalid reference-index source revision');
+    requireValue(typeof entry.provenance?.builtAt === 'string' && entry.provenance.builtAt.length > 0, 'missing reference-index build time');
+    requireValue(entry.archive?.format === 'zip', 'only ZIP reference indexes are approved');
+    requireValue(SHA256.test(entry.archive?.sha256 ?? ''), 'invalid reference-index archive SHA-256');
+    requireValue(Number.isSafeInteger(entry.archive?.sizeBytes) && entry.archive.sizeBytes > 0, 'invalid reference-index archive size');
+    exactAssetUrl(
+      policy,
+      entry.archive.url,
+      `reference-indexes/${entry.id}/${entry.version}/${entry.archive.sha256}.zip`,
+    );
+  }
+}
+
+// Each kind carries its own schema version. The Runtime Box documents follow Scrollcase's box format;
+// the reference-index catalog is Liatir's own format, which the app and the Registry still read as
+// version 2, so moving the boxes to version 3 must not move it.
+const SIGNABLE_DOCUMENTS = new Map([
+  ['liatir.runtime-box.release', { schemaVersion: 3, validate: validateRelease }],
+  ['liatir.runtime-box.channel', { schemaVersion: 3, validate: validateChannel }],
+  ['liatir.runtime-box.revocations', { schemaVersion: 3, validate: validateRevocations }],
+  ['liatir.single-cell-index.catalog', { schemaVersion: 2, validate: validateReferenceIndexCatalog }],
+]);
+
+/** Validate the exact payload before KMS is allowed to sign it. */
+export function validateSigningPayload(policy, payload) {
+  requireValue(payload && typeof payload === 'object' && !Array.isArray(payload), 'payload must be an object');
+  const document = SIGNABLE_DOCUMENTS.get(payload.kind);
+  requireValue(document, 'document kind is not signable');
+  requireValue(payload.schemaVersion === document.schemaVersion, 'unsupported Runtime Box schema');
+  document.validate(policy, payload);
+}

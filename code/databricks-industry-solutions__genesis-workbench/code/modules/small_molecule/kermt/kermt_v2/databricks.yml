@@ -1,0 +1,42 @@
+bundle:
+  name: genesis_workbench_kermt
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/*.yml
+
+# Per-cloud targets. Jobs run on serverless compute (register_kermt on serverless
+# CPU cpu_env; kermt_finetune/kermt_deploy on serverless GPU gpu_env / GPU_1xA10) —
+# no classic job_clusters, so no per-cloud cluster overrides are needed.
+targets:
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}

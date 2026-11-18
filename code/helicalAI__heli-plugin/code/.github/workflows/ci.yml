@@ -1,0 +1,26 @@
+name: ci
+
+# push is scoped to develop: a feature branch with an open PR fires both events
+# otherwise, and every run is duplicated. main runs this through release.yml
+# (workflow_call), so the release waits on it and it runs once per push.
+on:
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_call:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+      - run: npm i -g @openai/codex@0.153.0     # pin — CLI changes shouldn't break your CI
+
+      - run: npm i -g @anthropic-ai/claude-code@2.1.281     # pin, same reason as codex
+
+      # The same gate as a local `make check`: unit tests, strict validation, and a
+      # round-trip through both loaders, with their config homes under the runner temp.
+      - run: make check TMP_DIR="$RUNNER_TEMP/heli-plugin"

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zebrafish Retina Simulation</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="model.js"></script>
+  <script defer src="viewer.js"></script>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">DANIO RERIO / LARVAL RETINA</div>
+      <h1>Zebrafish retina simulation</h1>
+      <p>Follow a light stimulus from cones to ganglion cells and test how a simulated <i>synj1</i> perturbation changes the response.</p>
+      <div class="model-note">Schematic patch at ~6 dpf · Synthetic wiring and activity · Parameters have yet to be fitted to recordings</div>
+    </header>
+
+    <section class="controls" aria-label="Simulation controls">
+      <label>Light stimulus
+        <select id="stimulus"><option value="white">Broadband flash</option><option value="uv">UV flash</option><option value="bar">Moving bright bar</option></select>
+      </label>
+      <label>Perturbation
+        <select id="mode"><option value="synaptic">Transmission only</option><option value="contacts" selected>Transmission + contact loss</option></select>
+      </label>
+      <label><span>Transmission effect <output id="stressValue">65%</output></span>
+        <input id="stress" type="range" min="0" max="100" value="65">
+      </label>
+      <label><span>Contact loss probability <output id="lossValue">40%</output></span>
+        <input id="loss" type="range" min="0" max="100" value="40" aria-describedby="contact-model">
+      </label>
+    </section>
+
+    <section class="retina-section" aria-labelledby="retina-heading">
+      <div class="section-head">
+        <div><h2 id="retina-heading">Retinal architecture</h2><p id="contact-model">Contact loss applies to modeled invaginating contacts. Drag either patch to rotate both.</p></div>
+        <div class="view-controls">
+          <label>Show <select id="connections"><option value="anatomy">Anatomical contacts</option><option value="effective">Transmission strength</option><option value="none">Cells only</option></select></label>
+          <button id="resetView" type="button">Reset view</button>
+        </div>
+      </div>
+      <div class="comparison">
+        <article class="retina-card">
+          <div class="card-head"><h3><span class="tag wild"></span>Wild type</h3><span id="wildCount"></span></div>
+          <canvas id="wildCanvas" class="retina-canvas" aria-label="Rotatable wild-type retinal patch"></canvas>
+        </article>
+        <article class="retina-card">
+          <div class="card-head"><h3><span class="tag mutant"></span>Simulated <i>synj1</i></h3><span id="mutantCount"></span></div>
+          <canvas id="mutantCanvas" class="retina-canvas" aria-label="Rotatable perturbed retinal patch"></canvas>
+        </article>
+      </div>
+      <div class="legend-row" id="cellLegend"></div>
+    </section>
+
+    <section class="playback" aria-label="Stimulus playback">
+      <button id="play" type="button">Play</button>
+      <output id="timeValue" for="time">700 ms</output>
+      <input id="time" type="range" min="0" max="2200" step="10" value="700" aria-label="Simulation time">
+      <span id="lightState" class="light-state">Light on</span>
+    </section>
+
+    <div class="results">
+      <section class="panel" aria-labelledby="activity-heading">
+        <div class="section-head"><div><h2 id="activity-heading">Neuronal activity</h2><p>Shading marks the stimulus interval.</p></div><label>Trace <select id="trace"></select></label></div>
+        <div class="trace-legend"><span><i class="tag wild"></i>Wild type</span><span><i class="tag mutant"></i>Simulated <i>synj1</i></span></div>
+        <canvas id="traceCanvas" aria-label="Time series comparing wild-type and simulated mutant responses"></canvas>
+        <div id="metrics" class="metrics"></div>
+      </section>
+
+      <section class="panel wiring" aria-labelledby="wiring-heading">
+        <div class="section-head"><div><h2 id="wiring-heading">Connectivity</h2><p id="matrixNote">Active contacts by source and target.</p></div>
+          <label>Matrix <select id="matrixView"><option value="anatomy">Contact count</option><option value="effective">Mean |gain|</option></select></label>
+        </div>
+        <div id="matrix" class="matrix-wrap"></div>
+        <p id="matrixReadout" class="matrix-readout" aria-live="polite"></p>
+      </section>
+    </div>
+
+    <details>
+      <summary>Model assumptions and sources</summary>
+      <p>The patch uses seeded synthetic positions and nearest-neighbor contacts within retinal layers. Each cell integrates signed inputs in 10 ms steps. Cones reduce release under light, ON bipolar cells invert that change, and OFF bipolar cells preserve its sign and adapt to sustained input. Ganglion rates are illustrative. Cell brightness shows the magnitude of change from baseline.</p>
+      <p>The <i>synj1</i> presets weaken and slow cone output. The contact-loss option also removes a seeded fraction of modeled invaginating contacts. The sliders set model parameters. Gain values are dimensionless, and the matrix averages their absolute values over all baseline contacts in each pathway, counting removed contacts as zero.</p>
+      <p>References for the anatomy and direction of the phenotype <a href="https://doi.org/10.7554/eLife.67851">outer-retina anatomy</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6729946/"><i>synj1</i> ribbon phenotype</a> · <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC2141919/">mutant ganglion cell responses</a></p>
+    </details>
+  </main>
+</body>
+</html>

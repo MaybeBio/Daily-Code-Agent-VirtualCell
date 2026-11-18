@@ -1,0 +1,62 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+## 📨 Chat with Gmail Inbox 
+
+### 🎓 FREE Step-by-Step Tutorial 
+**👉 [Click here to follow our complete step-by-step tutorial](https://www.theunwindai.com/p/build-rag-app-to-chat-with-your-gmail-inbox) and learn how to build this from scratch with detailed code walkthroughs, explanations, and best practices.**
+
+LLM app with RAG to chat with Gmail in just 30 lines of Python Code. The app uses Retrieval Augmented Generation (RAG) to provide accurate answers to questions based on the content of your Gmail Inbox.
+
+### Features
+
+- Connect to your Gmail Inbox
+- Ask questions about the content of your emails
+- Get accurate answers using RAG and the selected LLM
+
+### Installation
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/Shubhamsaboo/awesome-llm-apps.git
+cd advanced_llm_apps/chat_with_X_tutorials/chat_with_gmail
+```
+2. Install the required dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up your Google Cloud project and enable the Gmail API:
+
+- Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+- Navigate to "APIs & Services > OAuth consent screen" and configure the OAuth consent screen.
+- Publish the OAuth consent screen by providing the necessary app information.
+- Enable the Gmail API and create OAuth client ID credentials.
+- Download the credentials in JSON format and save them as `credentials.json` in your working directory.
+
+4. Get your OpenAI API Key
+
+- Sign up for an [OpenAI account](https://platform.openai.com/) (or the LLM provider of your choice) and obtain your API key.
+
+4. Run the Streamlit App
+
+```bash
+streamlit run chat_gmail.py
+```
+
+
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

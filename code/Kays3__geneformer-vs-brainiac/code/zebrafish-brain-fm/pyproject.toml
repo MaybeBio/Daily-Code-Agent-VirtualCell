@@ -1,0 +1,15 @@
+[project]
+name = "zebrafish-brain-fm"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "anndata>=0.12.19",
+    "datasets>=5.2.0",
+    "neuroworkflow",
+    "scanpy>=1.11.5",
+    "torch>=2.15.0",
+    "transformers>=5.23.0",
+]
+
+[tool.uv.sources]
+neuroworkflow = { git = "https://github.com/oist/neuro-workflow.git" }

@@ -1,0 +1,8 @@
+# Transfer to an unseen tissue context.
+name: tissue_held_out
+val: 0.15
+test: 0.2
+seed: ${seed}
+stratify_key: null
+min_groups: 3
+allow_fabricated: false

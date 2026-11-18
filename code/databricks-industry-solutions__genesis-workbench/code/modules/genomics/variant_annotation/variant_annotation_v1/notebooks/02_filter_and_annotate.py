@@ -1,0 +1,256 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC ### Filter Gene Regions & Annotate with ClinVar
+# MAGIC Filters variants to specified gene regions (e.g., BRCA1/BRCA2), then
+# MAGIC joins with ClinVar to add clinical significance annotations and
+# MAGIC identify pathogenic variants.
+
+# COMMAND ----------
+
+dbutils.widgets.text("catalog", "genesis_workbench", "Catalog")
+dbutils.widgets.text("schema", "genesis_schema", "Schema")
+dbutils.widgets.text("sql_warehouse_id", "w123", "SQL Warehouse Id")
+dbutils.widgets.text("variants_table", "", "Variants Table (from spike step)")
+dbutils.widgets.text("gene_regions", '[{"name":"BRCA1","contig":"chr17","start":43044292,"end":43170327},{"name":"BRCA2","contig":"chr13","start":32315086,"end":32400268}]', "Gene Regions JSON")
+dbutils.widgets.text("gene_panel_mode", "custom", "Gene Panel Mode (custom or acmg)")
+dbutils.widgets.text("mlflow_run_id", "", "MLflow Run ID")
+dbutils.widgets.text("run_name", "", "Run Name")
+dbutils.widgets.text("user_email", "a@b.com", "User Email")
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+# COMMAND ----------
+
+# MAGIC %pip install databricks-sdk==0.50.0 databricks-sql-connector==4.0.3 mlflow==2.22.0
+
+# COMMAND ----------
+
+gwb_library_path = None
+libraries = dbutils.fs.ls(f"/Volumes/{catalog}/{schema}/libraries")
+for lib in libraries:
+    if lib.name.startswith("genesis_workbench"):
+        gwb_library_path = lib.path.replace("dbfs:", "")
+
+# COMMAND ----------
+
+# MAGIC %pip install {gwb_library_path} --force-reinstall
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+sql_warehouse_id = dbutils.widgets.get("sql_warehouse_id")
+variants_table = dbutils.widgets.get("variants_table")
+gene_regions_json = dbutils.widgets.get("gene_regions")
+gene_panel_mode = dbutils.widgets.get("gene_panel_mode")
+mlflow_run_id = dbutils.widgets.get("mlflow_run_id")
+run_name = dbutils.widgets.get("run_name")
+user_email = dbutils.widgets.get("user_email")
+
+# COMMAND ----------
+
+from genesis_workbench.workbench import initialize
+databricks_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+initialize(core_catalog_name=catalog, core_schema_name=schema, sql_warehouse_id=sql_warehouse_id, token=databricks_token)
+
+# COMMAND ----------
+
+import json
+import mlflow
+import pyspark.sql.functions as F
+from functools import reduce
+import re
+
+mlflow.set_registry_uri("databricks-uc")
+mlflow.set_tracking_uri("databricks")
+
+
+def _sanitize_run_name(name: str) -> str:
+    safe = re.sub(r"[^a-z0-9_]", "_", (name or "").lower())
+    safe = re.sub(r"_+", "_", safe).strip("_")
+    return safe[:40] if safe else "unnamed"
+
+
+def per_run_table(base: str, run_name: str, mlflow_run_id: str) -> str:
+    """Deterministic per-run table name. Each run owns its own tables, so
+    Glow's VCF-INFO struct-shape drift can never collide across runs."""
+    return f"{base}__{_sanitize_run_name(run_name)}_{(mlflow_run_id or 'norun')[:8]}"
+
+
+def write_per_run_table(df, table):
+    df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(table)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Filter variants to gene regions
+
+# COMMAND ----------
+
+# Per-run input from notebook 01.
+source_table = per_run_table(
+    f"{catalog}.{schema}.variant_annotation_variants_with_pathogenic",
+    run_name, mlflow_run_id,
+)
+vcf_df = spark.table(source_table)
+
+use_acmg = gene_panel_mode.strip().lower() == "acmg"
+
+if use_acmg:
+    # ACMG mode: spatial join against the gene panel Delta table
+    gene_panel = spark.table(f"{catalog}.{schema}.acmg_gene_panel")
+    panel_gene_count = gene_panel.select("name").distinct().count()
+
+    gene_variants = vcf_df.join(
+        gene_panel,
+        (vcf_df.contigName == gene_panel.chrom) &
+        (vcf_df.start >= gene_panel.chromStart) &
+        (vcf_df.start <= gene_panel.chromEnd),
+        "inner"
+    )
+
+    # Rename 'name' from BED table to 'gene' for consistency
+    gene_variants = gene_variants.withColumnRenamed("name", "gene")
+
+    print(f"ACMG mode: filtering against {panel_gene_count} genes from gene panel table")
+
+else:
+    # Custom mode: use JSON-based coordinate filtering (original behavior)
+    gene_regions = json.loads(gene_regions_json)
+
+    region_filters = []
+    for region in gene_regions:
+        region_filter = (
+            (F.col("contigName") == region["contig"]) &
+            (F.col("start") >= region["start"]) &
+            (F.col("end") <= region["end"])
+        )
+        region_filters.append(region_filter)
+
+    combined_filter = reduce(lambda a, b: a | b, region_filters)
+    gene_variants = vcf_df.where(combined_filter)
+
+    # Add gene name based on region
+    gene_case = F.when(F.lit(False), F.lit(""))
+    for region in gene_regions:
+        gene_case = gene_case.when(
+            (F.col("contigName") == region["contig"]) &
+            (F.col("start") >= region["start"]) &
+            (F.col("end") <= region["end"]),
+            F.lit(region["name"])
+        )
+    gene_case = gene_case.otherwise(F.lit("Unknown"))
+
+    gene_variants = gene_variants.withColumn("gene", gene_case)
+    panel_gene_count = len(gene_regions)
+
+# Add derived columns (shared by both modes)
+gene_variants = gene_variants.withColumn(
+    "chromosome", F.col("contigName")
+).withColumn(
+    "ref", F.col("referenceAllele")
+).withColumn(
+    "alt", F.col("alternateAlleles")[0]
+).withColumn(
+    "zygosity",
+    F.when(
+        F.col("genotypes")[0]["calls"][0] == F.col("genotypes")[0]["calls"][1],
+        F.lit("Homozygous Alt")
+    ).otherwise(F.lit("Heterozygous"))
+)
+
+gene_variant_count = gene_variants.count()
+print(f"Found {gene_variant_count} variants in {panel_gene_count} gene region(s)")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Annotate with ClinVar
+
+# COMMAND ----------
+
+clinvar_table = f"{catalog}.{schema}.clinvar_variants"
+clinvar_df = spark.table(clinvar_table)
+
+# Join variants with ClinVar (handle chr prefix mismatch)
+joined = gene_variants.alias("gv").join(
+    clinvar_df.alias("cv"),
+    (F.regexp_replace(F.col("gv.contigName"), "chr", "") == F.col("cv.contigName")) &
+    (F.col("gv.start") == F.col("cv.start")) &
+    (F.col("gv.referenceAllele") == F.col("cv.referenceAllele")) &
+    (F.col("gv.alternateAlleles")[0] == F.col("cv.alternateAlleles")[0]),
+    "left_outer"
+)
+
+select_cols = [
+    F.col("gv.gene"),
+]
+# Include category/condition columns from BED table when in ACMG mode
+if use_acmg:
+    select_cols.append(F.col("gv.category"))
+    select_cols.append(F.col("gv.condition"))
+
+select_cols.extend([
+    F.col("gv.chromosome"),
+    F.col("gv.start"),
+    F.col("gv.ref"),
+    F.col("gv.alt"),
+    F.col("gv.zygosity"),
+    F.col("gv.qual"),
+    F.col("cv.INFO_CLNSIG").alias("clinical_significance"),
+    F.col("cv.INFO_CLNDN").alias("disease_name"),
+    F.col("cv.INFO_CLNVI").alias("variant_ids"),
+    F.col("gv.genotypes"),
+])
+
+annotated = joined.select(*select_cols)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC #### Save annotated variants and identify pathogenic
+
+# COMMAND ----------
+
+clinical_annotated_table = per_run_table(
+    f"{catalog}.{schema}.variant_annotation_clinical_annotated",
+    run_name, mlflow_run_id,
+)
+write_per_run_table(annotated, clinical_annotated_table)
+
+# Filter pathogenic variants
+pathogenic = annotated.where(
+    F.array_contains(F.col("clinical_significance"), "Pathogenic") |
+    F.array_contains(F.col("clinical_significance"), "Likely_pathogenic")
+)
+
+pathogenic_table = per_run_table(
+    f"{catalog}.{schema}.variant_annotation_pathogenic",
+    run_name, mlflow_run_id,
+)
+write_per_run_table(pathogenic, pathogenic_table)
+
+pathogenic_count = spark.table(pathogenic_table).count()
+annotated_count = spark.table(clinical_annotated_table).count()
+
+# COMMAND ----------
+
+with mlflow.start_run(run_id=mlflow_run_id) as run:
+    mlflow.log_param("gene_panel_mode", gene_panel_mode)
+    if use_acmg:
+        mlflow.log_param("gene_panel", "ACMG_SFv3.2")
+    else:
+        mlflow.log_param("gene_regions", gene_regions_json)
+    mlflow.log_param("clinvar_table", clinvar_table)
+    mlflow.log_param("annotated_table", clinical_annotated_table)
+    mlflow.log_param("pathogenic_table", pathogenic_table)
+    mlflow.log_metric("gene_region_variants", annotated_count)
+    mlflow.log_metric("pathogenic_variants", pathogenic_count)
+    mlflow.set_tag("run_name", run_name)
+    mlflow.set_tag("annotated_table", clinical_annotated_table)
+    mlflow.set_tag("pathogenic_table", pathogenic_table)
+    mlflow.set_tag("job_status", "annotation_complete")
+
+print(f"Annotation complete: {annotated_count} annotated, {pathogenic_count} pathogenic")

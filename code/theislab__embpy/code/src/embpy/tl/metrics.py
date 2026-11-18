@@ -1,0 +1,907 @@
+"""Evaluation metrics for perturbation prediction.
+
+Provides standalone metric functions, a scanpy DEG wrapper, and biological
+evaluation tools for comparing predicted vs. observed expression.
+
+**Regression metrics** (operate on numpy arrays):
+
+- :func:`mse`, :func:`r2`, :func:`mean_correlation`
+- :func:`delta_l2` — L2-norm shift from control
+- :func:`compute_metrics` — aggregate dictionary of all the above
+
+**Biological metrics** (expression-level):
+
+- :func:`gene_r2`, :func:`perturbation_r2`
+- :func:`frac_correct_direction`
+
+**Differential expression** (scanpy wrappers + comparison):
+
+- :func:`rank_genes_groups` — thin wrapper around ``sc.tl.rank_genes_groups``
+- :func:`get_deg_dataframe` — extract a filtered DEG table
+- :func:`deg_overlap` — Jaccard / precision / recall of top DEG lists
+- :func:`deg_direction_agreement` — fraction of shared DEGs with matching sign
+- :func:`compare_deg` — high-level function running both comparisons
+
+**cell-eval wrapper** (requires ``cell-eval`` package):
+
+- :func:`cell_eval` — thin wrapper around ``cell_eval.MetricsEvaluator``
+
+**Phenocopy metrics** (PRESAGE-inspired, cosine-similarity-based):
+
+- :func:`phenocopy_score` — low-level numpy function
+- :func:`phenocopy_score_adata` — high-level AnnData convenience wrapper
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any, Literal
+
+import numpy as np
+import pandas as pd
+from anndata import AnnData
+from scipy.stats import median_abs_deviation, pearsonr, spearmanr
+from sklearn.decomposition import PCA
+from sklearn.metrics import mean_squared_error, r2_score, roc_auc_score
+from sklearn.metrics.pairwise import cosine_similarity
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _require_scanpy():
+    """Lazily import scanpy, raising a clear error if missing."""
+    try:
+        import scanpy as sc
+
+        return sc
+    except ImportError as e:
+        raise ImportError(
+            "scanpy is required for this function but is not installed. Install it with:  pip install 'embpy[scanpy]'"
+        ) from e
+
+
+def _require_cell_eval():
+    """Lazily import cell_eval, raising a clear error if missing."""
+    try:
+        import cell_eval
+
+        return cell_eval
+    except ImportError as e:
+        raise ImportError(
+            "cell-eval is required for this function but is not installed. Install it with:  pip install cell-eval"
+        ) from e
+
+
+def _safe_pearson(a: np.ndarray, b: np.ndarray) -> float:
+    if np.std(a) == 0 or np.std(b) == 0:
+        return 0.0
+    result = pearsonr(a.ravel(), b.ravel())
+    return float(result[0])  # type: ignore[arg-type]
+
+
+def _safe_spearman(a: np.ndarray, b: np.ndarray) -> float:
+    if np.std(a) == 0 or np.std(b) == 0:
+        return 0.0
+    result = spearmanr(a.ravel(), b.ravel())
+    return float(result[0])  # type: ignore[arg-type]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Regression metrics
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def mse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Mean squared error between true and predicted values."""
+    return float(mean_squared_error(y_true, y_pred))
+
+
+def r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """R² score, averaged per perturbation for 2-D expression matrices.
+
+    For 2-D inputs, R² is computed per row (perturbation) and averaged,
+    skipping constant rows.  This answers: "for each perturbation, how
+    well does the predicted expression profile match the true one?"
+    """
+    if y_true.ndim == 2:
+        scores: list[float] = []
+        for i in range(y_true.shape[0]):
+            if np.std(y_true[i]) == 0:
+                continue
+            scores.append(float(r2_score(y_true[i], y_pred[i])))
+        return float(np.mean(scores)) if scores else 0.0
+    return float(r2_score(y_true, y_pred))
+
+
+def mean_correlation(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    method: str = "pearson",
+) -> float:
+    """Mean correlation between true and predicted values.
+
+    For 2-D inputs (expression matrices), correlation is computed per row
+    (perturbation) and averaged — i.e. "how well does the predicted
+    expression signature match the true one for each perturbation?"
+
+    Parameters
+    ----------
+    y_true
+        True values (1-D scalar target or 2-D expression matrix).
+    y_pred
+        Predicted values (same shape).
+    method
+        ``"pearson"`` or ``"spearman"``.
+    """
+    corr_fn = _safe_pearson if method == "pearson" else _safe_spearman
+    if y_true.ndim == 2:
+        rs = [corr_fn(y_true[i], y_pred[i]) for i in range(y_true.shape[0])]
+        return float(np.mean(rs)) if rs else 0.0
+    return corr_fn(y_true, y_pred)
+
+
+def delta_l2(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    mean_control: np.ndarray,
+) -> dict[str, float]:
+    """Delta-L2 metrics measuring change from control.
+
+    Computes the L2 norm of the difference from the control mean for
+    both true and predicted expression, then reports the MAE and Pearson
+    correlation between these norms.
+
+    Parameters
+    ----------
+    y_true
+        True expression matrix ``(n_samples, n_genes)``.
+    y_pred
+        Predicted expression matrix (same shape).
+    mean_control
+        Mean control expression vector ``(n_genes,)``.
+
+    Returns
+    -------
+    Dictionary with keys ``"delta_l2_mae"`` and ``"delta_l2_pearson"``.
+    """
+    if y_true.ndim != 2:
+        return {"delta_l2_mae": float("nan"), "delta_l2_pearson": float("nan")}
+
+    delta_true = np.linalg.norm(y_true - mean_control, axis=1)
+    delta_pred = np.linalg.norm(y_pred - mean_control, axis=1)
+
+    mae = float(np.mean(np.abs(delta_pred - delta_true)))
+    r = _safe_pearson(delta_true, delta_pred)
+    return {"delta_l2_mae": mae, "delta_l2_pearson": r}
+
+
+# ---------------------------------------------------------------------------
+# Aggregate regression metrics (used by the benchmark module)
+# ---------------------------------------------------------------------------
+
+
+def compute_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    mean_control: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Compute all regression metrics for a prediction task.
+
+    Parameters
+    ----------
+    y_true
+        Ground-truth target (1-D or 2-D).
+    y_pred
+        Predicted target (same shape as *y_true*).
+    mean_control
+        Mean control expression vector (only used for delta-L2 when
+        *y_true* is 2-D).
+
+    Returns
+    -------
+    Dictionary mapping metric names to float values.
+    """
+    metrics: dict[str, float] = {}
+    metrics["mse"] = mse(y_true, y_pred)
+    metrics["r2"] = r2(y_true, y_pred)
+    metrics["pearson"] = mean_correlation(y_true, y_pred, method="pearson")
+    metrics["spearman"] = mean_correlation(y_true, y_pred, method="spearman")
+
+    if y_true.ndim == 2 and mean_control is not None:
+        metrics.update(delta_l2(y_true, y_pred, mean_control))
+    else:
+        metrics["delta_l2_mae"] = float("nan")
+        metrics["delta_l2_pearson"] = float("nan")
+
+    return metrics
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Biological metrics — expression-level
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def gene_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Per-gene R², averaged across genes.
+
+    Measures how well predicted expression tracks each gene's variation
+    across perturbations.
+
+    Parameters
+    ----------
+    y_true
+        True expression matrix ``(n_perturbations, n_genes)``.
+    y_pred
+        Predicted expression matrix (same shape).
+    """
+    if y_true.ndim != 2:
+        raise ValueError("gene_r2 requires 2-D expression matrices.")
+    scores: list[float] = []
+    for j in range(y_true.shape[1]):
+        if np.std(y_true[:, j]) == 0:
+            continue
+        scores.append(float(r2_score(y_true[:, j], y_pred[:, j])))
+    return float(np.mean(scores)) if scores else 0.0
+
+
+def frac_correct_direction(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    mean_control: np.ndarray,
+    threshold: float = 0.0,
+) -> float:
+    """Fraction of genes with correct direction of change from control.
+
+    For each gene, the sign of ``(expression − control)`` is compared
+    between true and predicted.  Returns the fraction that agree.
+
+    Parameters
+    ----------
+    y_true
+        True expression matrix ``(n_perturbations, n_genes)``.
+    y_pred
+        Predicted expression matrix (same shape).
+    mean_control
+        Mean control expression vector ``(n_genes,)``.
+    threshold
+        Minimum absolute change to consider.  Entries where both true and
+        predicted absolute change are below this value are excluded.
+    """
+    if y_true.ndim != 2:
+        raise ValueError("frac_correct_direction requires 2-D expression matrices.")
+
+    diff_true = y_true - mean_control
+    diff_pred = y_pred - mean_control
+
+    sign_true = np.sign(diff_true)
+    sign_pred = np.sign(diff_pred)
+
+    if threshold > 0:
+        mask = (np.abs(diff_true) >= threshold) | (np.abs(diff_pred) >= threshold)
+        if mask.sum() == 0:
+            return float("nan")
+        return float(np.mean(sign_true[mask] == sign_pred[mask]))
+
+    return float(np.mean(sign_true == sign_pred))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Scanpy wrappers — Differential Expression
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def rank_genes_groups(
+    adata: AnnData,
+    groupby: str,
+    reference: str = "rest",
+    method: str = "wilcoxon",
+    n_genes: int | None = None,
+    key_added: str = "rank_genes_groups",
+    **kwargs: Any,
+) -> AnnData:
+    """Run differential expression analysis via scanpy.
+
+    Thin wrapper around :func:`scanpy.tl.rank_genes_groups` with
+    sensible defaults for perturbation screens.
+
+    Parameters
+    ----------
+    adata
+        AnnData with expression in ``.X`` and group labels in ``.obs``.
+    groupby
+        Column in ``.obs`` defining groups (e.g. ``"perturbation"``).
+    reference
+        Reference group for comparison.  ``"rest"`` compares each group
+        against all others.
+    method
+        Statistical test: ``"wilcoxon"``, ``"t-test"``,
+        ``"t-test_overestim_var"``, ``"logreg"``.
+    n_genes
+        Number of genes to report per group.  ``None`` reports all.
+    key_added
+        Key in ``adata.uns`` for the results.
+    **kwargs
+        Additional arguments passed to ``scanpy.tl.rank_genes_groups``.
+
+    Returns
+    -------
+    AnnData with DEG results stored in ``uns[key_added]``.
+    """
+    sc = _require_scanpy()
+
+    if groupby not in adata.obs.columns:
+        raise KeyError(f"'{groupby}' not found in adata.obs. Available: {list(adata.obs.columns)}")
+
+    sc_kwargs: dict[str, Any] = {
+        "groupby": groupby,
+        "reference": reference,
+        "method": method,
+        "key_added": key_added,
+    }
+    if n_genes is not None:
+        sc_kwargs["n_genes"] = n_genes
+    sc_kwargs.update(kwargs)
+
+    sc.tl.rank_genes_groups(adata, **sc_kwargs)
+    logger.info(
+        "Ranked genes by '%s' (method=%s, reference=%s), stored in uns['%s'].",
+        groupby,
+        method,
+        reference,
+        key_added,
+    )
+    return adata
+
+
+def get_deg_dataframe(
+    adata: AnnData,
+    group: str,
+    key: str = "rank_genes_groups",
+    n_top: int | None = None,
+    pval_cutoff: float | None = 0.05,
+    log2fc_min: float | None = None,
+) -> pd.DataFrame:
+    """Extract a DEG table for a specific group from scanpy results.
+
+    Parameters
+    ----------
+    adata
+        AnnData with :func:`rank_genes_groups` results in ``uns``.
+    group
+        Group name to extract (must be in the results).
+    key
+        Key in ``adata.uns`` for the DEG results.
+    n_top
+        Maximum number of top genes to return.  ``None`` returns all
+        that pass the filters.
+    pval_cutoff
+        Maximum adjusted p-value.  ``None`` disables filtering.
+    log2fc_min
+        Minimum absolute log₂ fold change.  ``None`` disables filtering.
+
+    Returns
+    -------
+    DataFrame with columns
+    ``["gene", "score", "logfoldchange", "pval", "pval_adj"]``,
+    sorted by absolute score descending.
+    """
+    sc = _require_scanpy()
+
+    if key not in adata.uns:
+        raise KeyError(f"'{key}' not found in adata.uns. Run rank_genes_groups() first.")
+
+    result: pd.DataFrame = sc.get.rank_genes_groups_df(adata, group=group, key=key)
+
+    if pval_cutoff is not None and "pvals_adj" in result.columns:
+        result = result.loc[result["pvals_adj"] <= pval_cutoff]
+
+    if log2fc_min is not None and "logfoldchanges" in result.columns:
+        result = result.loc[result["logfoldchanges"].abs() >= log2fc_min]
+
+    if n_top is not None:
+        result = result.head(n_top)
+
+    rename_map = {
+        "names": "gene",
+        "scores": "score",
+        "logfoldchanges": "logfoldchange",
+        "pvals": "pval",
+        "pvals_adj": "pval_adj",
+    }
+    result = result.rename(columns={k: v for k, v in rename_map.items() if k in result.columns})
+
+    return result.reset_index(drop=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Biological metrics — DEG-based
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def deg_overlap(
+    genes_true: Sequence[str],
+    genes_pred: Sequence[str],
+) -> dict[str, float]:
+    """Overlap between two gene lists.
+
+    Parameters
+    ----------
+    genes_true
+        Reference (ground-truth) gene list.
+    genes_pred
+        Predicted gene list.
+
+    Returns
+    -------
+    Dictionary with ``"jaccard"``, ``"precision"``, ``"recall"``,
+    and ``"n_shared"``.
+    """
+    set_true = set(genes_true)
+    set_pred = set(genes_pred)
+
+    intersection = len(set_true & set_pred)
+    union = len(set_true | set_pred)
+
+    return {
+        "jaccard": intersection / union if union > 0 else 0.0,
+        "precision": intersection / len(set_pred) if set_pred else 0.0,
+        "recall": intersection / len(set_true) if set_true else 0.0,
+        "n_shared": float(intersection),
+    }
+
+
+def deg_direction_agreement(
+    deg_true: pd.DataFrame,
+    deg_pred: pd.DataFrame,
+    gene_col: str = "gene",
+    lfc_col: str = "logfoldchange",
+) -> dict[str, float]:
+    """Fraction of shared DEGs with matching direction of change.
+
+    Parameters
+    ----------
+    deg_true
+        DEG table for the true expression (as returned by
+        :func:`get_deg_dataframe`).
+    deg_pred
+        DEG table for the predicted expression.
+    gene_col
+        Column holding gene names.
+    lfc_col
+        Column holding log fold change values.
+
+    Returns
+    -------
+    Dictionary with ``"direction_agreement"`` and ``"n_shared"``.
+    """
+    shared = set(deg_true[gene_col]) & set(deg_pred[gene_col])
+    if not shared:
+        return {"direction_agreement": float("nan"), "n_shared": 0.0}
+
+    lfc_true = dict(zip(deg_true[gene_col], deg_true[lfc_col], strict=True))
+    lfc_pred = dict(zip(deg_pred[gene_col], deg_pred[lfc_col], strict=True))
+
+    agree = sum(1 for g in shared if np.sign(lfc_true[g]) == np.sign(lfc_pred[g]))
+
+    return {
+        "direction_agreement": agree / len(shared),
+        "n_shared": float(len(shared)),
+    }
+
+
+def compare_deg(
+    adata_true: AnnData,
+    adata_pred: AnnData,
+    groupby: str,
+    reference: str = "rest",
+    n_top_genes: int = 50,
+    method: str = "wilcoxon",
+    groups: list[str] | None = None,
+) -> pd.DataFrame:
+    """Compare DEGs between true and predicted expression across groups.
+
+    High-level function that runs :func:`rank_genes_groups` on both
+    AnnData objects, then computes :func:`deg_overlap` and
+    :func:`deg_direction_agreement` for every perturbation group.
+
+    Parameters
+    ----------
+    adata_true
+        AnnData with true (observed) expression in ``.X``.
+    adata_pred
+        AnnData with predicted expression in ``.X``.  Must have the
+        same ``.obs`` metadata as *adata_true*.
+    groupby
+        Column in ``.obs`` defining perturbation groups.
+    reference
+        Reference group (e.g. ``"control"``).
+    n_top_genes
+        Number of top DEGs to compare per group.
+    method
+        Statistical test for DEG analysis.
+    groups
+        Subset of groups to evaluate.  ``None`` evaluates all
+        non-reference groups.
+
+    Returns
+    -------
+    DataFrame with one row per group and columns ``["group", "jaccard",
+    "precision", "recall", "n_shared", "direction_agreement"]``.
+    """
+    key_true = "_embpy_deg_true"
+    key_pred = "_embpy_deg_pred"
+
+    rank_genes_groups(
+        adata_true,
+        groupby=groupby,
+        reference=reference,
+        method=method,
+        n_genes=n_top_genes,
+        key_added=key_true,
+    )
+    rank_genes_groups(
+        adata_pred,
+        groupby=groupby,
+        reference=reference,
+        method=method,
+        n_genes=n_top_genes,
+        key_added=key_pred,
+    )
+
+    if groups is None:
+        all_groups = adata_true.obs[groupby].unique().tolist()
+        groups = sorted(g for g in all_groups if str(g) != reference)
+
+    rows: list[dict[str, Any]] = []
+    for grp in groups:
+        grp_str = str(grp)
+        try:
+            df_true = get_deg_dataframe(
+                adata_true,
+                group=grp_str,
+                key=key_true,
+                n_top=n_top_genes,
+                pval_cutoff=None,
+            )
+            df_pred = get_deg_dataframe(
+                adata_pred,
+                group=grp_str,
+                key=key_pred,
+                n_top=n_top_genes,
+                pval_cutoff=None,
+            )
+        except (KeyError, ValueError, IndexError):
+            logger.warning("Could not extract DEGs for group '%s', skipping.", grp)
+            continue
+
+        overlap = deg_overlap(df_true["gene"].tolist(), df_pred["gene"].tolist())
+        direction = deg_direction_agreement(df_true, df_pred)
+
+        rows.append(
+            {
+                "group": grp,
+                **overlap,
+                "direction_agreement": direction["direction_agreement"],
+            }
+        )
+
+    adata_true.uns.pop(key_true, None)
+    adata_pred.uns.pop(key_pred, None)
+
+    return pd.DataFrame(rows)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# cell-eval wrapper
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def cell_eval(
+    adata_pred: AnnData,
+    adata_real: AnnData,
+    control_pert: str = "control",
+    pert_col: str = "perturbation",
+    profile: Literal["full", "vcc", "minimal", "de", "anndata"] = "full",
+    num_threads: int = 1,
+    metric_configs: dict[str, dict[str, Any]] | None = None,
+    skip_metrics: list[str] | None = None,
+    **kwargs: Any,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the ArcInstitute *cell-eval* evaluation suite.
+
+    Thin wrapper around :class:`cell_eval.MetricsEvaluator` that runs
+    differential-expression-based and AnnData-pair metrics comparing
+    predicted vs. real single-cell perturbation data.
+
+    Requires the ``cell-eval`` package (``pip install cell-eval``).
+
+    Parameters
+    ----------
+    adata_pred
+        AnnData with predicted expression (single-cell level).
+    adata_real
+        AnnData with real / observed expression (single-cell level).
+    control_pert
+        Label of control perturbation in ``adata.obs[pert_col]``.
+    pert_col
+        Column in ``.obs`` identifying perturbations.
+    profile
+        Metric profile to run.  One of ``"full"``, ``"vcc"``,
+        ``"minimal"``, ``"de"``, ``"anndata"``.
+    num_threads
+        Number of threads for parallel differential expression.
+    metric_configs
+        Per-metric keyword arguments, passed to
+        :meth:`cell_eval.MetricsEvaluator.compute` rather than to the
+        constructor. This is the only route to ``embed_key``, which is what
+        makes the ten ``ANNDATA_PAIR`` metrics score an ``.obsm`` embedding
+        instead of ``.X``::
+
+            metric_configs={"discrimination_score_cosine": {"embed_key": "X_pca"}}
+
+        Note that ``discrimination_score_l1`` ignores ``embed_key`` upstream,
+        so a profile including it mixes expression-space and embedding-space
+        numbers.
+    skip_metrics
+        Metric names to leave out, also forwarded to ``compute``.
+    **kwargs
+        Forwarded to :class:`cell_eval.MetricsEvaluator` -- the constructor,
+        not ``compute``. ``skip_de=True`` belongs here.
+
+    Returns
+    -------
+    ``(results, agg_results)`` — per-perturbation and aggregated
+    metric DataFrames (pandas).
+
+    References
+    ----------
+    ArcInstitute cell-eval: https://github.com/ArcInstitute/cell-eval
+    """
+    ce = _require_cell_eval()
+
+    evaluator = ce.MetricsEvaluator(
+        adata_pred=adata_pred,
+        adata_real=adata_real,
+        control_pert=control_pert,
+        pert_col=pert_col,
+        num_threads=num_threads,
+        **kwargs,
+    )
+    # metric_configs and skip_metrics are `compute` arguments, not constructor
+    # ones. Folding them into **kwargs raised
+    # `MetricsEvaluator.__init__() got an unexpected keyword argument
+    # 'metric_configs'`, which left `embed_key` -- and therefore the whole
+    # embedding-scoring path -- unreachable through this wrapper.
+    results_pl, agg_pl = evaluator.compute(
+        profile=profile,
+        metric_configs=metric_configs,
+        skip_metrics=skip_metrics,
+        write_csv=False,
+    )
+
+    results = results_pl.to_pandas()
+    agg_results = agg_pl.to_pandas()
+    logger.info(
+        "cell-eval finished (profile='%s'): %d perturbation rows, %d aggregate rows.",
+        profile,
+        len(results),
+        len(agg_results),
+    )
+    return results, agg_results
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phenocopy metrics (PRESAGE-inspired)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def phenocopy_score(
+    mean_true: np.ndarray,
+    mean_pred: np.ndarray,
+    n_pca_components: int | None = 50,
+    mad_thresholds: Sequence[int] = (1, 2, 3, 5),
+    recall_ks: Sequence[int] = (5, 10, 20, 50),
+) -> dict[str, float]:
+    """Phenocopy virtual-screen metric.
+
+    Measures whether perturbations that produce similar expression
+    changes in reality are also predicted to be similar.  This is a
+    PRESAGE-inspired metric based on cosine-similarity neighbor
+    recovery.
+
+    Algorithm
+    ---------
+    1. Optionally reduce both matrices with PCA.
+    2. Compute pairwise cosine-similarity matrices for true and
+       predicted mean expression.
+    3. For each perturbation, define *true phenocopy neighbors* as
+       those whose true cosine similarity exceeds
+       ``median + t × MAD`` (for each threshold *t*).
+    4. Evaluate whether the *predicted* similarity ranking recovers
+       these true neighbors using AUROC.
+    5. Separately compute recall@k — the fraction of the top-*k*
+       true nearest neighbors recovered in the top-*k* predicted
+       neighbors.
+
+    Parameters
+    ----------
+    mean_true
+        True mean expression matrix ``(n_perturbations, n_genes)``.
+    mean_pred
+        Predicted mean expression matrix (same shape).
+    n_pca_components
+        Number of PCA components for dimensionality reduction before
+        computing similarities.  ``None`` skips PCA.
+    mad_thresholds
+        MAD multipliers used to define phenocopy neighbor thresholds.
+    recall_ks
+        Values of *k* for recall@k computation.
+
+    Returns
+    -------
+    Dictionary with keys of the form
+    ``"phenocopy_auroc_mad_{t}"`` and ``"phenocopy_recall_{k}"``.
+
+    References
+    ----------
+    Littman *et al.* (2025), "Gene-embedding-based prediction and
+    functional evaluation of perturbation expression responses with
+    PRESAGE", *bioRxiv* 2025.06.03.657653.
+    """
+    if mean_true.shape != mean_pred.shape:
+        raise ValueError(f"Shape mismatch: mean_true {mean_true.shape} vs mean_pred {mean_pred.shape}")
+    n_perts = mean_true.shape[0]
+    if n_perts < 3:
+        raise ValueError(f"Need at least 3 perturbations, got {n_perts}.")
+
+    # --- optional PCA reduction ---
+    if n_pca_components is not None:
+        n_components = min(n_pca_components, *mean_true.shape)
+        pca = PCA(n_components=n_components, random_state=0)
+        true_emb = pca.fit_transform(mean_true)
+        pred_emb = PCA(n_components=n_components, random_state=0).fit_transform(mean_pred)
+    else:
+        true_emb = mean_true
+        pred_emb = mean_pred
+
+    # --- pairwise cosine similarity ---
+    sim_true = cosine_similarity(true_emb)
+    sim_pred = cosine_similarity(pred_emb)
+
+    metrics: dict[str, float] = {}
+
+    # --- AUROC-based phenocopy scores (MAD thresholds) ---
+    for t in mad_thresholds:
+        aurocs: list[float] = []
+        for i in range(n_perts):
+            sim_vec = sim_true[i].copy()
+            sim_vec[i] = -np.inf  # exclude self
+
+            med = np.median(sim_vec[sim_vec > -np.inf])
+            mad = median_abs_deviation(sim_vec[sim_vec > -np.inf])
+            if mad == 0:
+                continue
+
+            neighbors = sim_vec > (med + t * mad)
+            if neighbors.sum() == 0 or neighbors.sum() == (n_perts - 1):
+                continue
+
+            pred_vec = sim_pred[i].copy()
+            pred_vec[i] = -np.inf
+
+            aurocs.append(float(roc_auc_score(neighbors, pred_vec)))
+
+        metrics[f"phenocopy_auroc_mad_{t}"] = float(np.mean(aurocs)) if aurocs else float("nan")
+
+    # --- Recall@k ---
+    for k in recall_ks:
+        if k >= n_perts:
+            metrics[f"phenocopy_recall_{k}"] = float("nan")
+            continue
+        recalls: list[float] = []
+        for i in range(n_perts):
+            true_vec = sim_true[i].copy()
+            pred_vec = sim_pred[i].copy()
+            true_vec[i] = -np.inf
+            pred_vec[i] = -np.inf
+
+            true_topk = set(np.argsort(true_vec)[-k:])
+            pred_topk = set(np.argsort(pred_vec)[-k:])
+            recalls.append(len(true_topk & pred_topk) / k)
+
+        metrics[f"phenocopy_recall_{k}"] = float(np.mean(recalls))
+
+    return metrics
+
+
+def phenocopy_score_adata(
+    adata_true: AnnData,
+    adata_pred: AnnData,
+    pert_col: str = "perturbation",
+    control: str | None = "control",
+    layer: str | None = None,
+    **kwargs: Any,
+) -> dict[str, float]:
+    """Phenocopy score computed from AnnData objects.
+
+    Convenience wrapper around :func:`phenocopy_score` that computes
+    pseudobulk (mean expression per perturbation group) from single-cell
+    AnnData objects, aligns perturbation labels, and optionally subtracts
+    the control mean.
+
+    Parameters
+    ----------
+    adata_true
+        AnnData with true (observed) expression.
+    adata_pred
+        AnnData with predicted expression.  Must share the same
+        perturbation labels and gene space as *adata_true*.
+    pert_col
+        Column in ``.obs`` identifying perturbation groups.
+    control
+        Label of the control perturbation.  If provided, the control
+        mean is subtracted so that similarities reflect deviation from
+        baseline.  Set to ``None`` to skip subtraction.
+    layer
+        Layer to use for expression values.  ``None`` uses ``.X``.
+    **kwargs
+        Forwarded to :func:`phenocopy_score` (e.g.
+        ``n_pca_components``, ``mad_thresholds``, ``recall_ks``).
+
+    Returns
+    -------
+    Dictionary of phenocopy metrics (same format as
+    :func:`phenocopy_score`).
+    """
+    for name, ad_obj in [("adata_true", adata_true), ("adata_pred", adata_pred)]:
+        if pert_col not in ad_obj.obs.columns:
+            raise KeyError(f"'{pert_col}' not in {name}.obs.columns. Available: {list(ad_obj.obs.columns)}")
+
+    def _get_X(adata: AnnData) -> np.ndarray:
+        raw = adata.layers[layer] if layer else adata.X
+        if raw is None:
+            raise ValueError("Expression matrix (.X) is None.")
+        return np.asarray(raw.toarray() if hasattr(raw, "toarray") else raw, dtype=np.float64)  # type: ignore[union-attr]
+
+    def _pseudobulk(adata: AnnData) -> tuple[np.ndarray, list[str]]:
+        X = _get_X(adata)
+        labels = np.asarray(adata.obs[pert_col].values)
+        unique_labels = sorted(set(labels))
+        if control is not None and control in unique_labels:
+            unique_labels = [l for l in unique_labels if l != control]
+
+        means = np.array([X[labels == lab].mean(axis=0) for lab in unique_labels])
+        return means, unique_labels
+
+    mean_true, labels_true = _pseudobulk(adata_true)
+    mean_pred, labels_pred = _pseudobulk(adata_pred)
+
+    shared = sorted(set(labels_true) & set(labels_pred))
+    if len(shared) < 3:
+        raise ValueError(
+            f"Need at least 3 shared perturbations, found {len(shared)}. "
+            f"True has {len(labels_true)}, pred has {len(labels_pred)}."
+        )
+
+    idx_true = [labels_true.index(l) for l in shared]
+    idx_pred = [labels_pred.index(l) for l in shared]
+    mean_true = mean_true[idx_true]
+    mean_pred = mean_pred[idx_pred]
+
+    if control is not None:
+        X_true = _get_X(adata_true)
+        ctrl_mask = np.asarray(adata_true.obs[pert_col].values == control)
+        if ctrl_mask.any():
+            ctrl_mean = X_true[ctrl_mask].mean(axis=0)
+            mean_true = mean_true - ctrl_mean
+            mean_pred = mean_pred - ctrl_mean
+
+    return phenocopy_score(mean_true, mean_pred, **kwargs)

@@ -1,0 +1,61 @@
+resources:
+  jobs:
+    register_diffdock:
+      name: register_diffdock_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        # Serverless GPU (GPU_1xA10) — the workshop AWS account has EC2 GPU vCPU
+        # quota = 0, so the classic a10 (g5) cluster cannot provision. NOTE: the
+        # notebook's dependency stack was pinned to the DBR 13.3 LTS ML ABI
+        # (torch 1.13 / cu117 / py3.10); it was uplifted to the serverless ABI
+        # (torch 2.7 / cu126 / py3.12) — see 01_register_diffdock.py.
+        - task_key: register_diffdock_task
+          max_retries: 0
+          disable_auto_optimization: true
+          retry_on_timeout: false
+          environment_key: gpu_env
+          compute:
+            hardware_accelerator: GPU_1xA10
+          notebook_task:
+            notebook_path: ../notebooks/01_register_diffdock.py
+
+        #this task needs serverless runtime with python 3.11
+        - task_key: import_diffdock_task
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: register_diffdock_task
+          notebook_task:
+            notebook_path: ../notebooks/02_import_model_gwb.py
+          max_retries: 0
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+        - environment_key: gpu_env
+          spec:
+            client: '4'
+            
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: diffdock
+        - name: cache_dir
+          default: ${resources.volumes.diffdock_cache_dir.name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          default: ${var.gpu_medium_setting}
+          
+      tags: ${var.common_resource_tags}

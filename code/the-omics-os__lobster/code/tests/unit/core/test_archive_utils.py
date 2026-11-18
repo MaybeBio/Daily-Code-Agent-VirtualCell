@@ -1,0 +1,815 @@
+"""
+Unit tests for ContentDetector and ArchiveExtractor in lobster/core/archive_utils.py.
+
+Tests verify:
+1. V3 format detection (features.tsv)
+2. V2 format detection (genes.tsv)
+3. Compressed variants (.gz)
+4. Nested directory structures
+5. Incomplete/missing file handling
+6. Non-10X archive handling (Kallisto, Salmon, GEO RAW)
+7. Path traversal attack prevention (CVE-2007-4559)
+8. Symlink and hardlink escape detection
+9. Reject-all archive policy (no partial extraction)
+
+These tests ensure correct detection of 10X Genomics V2 (genes.tsv) vs V3 (features.tsv)
+formats, preventing regression of the zero-genes bug, and that archive extraction is
+secure against path traversal and symlink escape attacks.
+"""
+
+import io
+import tarfile
+from pathlib import Path
+
+import pytest
+
+from lobster.core.archive_utils import (
+    ArchiveContentType,
+    ArchiveExtractor,
+    ArchiveInspector,
+    ContentDetector,
+    unsafe_tar_members,
+)
+
+
+class TestContentDetector10XFormats:
+    """Tests for 10X Genomics V2/V3 format detection."""
+
+    @pytest.fixture
+    def v3_10x_directory(self, tmp_path: Path) -> Path:
+        """Create V3 format 10X directory structure (uncompressed)."""
+        mtx_dir = tmp_path / "filtered_feature_bc_matrix"
+        mtx_dir.mkdir(parents=True)
+        (mtx_dir / "matrix.mtx").write_bytes(b"mock mtx content")
+        (mtx_dir / "features.tsv").write_bytes(b"mock features content")
+        (mtx_dir / "barcodes.tsv").write_bytes(b"mock barcodes content")
+        return tmp_path
+
+    @pytest.fixture
+    def v3_10x_directory_compressed(self, tmp_path: Path) -> Path:
+        """Create V3 format 10X directory structure (compressed .gz)."""
+        mtx_dir = tmp_path / "filtered_feature_bc_matrix"
+        mtx_dir.mkdir(parents=True)
+        (mtx_dir / "matrix.mtx.gz").write_bytes(b"mock compressed mtx")
+        (mtx_dir / "features.tsv.gz").write_bytes(b"mock compressed features")
+        (mtx_dir / "barcodes.tsv.gz").write_bytes(b"mock compressed barcodes")
+        return tmp_path
+
+    @pytest.fixture
+    def v2_10x_directory(self, tmp_path: Path) -> Path:
+        """Create V2 format 10X directory structure (uncompressed)."""
+        mtx_dir = tmp_path / "filtered_gene_bc_matrices" / "GRCh38"
+        mtx_dir.mkdir(parents=True)
+        (mtx_dir / "matrix.mtx").write_bytes(b"mock mtx content")
+        (mtx_dir / "genes.tsv").write_bytes(b"mock genes content")
+        (mtx_dir / "barcodes.tsv").write_bytes(b"mock barcodes content")
+        return tmp_path
+
+    @pytest.fixture
+    def v2_10x_directory_compressed(self, tmp_path: Path) -> Path:
+        """Create V2 format 10X directory structure (compressed .gz)."""
+        mtx_dir = tmp_path / "filtered_gene_bc_matrices" / "GRCh38"
+        mtx_dir.mkdir(parents=True)
+        (mtx_dir / "matrix.mtx.gz").write_bytes(b"mock compressed mtx")
+        (mtx_dir / "genes.tsv.gz").write_bytes(b"mock compressed genes")
+        (mtx_dir / "barcodes.tsv.gz").write_bytes(b"mock compressed barcodes")
+        return tmp_path
+
+    # --- V3 Format Tests ---
+
+    def test_v3_format_detection_uncompressed(self, v3_10x_directory: Path):
+        """V3 format (features.tsv) is correctly identified."""
+        result = ContentDetector.detect_content_type(v3_10x_directory)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V3 format (features.tsv) should be detected as TEN_X_MTX, got {result}"
+
+    def test_v3_format_detection_compressed(self, v3_10x_directory_compressed: Path):
+        """V3 format with .gz compression is correctly identified."""
+        result = ContentDetector.detect_content_type(v3_10x_directory_compressed)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V3 compressed format should be detected as TEN_X_MTX, got {result}"
+
+    # --- V2 Format Tests ---
+
+    def test_v2_format_detection_uncompressed(self, v2_10x_directory: Path):
+        """V2 format (genes.tsv) is correctly identified."""
+        result = ContentDetector.detect_content_type(v2_10x_directory)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V2 format (genes.tsv) should be detected as TEN_X_MTX, got {result}"
+
+    def test_v2_format_detection_compressed(self, v2_10x_directory_compressed: Path):
+        """V2 format with .gz compression is correctly identified."""
+        result = ContentDetector.detect_content_type(v2_10x_directory_compressed)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V2 compressed format should be detected as TEN_X_MTX, got {result}"
+
+    # --- Nested Directory Tests ---
+
+    def test_nested_v2_geo_pattern(self, tmp_path: Path):
+        """V2 format in nested GEO directory structure (common pattern)."""
+        # Common GEO pattern: GSM123456_sample/filtered_feature_bc_matrix/
+        nested_dir = tmp_path / "GSM123456_sample" / "filtered_feature_bc_matrix"
+        nested_dir.mkdir(parents=True)
+        (nested_dir / "matrix.mtx.gz").write_bytes(b"mock")
+        (nested_dir / "genes.tsv.gz").write_bytes(b"mock")
+        (nested_dir / "barcodes.tsv.gz").write_bytes(b"mock")
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"Nested V2 GEO pattern should be detected, got {result}"
+
+    def test_nested_v3_sample_pattern(self, tmp_path: Path):
+        """V3 format in nested sample directory structure."""
+        nested_dir = tmp_path / "sample" / "filtered_feature_bc_matrix"
+        nested_dir.mkdir(parents=True)
+        (nested_dir / "matrix.mtx.gz").write_bytes(b"mock")
+        (nested_dir / "features.tsv.gz").write_bytes(b"mock")
+        (nested_dir / "barcodes.tsv.gz").write_bytes(b"mock")
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"Nested V3 sample pattern should be detected, got {result}"
+
+    # --- Incomplete 10X Tests ---
+
+    def test_incomplete_10x_missing_matrix(self, tmp_path: Path):
+        """Incomplete 10X without matrix file is NOT detected as 10X."""
+        mtx_dir = tmp_path / "incomplete"
+        mtx_dir.mkdir()
+        (mtx_dir / "features.tsv.gz").write_bytes(b"mock")
+        (mtx_dir / "barcodes.tsv.gz").write_bytes(b"mock")
+        # matrix.mtx is missing
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result != ArchiveContentType.TEN_X_MTX
+        ), f"Incomplete 10X (missing matrix) should NOT be TEN_X_MTX, got {result}"
+
+    def test_incomplete_10x_missing_features(self, tmp_path: Path):
+        """Incomplete 10X without features/genes file is NOT detected as 10X."""
+        mtx_dir = tmp_path / "incomplete"
+        mtx_dir.mkdir()
+        (mtx_dir / "matrix.mtx.gz").write_bytes(b"mock")
+        (mtx_dir / "barcodes.tsv.gz").write_bytes(b"mock")
+        # features.tsv or genes.tsv is missing
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result != ArchiveContentType.TEN_X_MTX
+        ), f"Incomplete 10X (missing features) should NOT be TEN_X_MTX, got {result}"
+
+    def test_incomplete_10x_missing_barcodes(self, tmp_path: Path):
+        """Incomplete 10X without barcodes file is NOT detected as 10X."""
+        mtx_dir = tmp_path / "incomplete"
+        mtx_dir.mkdir()
+        (mtx_dir / "matrix.mtx.gz").write_bytes(b"mock")
+        (mtx_dir / "features.tsv.gz").write_bytes(b"mock")
+        # barcodes.tsv is missing
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result != ArchiveContentType.TEN_X_MTX
+        ), f"Incomplete 10X (missing barcodes) should NOT be TEN_X_MTX, got {result}"
+
+
+class TestContentDetectorOtherFormats:
+    """Tests for non-10X format detection."""
+
+    @pytest.fixture
+    def kallisto_directory(self, tmp_path: Path) -> Path:
+        """Create Kallisto quantification directory structure."""
+        for i in range(3):
+            sample_dir = tmp_path / f"sample_{i}"
+            sample_dir.mkdir()
+            (sample_dir / "abundance.tsv").write_bytes(b"mock kallisto output")
+            (sample_dir / "abundance.h5").write_bytes(b"mock h5")
+        return tmp_path
+
+    @pytest.fixture
+    def salmon_directory(self, tmp_path: Path) -> Path:
+        """Create Salmon quantification directory structure."""
+        for i in range(3):
+            sample_dir = tmp_path / f"sample_{i}"
+            sample_dir.mkdir()
+            (sample_dir / "quant.sf").write_bytes(b"mock salmon output")
+        return tmp_path
+
+    @pytest.fixture
+    def geo_raw_directory(self, tmp_path: Path) -> Path:
+        """Create GEO RAW expression directory structure."""
+        (tmp_path / "GSM123456_sample1.txt.gz").write_bytes(b"mock geo")
+        (tmp_path / "GSM123457_sample2.txt.gz").write_bytes(b"mock geo")
+        (tmp_path / "GSM123458_sample3.txt").write_bytes(b"mock geo")
+        return tmp_path
+
+    @pytest.fixture
+    def generic_expression_directory(self, tmp_path: Path) -> Path:
+        """Create generic expression matrix directory."""
+        # Create a large CSV file (>100KB) to pass size threshold
+        large_content = b"gene,sample1,sample2\n" + b"GENE,1.0,2.0\n" * 10000
+        (tmp_path / "expression_matrix.csv").write_bytes(large_content)
+        (tmp_path / "sample_metadata.csv").write_bytes(b"sample,condition\n")
+        return tmp_path
+
+    def test_kallisto_quant_detection(self, kallisto_directory: Path):
+        """Kallisto quantification files are correctly identified."""
+        result = ContentDetector.detect_content_type(kallisto_directory)
+        assert (
+            result == ArchiveContentType.KALLISTO_QUANT
+        ), f"Kallisto directory should be detected as KALLISTO_QUANT, got {result}"
+
+    def test_salmon_quant_detection(self, salmon_directory: Path):
+        """Salmon quantification files are correctly identified."""
+        result = ContentDetector.detect_content_type(salmon_directory)
+        assert (
+            result == ArchiveContentType.SALMON_QUANT
+        ), f"Salmon directory should be detected as SALMON_QUANT, got {result}"
+
+    def test_geo_raw_detection(self, geo_raw_directory: Path):
+        """GEO RAW files (GSM*.txt.gz) are correctly identified."""
+        result = ContentDetector.detect_content_type(geo_raw_directory)
+        assert (
+            result == ArchiveContentType.GEO_RAW
+        ), f"GEO RAW directory should be detected as GEO_RAW, got {result}"
+
+    def test_generic_expression_detection(self, generic_expression_directory: Path):
+        """Generic expression matrix (CSV >100KB) is correctly identified."""
+        result = ContentDetector.detect_content_type(generic_expression_directory)
+        assert (
+            result == ArchiveContentType.GENERIC_EXPRESSION
+        ), f"Generic expression should be detected as GENERIC_EXPRESSION, got {result}"
+
+    def test_unknown_format_detection(self, tmp_path: Path):
+        """Unknown file collection returns UNKNOWN."""
+        (tmp_path / "random.xyz").write_bytes(b"unknown")
+        (tmp_path / "another.abc").write_bytes(b"unknown")
+
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result == ArchiveContentType.UNKNOWN
+        ), f"Unknown files should be detected as UNKNOWN, got {result}"
+
+    def test_empty_directory_detection(self, tmp_path: Path):
+        """Empty directory returns UNKNOWN."""
+        result = ContentDetector.detect_content_type(tmp_path)
+        assert (
+            result == ArchiveContentType.UNKNOWN
+        ), f"Empty directory should be detected as UNKNOWN, got {result}"
+
+
+class TestArchiveInspectorManifestDetection:
+    """Tests for ArchiveInspector content type detection from manifest."""
+
+    def test_manifest_v3_detection(self):
+        """V3 format detected from manifest (features.tsv)."""
+        manifest = {
+            "filenames": [
+                "sample/matrix.mtx.gz",
+                "sample/features.tsv.gz",
+                "sample/barcodes.tsv.gz",
+            ],
+            "has_subdirectories": True,
+            "extensions": {".gz": 3},
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_content_type_from_manifest(manifest)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V3 manifest should be detected as TEN_X_MTX, got {result}"
+
+    def test_manifest_v2_detection(self):
+        """V2 format detected from manifest (genes.tsv)."""
+        manifest = {
+            "filenames": [
+                "sample/matrix.mtx.gz",
+                "sample/genes.tsv.gz",
+                "sample/barcodes.tsv.gz",
+            ],
+            "has_subdirectories": True,
+            "extensions": {".gz": 3},
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_content_type_from_manifest(manifest)
+        assert (
+            result == ArchiveContentType.TEN_X_MTX
+        ), f"V2 manifest should be detected as TEN_X_MTX, got {result}"
+
+    def test_manifest_kallisto_detection(self):
+        """Kallisto format detected from manifest."""
+        manifest = {
+            "filenames": [
+                "sample1/abundance.tsv",
+                "sample1/abundance.h5",
+                "sample2/abundance.tsv",
+                "sample2/abundance.h5",
+            ],
+            "has_subdirectories": True,
+            "extensions": {".tsv": 2, ".h5": 2},
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_content_type_from_manifest(manifest)
+        assert (
+            result == ArchiveContentType.KALLISTO_QUANT
+        ), f"Kallisto manifest should be detected as KALLISTO_QUANT, got {result}"
+
+    def test_manifest_salmon_detection(self):
+        """Salmon format detected from manifest."""
+        manifest = {
+            "filenames": [
+                "sample1/quant.sf",
+                "sample2/quant.sf",
+            ],
+            "has_subdirectories": True,
+            "extensions": {".sf": 2},
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_content_type_from_manifest(manifest)
+        assert (
+            result == ArchiveContentType.SALMON_QUANT
+        ), f"Salmon manifest should be detected as SALMON_QUANT, got {result}"
+
+    def test_manifest_geo_raw_detection(self):
+        """GEO RAW format detected from manifest."""
+        manifest = {
+            "filenames": [
+                "GSM123456_sample1.txt.gz",
+                "GSM123457_sample2.txt.gz",
+            ],
+            "has_subdirectories": False,
+            "extensions": {".gz": 2},
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_content_type_from_manifest(manifest)
+        assert (
+            result == ArchiveContentType.GEO_RAW
+        ), f"GEO RAW manifest should be detected as GEO_RAW, got {result}"
+
+
+class TestContentDetectorKallistoSalmon:
+    """Tests for detect_kallisto_salmon() method."""
+
+    def test_detect_kallisto_files(self):
+        """Kallisto abundance files are detected."""
+        file_paths = [
+            "/path/sample1/abundance.tsv",
+            "/path/sample1/abundance.h5",
+            "/path/sample2/abundance.tsv",
+            "/path/sample2/abundance.h5",
+        ]
+
+        has_quant, tool_type, matched, n_samples = (
+            ContentDetector.detect_kallisto_salmon(file_paths)
+        )
+
+        assert has_quant is True
+        assert tool_type == "kallisto"
+        assert len(matched) == 4
+        assert n_samples == 4  # 2 .tsv + 2 .h5
+
+    def test_detect_salmon_files(self):
+        """Salmon quant files are detected."""
+        file_paths = [
+            "/path/sample1/quant.sf",
+            "/path/sample2/quant.sf",
+        ]
+
+        has_quant, tool_type, matched, n_samples = (
+            ContentDetector.detect_kallisto_salmon(file_paths)
+        )
+
+        assert has_quant is True
+        assert tool_type == "salmon"
+        assert len(matched) == 2
+        assert n_samples == 2
+
+    def test_detect_mixed_quantification(self):
+        """Mixed Kallisto and Salmon files are detected."""
+        file_paths = [
+            "/path/sample1/abundance.tsv",
+            "/path/sample2/quant.sf",
+        ]
+
+        has_quant, tool_type, matched, n_samples = (
+            ContentDetector.detect_kallisto_salmon(file_paths)
+        )
+
+        assert has_quant is True
+        assert tool_type == "mixed"
+        assert len(matched) == 2
+
+    def test_no_quantification_files(self):
+        """Non-quantification files return negative result."""
+        file_paths = [
+            "/path/random.csv",
+            "/path/other.txt",
+        ]
+
+        has_quant, tool_type, matched, n_samples = (
+            ContentDetector.detect_kallisto_salmon(file_paths)
+        )
+
+        assert has_quant is False
+        assert tool_type == ""
+        assert len(matched) == 0
+        assert n_samples == 0
+
+
+class TestArchiveInspectorNestedArchives:
+    """Tests for nested archive detection."""
+
+    def test_detect_nested_archives(self):
+        """Nested .tar.gz archives within parent archive are detected."""
+        manifest = {
+            "filenames": [
+                "GSM4710689_PDAC_TISSUE_1.tar.gz",
+                "GSM4710690_PDAC_TISSUE_2.tar.gz",
+                "GSM4710691_PDAC_PBMC_1.tar.gz",
+            ],
+            "has_subdirectories": False,
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_nested_archives(manifest, "/path/to/archive.tar")
+
+        assert result is not None
+        assert result.total_count == 3
+        assert len(result.nested_archives) == 3
+        assert "PDAC_TISSUE" in result.groups
+        assert "PDAC_PBMC" in result.groups
+        assert len(result.groups["PDAC_TISSUE"]) == 2
+        assert len(result.groups["PDAC_PBMC"]) == 1
+
+    def test_no_nested_archives(self):
+        """Returns None when no nested archives found."""
+        manifest = {
+            "filenames": [
+                "matrix.mtx.gz",
+                "features.tsv.gz",
+                "barcodes.tsv.gz",
+            ],
+            "has_subdirectories": False,
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_nested_archives(manifest)
+
+        assert result is None
+
+    def test_single_nested_archive(self):
+        """Returns None for single nested archive (not worth special handling)."""
+        manifest = {
+            "filenames": [
+                "GSM4710689_PDAC_TISSUE_1.tar.gz",
+            ],
+            "has_subdirectories": False,
+        }
+
+        inspector = ArchiveInspector()
+        result = inspector.detect_nested_archives(manifest)
+
+        assert result is None  # Need >= 2 for special handling
+
+
+class TestArchiveExtractor:
+    """Tests for ArchiveExtractor security and functionality."""
+
+    def test_cleanup_removes_temp_dirs(self, tmp_path: Path):
+        """Cleanup removes all tracked temporary directories."""
+        extractor = ArchiveExtractor()
+        temp_dir = tmp_path / "temp_test"
+        temp_dir.mkdir()
+        extractor.temp_dirs.append(temp_dir)
+
+        assert temp_dir.exists()
+        extractor.cleanup()
+        assert not temp_dir.exists()
+        assert len(extractor.temp_dirs) == 0
+
+
+# =============================================================================
+# Helper: create tar archives with specific members
+# =============================================================================
+
+
+def _create_tar_bytes(members):
+    """Create a tar archive in memory with specified members.
+
+    Args:
+        members: list of dicts with keys:
+            name (str), content (bytes|None), type (int), linkname (str|None)
+    Returns:
+        bytes of the tar archive
+    """
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for m in members:
+            info = tarfile.TarInfo(name=m["name"])
+            info.type = m.get("type", tarfile.REGTYPE)
+            info.linkname = m.get("linkname", "")
+            content = m.get("content", b"")
+            if content is None:
+                content = b""
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
+    buf.seek(0)
+    return buf.read()
+
+
+def _write_tar_file(tmp_path, name, members):
+    """Write a tar archive to disk."""
+    data = _create_tar_bytes(members)
+    tar_path = tmp_path / name
+    tar_path.write_bytes(data)
+    return tar_path
+
+
+# =============================================================================
+# Security Tests: _is_safe_member
+# =============================================================================
+
+
+class TestIsSafeMember:
+    """Tests for ArchiveExtractor._is_safe_member path traversal and symlink detection."""
+
+    def test_rejects_path_traversal_dotdot(self, tmp_path: Path):
+        """_is_safe_member rejects members with ../ in path."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="../../../etc/passwd")
+        member.type = tarfile.REGTYPE
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+    def test_rejects_absolute_path(self, tmp_path: Path):
+        """_is_safe_member rejects members with absolute paths."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="/etc/passwd")
+        member.type = tarfile.REGTYPE
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+    def test_rejects_symlink_outside_target(self, tmp_path: Path):
+        """_is_safe_member rejects symlinks pointing outside target directory."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="evil_link")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../../../etc/shadow"
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+    def test_rejects_hardlink_outside_target(self, tmp_path: Path):
+        """_is_safe_member rejects hardlinks pointing outside target directory."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="evil_hardlink")
+        member.type = tarfile.LNKTYPE
+        member.linkname = "../../../etc/shadow"
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+    def test_rejects_absolute_symlink_target(self, tmp_path: Path):
+        """_is_safe_member rejects symlinks with absolute targets."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="abs_link")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "/etc/passwd"
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+    def test_accepts_safe_relative_symlink(self, tmp_path: Path):
+        """_is_safe_member accepts safe relative symlinks within target directory."""
+        extractor = ArchiveExtractor()
+        # Create a subdirectory so the symlink target resolves within target
+        (tmp_path / "subdir").mkdir(parents=True, exist_ok=True)
+        member = tarfile.TarInfo(name="subdir/link_to_file")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../safe_file.txt"
+        assert extractor._is_safe_member(member, tmp_path) is True
+
+    def test_accepts_normal_file(self, tmp_path: Path):
+        """_is_safe_member accepts normal files within target directory."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="data/sample.txt")
+        member.type = tarfile.REGTYPE
+        assert extractor._is_safe_member(member, tmp_path) is True
+
+    def test_rejects_symlink_into_sibling_sharing_name_prefix(self, tmp_path: Path):
+        """A link into ``ws2`` must not pass as inside ``ws`` (prefix match)."""
+        extractor = ArchiveExtractor()
+        target = tmp_path / "ws"
+        target.mkdir()
+        member = tarfile.TarInfo(name="link")
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../ws2/secret"
+        assert extractor._is_safe_member(member, target) is False
+
+    @pytest.mark.parametrize(
+        "member_type", [tarfile.CHRTYPE, tarfile.BLKTYPE, tarfile.FIFOTYPE]
+    )
+    def test_rejects_device_and_fifo_members(self, tmp_path: Path, member_type):
+        """_is_safe_member rejects character/block devices and FIFOs."""
+        extractor = ArchiveExtractor()
+        member = tarfile.TarInfo(name="dev/null")
+        member.type = member_type
+        assert extractor._is_safe_member(member, tmp_path) is False
+
+
+def _info(name, member_type=tarfile.REGTYPE, linkname="", mode=0o644):
+    info = tarfile.TarInfo(name)
+    info.type = member_type
+    info.linkname = linkname
+    info.mode = mode
+    return info
+
+
+@pytest.mark.parametrize(
+    "member",
+    [
+        _info("./x.txt"),
+        _info("GSM1/", tarfile.DIRTYPE, mode=0o755),
+        _info("same.txt", tarfile.LNKTYPE, linkname="ok.txt"),
+        _info("GSM1/link.txt", tarfile.SYMTYPE, linkname="ok.txt"),
+        _info("GSM1_" + "x" * 150 + ".mtx"),
+        _info("GSM1 sample/matrix 1.mtx"),
+        _info("GSM1%20sample.txt"),
+        _info("tool.sh", mode=0o4755),  # setuid is cleared on extraction, not refused
+    ],
+    ids=[
+        "dot-slash",
+        "directory",
+        "hardlink-inside",
+        "symlink-inside",
+        "long-name",
+        "spaces",
+        "percent",
+        "setuid",
+    ],
+)
+def test_unsafe_tar_members_accepts_safe_layouts(tmp_path: Path, member):
+    assert unsafe_tar_members([member], tmp_path) == []
+
+
+# =============================================================================
+# Security Tests: extract_safely reject-all policy
+# =============================================================================
+
+
+class TestExtractSafelyRejectAll:
+    """Tests for extract_safely reject-all archive policy."""
+
+    def test_rejects_archive_with_any_unsafe_member(self, tmp_path: Path):
+        """extract_safely raises RuntimeError when ANY member is unsafe (reject-all)."""
+        tar_path = _write_tar_file(
+            tmp_path,
+            "evil.tar.gz",
+            [
+                {"name": "safe_file.txt", "content": b"safe"},
+                {"name": "../../../etc/passwd", "content": b"evil"},
+            ],
+        )
+        target_dir = tmp_path / "extract"
+
+        extractor = ArchiveExtractor()
+        with pytest.raises(RuntimeError, match="Archive rejected"):
+            extractor.extract_safely(tar_path, target_dir)
+
+    def test_error_message_includes_offending_paths(self, tmp_path: Path):
+        """extract_safely error message includes offending member paths (up to 10)."""
+        tar_path = _write_tar_file(
+            tmp_path,
+            "evil.tar.gz",
+            [
+                {"name": "../escape.txt", "content": b"evil"},
+                {"name": "safe.txt", "content": b"safe"},
+            ],
+        )
+        target_dir = tmp_path / "extract"
+
+        extractor = ArchiveExtractor()
+        with pytest.raises(RuntimeError, match="escape.txt"):
+            extractor.extract_safely(tar_path, target_dir)
+
+    def test_succeeds_for_all_safe_members(self, tmp_path: Path):
+        """extract_safely succeeds for archives with all safe members."""
+        tar_path = _write_tar_file(
+            tmp_path,
+            "safe.tar.gz",
+            [
+                {"name": "data/file1.txt", "content": b"hello"},
+                {"name": "data/file2.txt", "content": b"world"},
+            ],
+        )
+        target_dir = tmp_path / "extract"
+
+        extractor = ArchiveExtractor()
+        result = extractor.extract_safely(tar_path, target_dir)
+        assert result == target_dir
+        assert (target_dir / "data" / "file1.txt").exists()
+        assert (target_dir / "data" / "file2.txt").exists()
+
+    def test_rejects_archive_with_symlink_escape(self, tmp_path: Path):
+        """extract_safely rejects archive containing symlinks that escape target."""
+        tar_path = _write_tar_file(
+            tmp_path,
+            "symlink_evil.tar.gz",
+            [
+                {"name": "safe.txt", "content": b"ok"},
+                {
+                    "name": "evil_link",
+                    "type": tarfile.SYMTYPE,
+                    "linkname": "/etc/shadow",
+                    "content": None,
+                },
+            ],
+        )
+        target_dir = tmp_path / "extract"
+
+        extractor = ArchiveExtractor()
+        with pytest.raises(RuntimeError, match="Archive rejected"):
+            extractor.extract_safely(tar_path, target_dir)
+
+    def test_cleanup_on_error(self, tmp_path: Path):
+        """extract_safely cleans up target_dir on error when cleanup_on_error=True."""
+        tar_path = _write_tar_file(
+            tmp_path,
+            "evil.tar.gz",
+            [{"name": "../escape.txt", "content": b"evil"}],
+        )
+        target_dir = tmp_path / "extract"
+
+        extractor = ArchiveExtractor()
+        with pytest.raises(RuntimeError):
+            extractor.extract_safely(tar_path, target_dir, cleanup_on_error=True)
+
+        # target_dir should be cleaned up
+        assert not target_dir.exists()
+
+    @pytest.mark.parametrize(
+        "unsafe_member",
+        [
+            {"name": "link", "type": tarfile.SYMTYPE, "linkname": "../extract2/x"},
+            {"name": "hard", "type": tarfile.LNKTYPE, "linkname": "../extract2/x"},
+            {"name": "null", "type": tarfile.CHRTYPE, "content": None},
+        ],
+        ids=["symlink-sibling-prefix", "hardlink-sibling-prefix", "device"],
+    )
+    def test_refuses_archive_and_writes_nothing(self, tmp_path: Path, unsafe_member):
+        """Sibling-prefix links and device files refuse the whole archive."""
+        (tmp_path / "extract2").mkdir()
+        (tmp_path / "extract2" / "x").write_text("outside")
+        tar_path = _write_tar_file(
+            tmp_path,
+            "evil.tar.gz",
+            [{"name": "safe.txt", "content": b"ok"}, unsafe_member],
+        )
+        target_dir = tmp_path / "extract"
+
+        with pytest.raises(RuntimeError, match="Archive rejected"):
+            ArchiveExtractor().extract_safely(tar_path, target_dir)
+
+        assert not target_dir.exists()
+        assert sorted(p.name for p in (tmp_path / "extract2").iterdir()) == ["x"]
+
+    def test_extraction_uses_data_filter(self, tmp_path: Path):
+        """Accepted archives are extracted with the stdlib data filter."""
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            info = tarfile.TarInfo(name="tool.sh")
+            info.mode = 0o4777  # setuid, world-writable
+            info.size = 2
+            tar.addfile(info, io.BytesIO(b"ok"))
+        tar_path = tmp_path / "modes.tar.gz"
+        tar_path.write_bytes(buf.getvalue())
+
+        target_dir = tmp_path / "extract"
+        ArchiveExtractor().extract_safely(tar_path, target_dir)
+
+        mode = (target_dir / "tool.sh").stat().st_mode
+        assert not mode & 0o4000  # setuid cleared
+        assert not mode & 0o022  # group/other write cleared
+
+
+# =============================================================================
+# Integration Tests: geo/downloader.py uses shared implementation
+# =============================================================================
+
+
+class TestGeoDownloaderUsesSharedSafeMember:
+    """Test that geo/downloader.py uses shared _is_safe_member from archive_utils."""
+
+    def test_no_inline_is_safe_member_in_downloader(self):
+        """geo/downloader.py should NOT define its own is_safe_member function."""
+        import inspect
+
+        from lobster.services.data_access.geo import downloader
+
+        source = inspect.getsource(downloader)
+        # The inline function definition should be removed
+        assert "def is_safe_member(member)" not in source, (
+            "geo/downloader.py still contains inline is_safe_member function. "
+            "It should use the shared implementation from archive_utils."
+        )

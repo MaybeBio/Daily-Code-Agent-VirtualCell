@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]  # PEP 639 license fields
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thalamus-decision"
+version = "0.1.0"
+description = "Thalamus-Decision: calibrated typed decisions (choice / yes-no / score) about text and expression profiles; inference engine with an HTTP API and MCP"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Ingenix.ai" }]
+requires-python = ">=3.11,<3.14"
+# Profiles are made and read by the thalamus-reasoning package itself (tr-embed, DepMap, @references), pinned to the
+# release whose preprocessing files ship in the model repositories. Its pins (transformers 5.5.3) apply here too.
+dependencies = [
+    "thalamus-reasoning @ git+https://github.com/IngenixAI/Thalamus-Reasoning@e7efcb1b1992625ca1cc5a04dd52647e257abe2a",
+    # torch 2.14+ headers need C++20, and flash-attn 2.8.3 (the `fast` extra) builds as C++17; 2.13 is the version the
+    # released calibration and the identity checks were run with
+    "torch>=2.6,<2.14",
+    "transformers==5.5.3",
+    "safetensors>=0.6",
+    "huggingface_hub>=0.34",
+    "numpy",
+    "starlette>=0.47",
+    "uvicorn>=0.35",
+]
+
+[project.optional-dependencies]
+# The packed readout the model was calibrated with: FlashAttention 2 for the full-attention layers, flash-linear-attention
+# and causal-conv1d for the Gated DeltaNet layers. Without them every prompt runs on its own (same answers up to bf16
+# rounding, several times slower).
+fast = ["flash-attn>=2.8", "flash-linear-attention>=0.5.2", "causal-conv1d>=1.7"]
+mcp = ["mcp>=1.28,<2", "httpx>=0.28"]   # FastMCP (removed in mcp 2)
+eval = ["scikit-learn"]                # eval/benchmark.py (macro AUROC)
+dev = ["pytest>=8", "httpx>=0.28"]
+
+[project.urls]
+Model = "https://huggingface.co/ingenix/Thalamus-Decision-9B"
+Profiles = "https://github.com/IngenixAI/Thalamus-Reasoning"
+
+[project.scripts]
+td-serve = "thalamus_decision.server:main"
+td-mcp = "thalamus_decision.mcp_server:main"
+td-client = "thalamus_decision.client:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+no-build-isolation-package = ["flash-attn", "causal-conv1d"]
+
+[tool.uv.extra-build-dependencies]
+causal-conv1d = [{ requirement = "torch", match-runtime = true }]
+flash-attn = [{ requirement = "torch", match-runtime = true }]

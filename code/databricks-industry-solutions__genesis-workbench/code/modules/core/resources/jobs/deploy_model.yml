@@ -1,0 +1,57 @@
+resources:
+  jobs:
+    deploy_model_job:
+      name: dbx_gwb_deploy_model_job
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: deploy_model_task
+          disable_auto_optimization: true
+          notebook_task:
+            notebook_path: ../../notebooks/deploy_model.py
+          max_retries: 0 
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+
+      max_concurrent_runs: 5
+
+      # The app triggers this job as its service principal (model deploy), so the
+      # SP needs run rights — declared here so it survives app deploys.
+      permissions:
+        - level: CAN_MANAGE_RUN
+          service_principal_name: ${resources.apps.genesis_workbench_app.service_principal_client_id}
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}          
+        - name: gwb_model_id
+          default: '-1' 
+        - name: dev_user_prefix
+          default: ${var.dev_user_prefix}          
+        - name: deployment_name
+          default: name
+        - name: deployment_description
+          default: description
+        - name: workload_type
+          default: "GPU_SMALL"
+        - name: workload_size
+          default: Small
+        - name: deploy_user
+          default: none
+        - name: databricks_app_name
+          default: ${var.app_name}
+        - name: databricks_app_names
+          default: ${var.app_names}
+
+      tags: ${var.common_resource_tags}
+

@@ -1,0 +1,47 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+# Copyright (c) Microsoft. All rights reserved.
+from enum import Enum
+from typing import Final
+
+AUDIO_CONTENT_TAG: Final[str] = "audio"
+CHAT_MESSAGE_CONTENT_TAG: Final[str] = "message"
+CHAT_HISTORY_TAG: Final[str] = "chat_history"
+TEXT_CONTENT_TAG: Final[str] = "text"
+IMAGE_CONTENT_TAG: Final[str] = "image"
+ANNOTATION_CONTENT_TAG: Final[str] = "annotation"
+STREAMING_ANNOTATION_CONTENT_TAG: Final[str] = "streaming_annotation"
+BINARY_CONTENT_TAG: Final[str] = "binary"
+FILE_REFERENCE_CONTENT_TAG: Final[str] = "file_reference"
+STREAMING_FILE_REFERENCE_CONTENT_TAG: Final[str] = "streaming_file_reference"
+FUNCTION_CALL_CONTENT_TAG: Final[str] = "function_call"
+FUNCTION_RESULT_CONTENT_TAG: Final[str] = "function_result"
+REASONING_CONTENT_TAG: Final[str] = "reasoning"
+DISCRIMINATOR_FIELD: Final[str] = "content_type"
+
+
+class ContentTypes(str, Enum):
+    """Content types enumeration."""
+
+    AUDIO_CONTENT = AUDIO_CONTENT_TAG
+    ANNOTATION_CONTENT = ANNOTATION_CONTENT_TAG
+    BINARY_CONTENT = BINARY_CONTENT_TAG
+    CHAT_MESSAGE_CONTENT = CHAT_MESSAGE_CONTENT_TAG
+    IMAGE_CONTENT = IMAGE_CONTENT_TAG
+    FILE_REFERENCE_CONTENT = FILE_REFERENCE_CONTENT_TAG
+    FUNCTION_CALL_CONTENT = FUNCTION_CALL_CONTENT_TAG
+    FUNCTION_RESULT_CONTENT = FUNCTION_RESULT_CONTENT_TAG
+    REASONING_CONTENT = REASONING_CONTENT_TAG
+    STREAMING_ANNOTATION_CONTENT = STREAMING_ANNOTATION_CONTENT_TAG
+    STREAMING_FILE_REFERENCE_CONTENT = STREAMING_FILE_REFERENCE_CONTENT_TAG
+    TEXT_CONTENT = TEXT_CONTENT_TAG
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

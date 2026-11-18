@@ -1,0 +1,27 @@
+# Small V2-104M MIL finetune grid (memory / LR search, NOT the paper recipe).
+# Paper / v7 is in models/geneformer/V2-104M-i4096_finetune.yaml (fp32, 512
+# genes, chunk 128, no AMP, checkpoint_chunks=false). AMP + checkpoint_chunks
+# here matches the collapsed v8 run.
+#
+# Usage (from repo root):
+#   pixi run -e geneformer python -m scfm_cancer_eval.run.grid_search_finetune \
+#       grids/gf_finetune_v2_small.yaml
+
+base_exp: exp/geneformer/V2-104M-i4096_finetune/crc_mmr.yaml
+metric: AUC
+
+grid:
+  learning_rate: [1.0e-5, 2.0e-5, 5.0e-5]
+  epoch: [2, 3]
+  freeze_layers: [0, 6]
+  weight_decay: [1.0e-5]
+  warmup_ratio: [0.0, 0.1]
+  # Memory / throughput (single-valued so they don't multiply the grid):
+  max_number_genes: [4096]
+  max_cells_per_bag: [500]
+  max_cells_per_patient: [1000]
+  mil_chunk_size: [8]
+  gradient_checkpointing: [true]
+  checkpoint_chunks: [true]         # required so VRAM ≈ one chunk, not full bag
+  use_amp: [true]
+  empty_cache_between_bags: [false]

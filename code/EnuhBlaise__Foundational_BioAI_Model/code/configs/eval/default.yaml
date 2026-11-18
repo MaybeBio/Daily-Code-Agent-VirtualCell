@@ -1,0 +1,7 @@
+# Baselines are mandatory. This list may be extended, not emptied.
+split: test
+baselines:
+  - {name: pca, n_components: 50}
+  - {name: scaled_pca, n_components: 50}
+  - {name: hvg, n_genes: 50}
+  - {name: random_projection, n_components: 50}

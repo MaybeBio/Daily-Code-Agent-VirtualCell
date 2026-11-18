@@ -1,0 +1,32 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  spilt_name:
+  - train
+  - vaild
+  - test
+  - all
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+  batch_size: 32
+model_cfg:
+  model: Tabula
+  tasks: annotation
+  ckpt_path: weights/Tabula/pancreas.pth
+  checkpoint_label: official_pancreas_fixed_across_datasets
+  checkpoint_sha256: ed6a3ef16d042d6deacb4bc044daf6d93c57ddb3182559fb8bbd0149d06a965c
+  vocab_file: weights/Tabula/vocab.json
+  config_file: weights/Tabula/finetune_framework_annotation.yaml
+  pretrained_backbone: FlashAttention
+  n_bins: 51
+  in_feature: 1200
+  weights_dir: weights/Tabula
+  source_dir: public_code/Tabula
+  expression_layer: auto
+  inference_batch_size: 32

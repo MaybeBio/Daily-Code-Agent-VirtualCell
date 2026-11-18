@@ -1,0 +1,9 @@
+name: nicheformer
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - jupyterlab
+  - pip:
+    # - pip install -e . (in nicheformer directory)

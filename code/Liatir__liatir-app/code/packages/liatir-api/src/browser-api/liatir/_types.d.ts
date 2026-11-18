@@ -1,0 +1,48 @@
+import type { LiatirPluginRuntimesAPI } from "@liatir/core";
+import type { DesktopInterface } from "../modules/desktop/_types";
+import type { JobsInterface } from "../modules/rs/jobs/_types";
+import type { DepsInterface } from "../modules/rs/deps/_types";
+import type { ExternalWorkflowsInterface } from "../modules/rs/externalWorkflows/_types";
+import type { SingleCellIndexesInterface } from "../modules/rs/singleCellIndexes/_types";
+import type { SnpEffSuiteInterface } from "../modules/rs/snpEffSuite/_types";
+import type { RuntimeBoxesInterface } from "../modules/rs/runtimeBoxes/_types";
+import type { QcInterface } from "../modules/qc/_types";
+import type { WindowTauri } from "../core/_types";
+export type LiaPlatform = "macos" | "linux" | "windows";
+/** Browser/webview bridge exposed as window.Liatir inside the Tauri app. */
+export type LiatirBrowserAPI = {
+    readonly isAvailable: boolean;
+    readonly apiVersion: string;
+    readonly ready: Promise<true>;
+    invoke<T = unknown>(cmd: string, payload?: Record<string, unknown>): Promise<T>;
+    isDesktop: boolean;
+    /** Native desktop bridge — window, fs, notifications, clipboard, etc. */
+    desktop: DesktopInterface;
+    /** Async process manager — spawn, stream, kill any system binary. */
+    jobs: JobsInterface;
+    /** Check whether system tools are installed and get their versions. */
+    deps: DepsInterface;
+    /** Saved external scientific workflows executed through system engines such as Nextflow. */
+    externalWorkflows: ExternalWorkflowsInterface;
+    /** Verified catalog and app-global installation of reusable single-cell references. */
+    singleCellIndexes: SingleCellIndexesInterface;
+    /** Optional, verified SnpEff and SnpSift suite plus compatible genome databases. */
+    snpEffSuite: SnpEffSuiteInterface;
+    /** Explicit install, update, rollback and removal for signed Runtime Components. */
+    runtimeBoxes: RuntimeBoxesInterface;
+    pluginRuntimes: LiatirPluginRuntimesAPI;
+    scripts: import("@liatir/core").LiatirScriptsAPI;
+    qc: QcInterface;
+    tauri?: WindowTauri;
+    onReady: (callback: Function) => void;
+    openBrowser: (url: string) => Promise<void>;
+};
+/**
+ * @deprecated Use LiatirBrowserAPI for the window.Liatir webview bridge.
+ * LiatirAPI is kept only as a compatibility alias for older integrations.
+ */
+export type LiatirAPI = LiatirBrowserAPI;
+export interface LiatirInstanceInterface {
+    ready: () => boolean;
+    get: () => LiatirBrowserAPI;
+}

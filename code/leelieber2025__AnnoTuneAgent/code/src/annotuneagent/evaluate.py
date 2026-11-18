@@ -1,0 +1,183 @@
+# Copyright 2026 Zhao Li (李钊)
+# Licensed under the Apache License, Version 2.0
+
+"""Cluster-level comparison against author labels.
+
+Counts are the result. A rate that drops ``uncertain`` clusters is not reported,
+because refusing a label is part of the outcome.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+
+from anndata import AnnData
+
+from .evidence import cluster_ids
+
+
+def majority_label(labels: list[str]) -> str | None:
+    """Most common label. Equal top counts mean the reference is ambiguous."""
+    if not labels:
+        return None
+    counts = Counter(labels)
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+        return None
+    return ranked[0][0]
+
+
+# An unmapped author string still votes. The prefix cannot be a dictionary name.
+_UNMAPPED = "\x00unmapped:"
+
+
+def _author_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and value != value:
+        return None
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return None
+    return text
+
+
+def cluster_reference(raw_labels: list[object], mapped_labels: list[object]) -> str | None:
+    """Mapped name only when that name wins among every author-labeled cell.
+
+    Cells with no author string do not vote. Author strings that map to the
+    same dictionary name vote together. An author string that does not map
+    still votes, under its own raw text, and that vote cannot be the reference.
+    A mapped minority does not replace a larger unmapped group. A tie is None.
+    """
+    if len(raw_labels) != len(mapped_labels):
+        raise ValueError("raw and mapped labels differ in length")
+    votes: list[str] = []
+    for raw, mapped in zip(raw_labels, mapped_labels):
+        raw_text = _author_text(raw)
+        if raw_text is None:
+            continue
+        mapped_text = _author_text(mapped)
+        if mapped_text is None:
+            votes.append(f"{_UNMAPPED}{raw_text}")
+        else:
+            votes.append(mapped_text)
+    winner = majority_label(votes)
+    if winner is None or winner.startswith(_UNMAPPED):
+        return None
+    return winner
+
+
+def _coarse(predicted: str, reference: str, parents: dict[str, str]) -> bool:
+    if predicted == reference:
+        return True
+    if parents.get(predicted) == reference:
+        return True
+    if parents.get(reference) == predicted:
+        return True
+    return False
+
+
+def evaluate(
+    records: list[dict[str, object]],
+    adata: AnnData,
+    cluster_key: str,
+    label_key: str,
+    *,
+    parents: dict[str, str] | None = None,
+    prediction_key: str | None = None,
+    raw_label_key: str | None = None,
+) -> dict[str, object]:
+    """Compare one record per cluster with the majority author label in that cluster.
+
+    ``parents`` maps a label to the coarser label that still counts as a match.
+    Sibling types that share a parent do not match each other. When a workflow
+    wrote cell labels, ``prediction_key`` evaluates those final labels.
+    A workflow record has ``final_status``. Without ``prediction_key``, the
+    score uses ``written_label``, the title that was written, instead of the
+    marker ``status``. A record with no written title is uncertain, including
+    a cytotoxic mixture that was not written. ``prediction_key`` still scores
+    the labels on the cells, including a cluster that was split.
+    ``raw_label_key`` is the author string before alias mapping. With it, a
+    mapped name is the reference only when it wins among all author-labeled
+    cells. An unmapped raw majority is not replaced by a mapped minority.
+    """
+    if label_key not in adata.obs.columns:
+        raise KeyError(f"obs has no column {label_key!r}")
+    if prediction_key is not None and prediction_key not in adata.obs.columns:
+        raise KeyError(f"obs has no column {prediction_key!r}")
+    if raw_label_key is not None and raw_label_key not in adata.obs.columns:
+        raise KeyError(f"obs has no column {raw_label_key!r}")
+    parent_map = {} if parents is None else parents
+    by_cluster = {str(record["cluster"]): record for record in records}
+    n_exact = 0
+    n_coarse = 0
+    n_ambiguous = 0
+    n_label = 0
+    n_uncertain = 0
+    n_mixed = 0
+    per_cluster: list[dict[str, object]] = []
+    # A cell with no author label takes no part in the majority.
+    author = adata.obs[label_key]
+    known = author.notna()
+    groups = adata.obs[cluster_key].astype(str)
+    for cluster in cluster_ids(adata, cluster_key):
+        record = by_cluster.get(cluster, {"status": "uncertain", "cell_type": None})
+        status = str(record["status"])
+        predicted = record["cell_type"]
+        if "final_status" in record and prediction_key is None:
+            predicted = record.get("written_label")
+            status = "label" if predicted else "uncertain"
+        if prediction_key is not None:
+            labels = adata.obs.loc[groups == cluster, prediction_key]
+            names = labels.dropna().astype(str).unique()
+            if len(names) == 1 and not labels.isna().any():
+                status, predicted = "label", str(names[0])
+            elif len(names) == 0:
+                status, predicted = "uncertain", None
+            else:
+                status, predicted = "mixed", None
+        if status == "label":
+            n_label += 1
+        elif status == "uncertain":
+            n_uncertain += 1
+        elif status == "mixed":
+            n_mixed += 1
+        mask = groups == cluster
+        if raw_label_key is None:
+            reference = majority_label(author[mask & known].astype(str).tolist())
+        else:
+            reference = cluster_reference(
+                adata.obs.loc[mask, raw_label_key].tolist(),
+                author[mask].tolist(),
+            )
+        exact = False
+        coarse = False
+        if reference is None:
+            n_ambiguous += 1
+        elif status == "label" and isinstance(predicted, str):
+            exact = predicted == reference
+            coarse = _coarse(predicted, reference, parent_map)
+            n_exact += int(exact)
+            n_coarse += int(coarse)
+        per_cluster.append(
+            {
+                "cluster": cluster,
+                "status": status,
+                "predicted": predicted,
+                "reference": reference,
+                "exact": exact,
+                "coarse": coarse,
+            }
+        )
+    n_clusters = len(per_cluster)
+    return {
+        "n_clusters": n_clusters,
+        "n_label": n_label,
+        "n_uncertain": n_uncertain,
+        "n_mixed": n_mixed,
+        "n_ambiguous_reference": n_ambiguous,
+        "n_exact": n_exact,
+        "n_coarse": n_coarse,
+        "clusters": per_cluster,
+    }

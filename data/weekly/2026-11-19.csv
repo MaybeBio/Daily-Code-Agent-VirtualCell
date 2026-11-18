@@ -1,0 +1,515 @@
+repo,url,language,stars,last_commit,score,one_liner
+torvalds/linux,https://github.com/torvalds/linux,C,256171,2026-11-18T03:28:18Z,0,Linux内核仓库，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+K-Dense-AI/scientific-agent-skills,https://github.com/K-Dense-AI/scientific-agent-skills,Python,57688,2026-11-16T09:19:25Z,4,这是一个面向多学科科研的177个Agent技能库，虽包含单细胞RNA-seq等生物信息学技能，但并非聚焦虚拟细胞/器官或生物基座模型，属于通用科研Agent工具集。
+alibaba/open-code-review,https://github.com/alibaba/open-code-review,Go,54145,2026-11-18T13:43:50Z,0,这是一个AI代码审查CLI工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+bendlang/bend,https://github.com/bendlang/bend,TypeScript,25486,2026-11-18T14:56:54Z,0,这是一个名为Bend的编程语言项目，专注于通过数学证明防止AI编程错误，与单细胞/空间组学、生物基座模型或虚拟细胞等课题完全无关。
+ai-boost/awesome-prompts,https://github.com/ai-boost/awesome-prompts,Python,9275,2026-11-18T08:33:34Z,0,该仓库是面向通用LLM的提示词、框架和论文的精选列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+DeanChensj/jiangshan-map,https://github.com/DeanChensj/jiangshan-map,JavaScript,7889,2026-11-18T15:06:58Z,0,这是一个中国历史地图交互可视化项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+bowang-lab/MedSAM,https://github.com/bowang-lab/MedSAM,Jupyter Notebook,4450,2025-05-07T13:36:16Z,0,MedSAM是医学图像分割模型，面向CT/MR等影像，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+snap-stanford/Biomni,https://github.com/snap-stanford/Biomni,Python,4092,2026-11-16T19:06:06Z,7,Biomni 是一个通用生物医学 AI Agent，集成 LLM 推理与代码执行，支持 scRNA-seq 注释等任务，但非专用于单细胞基座模型或虚拟细胞建模。
+seandavi/awesome-single-cell,https://github.com/seandavi/awesome-single-cell,,3894,2026-11-15T09:31:44Z,2,这是一个单细胞数据分析软件包的资源列表，涵盖常规分析工具，但缺乏生物基座模型、细胞大语言模型或Agent实现，与课题核心方向关联微弱。
+taishi-i/awesome-ChatGPT-repositories,https://github.com/taishi-i/awesome-ChatGPT-repositories,Python,3383,2026-11-17T13:04:16Z,0,这是一个ChatGPT相关开源仓库的精选列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+luo-junyu/Awesome-Agent-Papers,https://github.com/luo-junyu/Awesome-Agent-Papers,,2878,2026-11-12T15:22:32Z,0,该仓库是通用LLM Agent论文资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+scverse/scanpy,https://github.com/scverse/scanpy,Python,2619,2026-11-17T13:38:46Z,2,Scanpy 是常规单细胞分析工具包，提供预处理、聚类、轨迹推断和可视化，但不涉及生物基座模型、大语言模型或 Agent 建模，与课题核心方向不匹配。
+coreos/go-oidc,https://github.com/coreos/go-oidc,Go,2506,2026-11-10T11:33:01Z,0,这是一个Go语言的OpenID Connect客户端库，用于身份认证，与单细胞/空间组学、生物基座模型等课题完全无关。
+TsinghuaC3I/Awesome-RL-for-LRMs,https://github.com/TsinghuaC3I/Awesome-RL-for-LRMs,TeX,2502,2026-11-18T03:56:23Z,0,该仓库是强化学习用于大型推理模型的综述与论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+LMD0311/Awesome-World-Model,https://github.com/LMD0311/Awesome-World-Model,,2305,2026-11-13T03:45:55Z,0,该仓库是自动驾驶/机器人世界模型的论文与资源汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+alibaba/yalantinglibs,https://github.com/alibaba/yalantinglibs,C++,2189,2026-11-05T00:57:07Z,0,这是一个C++20通用工具库集合，包含序列化、RPC、日志等，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+ai4s-research/awesome-ai-for-science,https://github.com/ai4s-research/awesome-ai-for-science,,2102,2026-11-18T08:36:30Z,2,这是一个跨学科AI4Science资源汇总清单，涵盖文献管理、论文转PPT、科研Agent等通用工具，但未聚焦单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向关联极弱。
+leofan90/Awesome-World-Models,https://github.com/leofan90/Awesome-World-Models,Python,2060,2026-11-13T13:18:54Z,0,该仓库是机器人/自动驾驶领域的世界模型论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+bowang-lab/scGPT,https://github.com/bowang-lab/scGPT,Jupyter Notebook,1668,2026-04-29T17:41:42Z,10,scGPT 是面向单细胞多组学的生成式预训练基座模型，提供预训练权重、微调与零样本推理代码，直接支撑细胞表征、注释、整合与参考映射等虚拟细胞建模核心任务。
+alibaba/rtp-llm,https://github.com/alibaba/rtp-llm,Python,1403,2026-11-18T17:10:37Z,0,RTP-LLM 是阿里巴巴的通用大语言模型推理加速引擎，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+ClawBio/ClawBio,https://github.com/ClawBio/ClawBio,Python,1186,2026-11-18T09:24:21Z,4,ClawBio 是一个面向生物信息学的通用 AI Agent 技能库，聚焦可复现的基因组/药物基因组学工作流，与单细胞/空间组学、虚拟细胞或生物基座模型无直接关联。
+sib-swiss/training-collection,https://github.com/sib-swiss/training-collection,Python,1160,2026-11-15T05:34:33Z,0,这是一个生物信息学培训材料汇总清单，涵盖通用技能和组学分析，但与虚拟细胞、生物基座模型或单细胞建模无关。
+bowang-lab/U-Mamba,https://github.com/bowang-lab/U-Mamba,Python,1033,2024-04-04T22:14:54Z,0,U-Mamba 是面向生物医学图像分割的 Mamba 模型，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+hyparam/hyparquet,https://github.com/hyparam/hyparquet,JavaScript,979,2026-11-17T06:17:24Z,0,这是一个用于在浏览器中解析Apache Parquet文件的JavaScript库，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+AspirinCode/papers-for-molecular-design-using-DL,https://github.com/AspirinCode/papers-for-molecular-design-using-DL,,954,2026-11-16T08:28:55Z,2,该仓库是分子/材料设计生成式AI论文列表，不涉及单细胞、空间组学或虚拟细胞/器官建模，与课题方向无关。
+COMBINE-lab/salmon,https://github.com/COMBINE-lab/salmon,Rust,946,2026-11-18T12:44:24Z,1,Salmon 是 RNA-seq 转录本定量工具，与单细胞/空间组学基座模型、虚拟细胞或生物大语言模型无关。
+harbor-framework/terminal-bench-science,https://github.com/harbor-framework/terminal-bench-science,Python,940,2026-11-18T07:54:51Z,2,这是一个跨科学领域的AI Agent基准测试仓库，不聚焦单细胞/空间组学或生物基座模型，与课题方向关联极弱。
+flyingdoog/awesome-graph-explainability-papers,https://github.com/flyingdoog/awesome-graph-explainability-papers,,820,2026-11-12T12:14:26Z,,[llm failed]
+yibie/awesome-autoresearch,https://github.com/yibie/awesome-autoresearch,Python,793,2026-11-18T05:52:36Z,0,该仓库是跨行业autoresearch用例的精选列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+scverse/anndata,https://github.com/scverse/anndata,Python,786,2026-11-17T16:46:51Z,2,anndata 是单细胞数据存储与处理的基础数据结构库，不涉及细胞基座模型、大语言模型或虚拟细胞建模，仅作为底层工具。
+bowang-lab/MedSAM2,https://github.com/bowang-lab/MedSAM2,Python,740,2025-07-11T22:49:02Z,0,MedSAM2 是面向 3D 医学图像和视频分割的模型，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+trackawesomelist/trackawesomelist,https://github.com/trackawesomelist/trackawesomelist,,701,2026-11-18T07:19:21Z,0,该仓库是跟踪awesome列表更新的工具，与单细胞/空间组学、生物基座模型等课题方向完全无关。
+PKU-YuanGroup/OpenAI4S,https://github.com/PKU-YuanGroup/OpenAI4S,Python,668,2026-11-17T18:42:54Z,4,OpenAI4S 是一个通用科学研究的 AI Agent 框架，虽包含单细胞 RNA 分析技能，但并非面向虚拟细胞/器官或生物基座模型，核心是通用科学代理而非细胞系统建模。
+OmicsML/awesome-foundation-model-single-cell-papers,https://github.com/OmicsML/awesome-foundation-model-single-cell-papers,,606,2026-11-13T19:24:59Z,8,这是一个单细胞基座模型论文与资源的精选清单，覆盖单细胞基座模型、虚拟细胞、AI Agent等方向，与课题高度相关但缺乏代码实现。
+google-gemma/awesome-gemma,https://github.com/google-gemma/awesome-gemma,,577,2026-11-18T09:32:13Z,2,这是一个Gemma大语言模型生态的awesome资源清单，核心是通用LLM，仅有一个Cell2Sentence-Scale单细胞微调模型条目与课题相关，但整体不聚焦单细胞/空间组学或生物基座建模。
+SpikingChen/SNN-Daily-Arxiv,https://github.com/SpikingChen/SNN-Daily-Arxiv,Python,524,2026-11-18T03:16:48Z,0,该仓库是脉冲神经网络（SNN）论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+imteekay/machine-learning-research,https://github.com/imteekay/machine-learning-research,Jupyter Notebook,457,2026-11-17T12:00:46Z,0,这是一个机器学习与AI学习资源汇总仓库，仅含学习路线和链接，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+fregu856/papers,https://github.com/fregu856/papers,,415,2026-11-17T18:00:54Z,2,这是一个个人论文阅读笔记仓库，虽包含少量单细胞/空间转录组相关论文，但本质是文献列表，无模型或Agent实现，与课题核心方向关联极弱。
+scverse/spatialdata,https://github.com/scverse/spatialdata,Python,410,2026-11-18T14:49:28Z,3,SpatialData 是空间组学数据框架与存储格式，提供数据读写与操作，但不涉及细胞基座模型、大语言模型或生物Agent建模，属于常规数据处理基础设施。
+bowang-lab/BioReason,https://github.com/bowang-lab/BioReason,Jupyter Notebook,407,2026-05-28T22:14:44Z,4,BioReason 是一个将DNA基础模型与LLM结合的多模态生物推理模型，面向基因组序列推理而非单细胞/空间组学，与课题核心方向关联较弱。
+OmicsML/dance,https://github.com/OmicsML/dance,Python,391,2026-11-16T17:09:42Z,4,DANCE 是面向单细胞和空间转录组数据的深度学习工具库与预处理推荐平台，聚焦细胞类型注释、聚类、插补等常规分析任务，不涉及生物基座模型、细胞大语言模型或生物Agent建模。
+theislab/ehrapy,https://github.com/theislab/ehrapy,Python,374,2026-11-17T22:18:35Z,1,ehrapy 是电子健康记录（EHR）分析框架，面向临床数据而非单细胞/空间组学，与虚拟细胞/生物基座模型方向无关。
+scverse/pertpy,https://github.com/scverse/pertpy,Python,360,2026-11-18T14:29:30Z,4,pertpy 是单细胞扰动实验分析框架，聚焦扰动响应与差异分析，不涉及虚拟细胞/器官或生物基座模型/大语言模型/Agent 建模。
+bowang-lab/EchoJEPA,https://github.com/bowang-lab/EchoJEPA,Python,356,2026-06-18T20:06:15Z,1,EchoJEPA 是面向超声心动图的医学影像基础模型，与单细胞/空间组学、虚拟细胞或生物基座模型方向无关。
+theislab/single-cell-transformer-papers,https://github.com/theislab/single-cell-transformer-papers,HTML,344,2026-08-16T18:00:37Z,6,该仓库是单细胞组学Transformer论文的综述与资源列表，虽聚焦于单细胞基座模型方向，但仅提供文献汇总而无模型或代码实现。
+Mic92/niks3,https://github.com/Mic92/niks3,Go,328,2026-11-18T12:01:07Z,0,这是一个基于S3的Nix二进制缓存与垃圾回收工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+bowang-lab/MedSAMSlicer,https://github.com/bowang-lab/MedSAMSlicer,Python,308,2025-04-07T14:45:20Z,0,这是医学图像分割工具MedSAM的3D Slicer插件，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+wd1511/Awesome-Diffusion-for-Image-Translation,https://github.com/wd1511/Awesome-Diffusion-for-Image-Translation,Python,274,2026-11-18T09:31:22Z,,[llm failed]
+toolsdk-ai/toolsdk-mcp-registry,https://github.com/toolsdk-ai/toolsdk-mcp-registry,TypeScript,273,2026-11-16T03:53:39Z,,[llm failed]
+Genentech/scimilarity,https://github.com/Genentech/scimilarity,Python,271,2026-03-14T21:49:09Z,8,SCimilarity 是一个基于单细胞表达谱的细胞基座模型，提供预训练表征和相似性搜索，支持细胞状态查询与大规模图谱利用，与虚拟细胞/细胞基座建模高度相关。
+alibaba/aacr-bench,https://github.com/alibaba/aacr-bench,Python,264,2026-11-16T12:36:19Z,0,这是一个面向多语言代码审查的基准测试仓库，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+alibaba/loongsuite-pilot,https://github.com/alibaba/loongsuite-pilot,TypeScript,263,2026-11-18T15:37:51Z,0,该仓库是AI编码代理的本地遥测收集器，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Tencent-Hunyuan/Hyra-results,https://github.com/Tencent-Hunyuan/Hyra-results,Python,258,2026-11-14T16:30:00Z,2,该仓库是腾讯Hyra研究Agent的成果汇总，涵盖数学、物理、量子、蛋白质等多个领域，其中仅HyCell是单细胞嵌入模型，但整体与虚拟细胞/器官、生物基座模型/Agent方向关联度很低。
+YoungDubbyDu/Awesome-LLM-Agent-Optimization-Papers,https://github.com/YoungDubbyDu/Awesome-LLM-Agent-Optimization-Papers,,252,2026-11-16T08:47:27Z,0,该仓库是LLM Agent优化技术的论文阅读清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+KaiWU5/Awesome-AI4AI,https://github.com/KaiWU5/Awesome-AI4AI,Python,225,2026-11-17T03:26:24Z,0,该仓库是AI4AI（AI改进AI）方向的论文与资源汇总清单，与单细胞/空间组学、虚拟细胞、生物基座模型等课题完全无关。
+andrew/ultimate-awesome,https://github.com/andrew/ultimate-awesome,,224,2026-11-18T00:31:44Z,0,这是一个自动生成的通用awesome列表索引，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+stjude-rust-labs/sprocket,https://github.com/stjude-rust-labs/sprocket,Rust,223,2026-11-18T17:09:19Z,0,这是一个基于WDL语言的生物信息学工作流执行引擎，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+p-gueguen/Spatial_transcriptomics_tools,https://github.com/p-gueguen/Spatial_transcriptomics_tools,,216,2026-11-12T07:33:24Z,4,该仓库是空间转录组学工具和资源的综合列表，虽涉及空间组学但主要聚焦于常规分析、可视化和流程，缺乏对虚拟细胞/器官或生物基座模型/Agent的深入实现。
+AI-in-Transportation-Lab/awesome-jepa,https://github.com/AI-in-Transportation-Lab/awesome-jepa,JavaScript,194,2026-11-17T07:14:20Z,0,该仓库是JEPA自监督学习方法的论文与资源汇总清单，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+openags/Awesome-AI-Scientist-Papers,https://github.com/openags/Awesome-AI-Scientist-Papers,,181,2026-11-17T09:32:32Z,2,该仓库是AI科学家论文的精选列表，涵盖文献综述、想法生成和虚拟实验等主题，但未涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+theislab/nicheformer,https://github.com/theislab/nicheformer,Jupyter Notebook,180,2025-11-23T13:38:26Z,9,Nicheformer 是一个面向单细胞和空间组学的基座模型，提供预训练权重和代码，直接契合虚拟细胞/器官建模方向。
+AI-in-Transportation-Lab/awesome-mechanistic-interpretability,https://github.com/AI-in-Transportation-Lab/awesome-mechanistic-interpretability,JavaScript,179,2026-11-18T05:36:00Z,0,这是一个机械可解释性（Mechanistic Interpretability）的资源清单仓库，聚焦于神经网络内部机制解析，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+inoue0426/awesome-computational-biology,https://github.com/inoue0426/awesome-computational-biology,Python,161,2026-11-16T21:30:21Z,3,这是一个计算生物学的资源汇总清单，虽涵盖单细胞基座模型和Agent条目，但本身只是目录，无模型或训练代码，与课题核心的虚拟细胞/器官建模直接价值有限。
+KalarisLabs/research-agent-skills,https://github.com/KalarisLabs/research-agent-skills,Python,160,2026-11-17T08:35:51Z,3,这是一个面向科研全流程的通用AI Agent技能库，包含Scanpy等单细胞分析技能，但并非针对虚拟细胞/基座模型/单细胞大模型方向，属于边缘相关。
+theislab/anndata2ri,https://github.com/theislab/anndata2ri,Python,154,2026-11-17T09:38:42Z,1,这是一个 AnnData 与 SingleCellExperiment 格式互转的 R/Python 桥接工具，仅做数据格式转换，与虚拟细胞/基座模型/Agent 建模无关。
+Xuchen-Li/llm-arxiv-daily,https://github.com/Xuchen-Li/llm-arxiv-daily,Python,146,2026-11-16T19:19:15Z,0,该仓库是通用LLM推理论文与代码的汇总列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+smiles724/Awesome-LLM-RLVR,https://github.com/smiles724/Awesome-LLM-RLVR,Python,144,2026-11-16T18:02:56Z,0,该仓库是LLM强化学习（RLVR）方向的论文与工具资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+sharkLoc/rust-in-bioinformatics,https://github.com/sharkLoc/rust-in-bioinformatics,Python,142,2026-11-12T01:33:57Z,1,这是一个Rust生物信息学工具列表仓库，涵盖序列比对、BAM/FASTQ处理等常规工具，与单细胞基座模型、虚拟细胞或生物大语言模型方向无关。
+Lotfollahi-lab/nichecompass,https://github.com/Lotfollahi-lab/nichecompass,Python,136,2026-11-09T09:20:25Z,7,NicheCompass 是基于图神经网络的空间多组学分析工具，用于细胞生态位识别、细胞通讯推断和空间参考映射，虽非基座模型或大语言模型，但其细胞图嵌入和空间建模方法对虚拟细胞/器官的空间表征具有可迁移价值。
+open-guji/luatex-cn,https://github.com/open-guji/luatex-cn,Lua,135,2026-11-18T05:21:17Z,0,这是一个基于LuaTeX的中文排版宏包，用于古籍和现代中文排版，与单细胞/空间组学、生物基座模型等课题完全无关。
+frederikkemarin/BEND,https://github.com/frederikkemarin/BEND,Python,134,2026-11-18T16:18:49Z,3,BEND 是 DNA 语言模型在基因组功能任务上的基准测试框架，不涉及单细胞/空间组学或虚拟细胞建模，仅方法上可部分迁移。
+sokrypton/py2Dmol,https://github.com/sokrypton/py2Dmol,Jupyter Notebook,115,2026-11-17T21:18:17Z,0,这是一个蛋白质/DNA/RNA结构2D可视化Python库，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+iszhanjiawei/flow_matching_arxiv_daily,https://github.com/iszhanjiawei/flow_matching_arxiv_daily,Python,106,2026-11-18T05:15:34Z,0,该仓库是Flow Matching相关论文的每日更新列表，内容涵盖图像、语音、机器人等多个领域，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+ratschlab/DeepSpot,https://github.com/ratschlab/DeepSpot,Python,106,2026-11-14T08:28:20Z,6,DeepSpot 从 H&E 图像预测空间转录组，属于虚拟空间转录组建模，但非单细胞基座模型或生物大语言模型，与课题核心方向部分相关。
+Omni-Scientist/Awesome-AI-Scientist,https://github.com/Omni-Scientist/Awesome-AI-Scientist,Python,105,2026-11-13T17:50:36Z,2,这是一个AI科学家系统、基准和数据集的总览清单，面向通用科学发现，不涉及单细胞/空间组学或虚拟细胞/器官建模，与课题方向无关。
+shandley/awesome-virome,https://github.com/shandley/awesome-virome,Python,96,2026-11-15T15:35:41Z,0,该仓库是病毒组学分析工具的资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型方向无关。
+EvoLinkAI/awesome-claude-fable-5-2-use-cases,https://github.com/EvoLinkAI/awesome-claude-fable-5-2-use-cases,Python,92,2026-11-17T04:02:07Z,0,该仓库是Claude Fable 5.2模型的使用案例汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+scverse/cookiecutter-scverse,https://github.com/scverse/cookiecutter-scverse,Python,91,2026-11-18T13:02:30Z,0,这是一个用于创建scverse生态Python包的项目模板，与虚拟细胞/器官、生物基座模型或Agent无关。
+stanford-star/plurel,https://github.com/stanford-star/plurel,Python,90,2026-11-16T23:52:54Z,0,PluRel 是生成合成关系数据库以预训练关系型基座模型的工具，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+mandel0614/circle-lang,https://github.com/mandel0614/circle-lang,Python,88,2026-11-16T14:29:15Z,8,Circle 是一个面向虚拟细胞系统的声明式编程语言，通过 BioIR 中间表示和多种执行 profile 实现细胞行为建模与表型验证，与虚拟细胞/虚拟器官方向高度契合。
+Lotfollahi-lab/terra,https://github.com/Lotfollahi-lab/terra,Python,79,2026-11-11T13:19:27Z,,[llm failed]
+refgenie/refgenie,https://github.com/refgenie/refgenie,Python,74,2026-11-17T16:48:28Z,1,Refgenie 是参考基因组资产管理器，用于组织、构建和提供参考基因组文件，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+camlab-bioml/rakaia,https://github.com/camlab-bioml/rakaia,Python,73,2026-11-18T17:17:41Z,2,rakaia 是一个浏览器端的空间生物学可视化分析工具，侧重图像浏览和常规分析，不涉及细胞基座模型或虚拟细胞建模。
+scverse/annbatch,https://github.com/scverse/annbatch,Python,72,2026-11-18T14:58:34Z,4,annbatch 是面向 AnnData 的 mini-batch 数据加载器，为大规模单细胞数据训练提供基础设施，但本身不实现细胞基座模型或生物Agent，仅作为底层工具可迁移复用。
+Mic92/nix-grpc-store,https://github.com/Mic92/nix-grpc-store,C++,71,2026-11-18T10:12:40Z,0,该仓库是Nix包管理器的gRPC远程存储访问工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+ratschlab/DeepSpotM,https://github.com/ratschlab/DeepSpotM,Python,62,2026-11-16T19:35:31Z,8,DeepSpot-M 是一个多模态基础模型，从组织学图像预测全转录组空间基因表达，利用单细胞基础模型（如 scGPT）的基因嵌入，与虚拟空间转录组和细胞表征建模高度相关。
+databio/pepatac,https://github.com/databio/pepatac,Python,61,2026-11-17T19:10:40Z,0,PEPATAC 是 ATAC-seq 数据处理流水线，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+sokrypton/localfold,https://github.com/sokrypton/localfold,JavaScript,53,2026-11-18T14:00:24Z,0,LocalFold 是浏览器端蛋白质结构预测工具，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+the-omics-os/lobster,https://github.com/the-omics-os/lobster,Python,51,2026-11-12T15:58:29Z,6,Lobster AI 是一个面向多组学（含单细胞转录组）的多智能体分析系统，通过 LLM 编排 Scanpy 等工具完成聚类、注释和轨迹推断，属于生物 Agent 方向但未涉及基座模型或虚拟细胞建模。
+ZhuYingJessica/cv-daily,https://github.com/ZhuYingJessica/cv-daily,Python,50,2026-11-18T04:48:33Z,0,该仓库是计算机视觉深度估计与语义分割的论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Yuejingkun/Awesome-Biomedical-World-Models,https://github.com/Yuejingkun/Awesome-Biomedical-World-Models,,50,2026-11-13T02:40:58Z,,[llm failed]
+ClassicMiniDIY/UltraLog,https://github.com/ClassicMiniDIY/UltraLog,Rust,48,2026-11-18T00:36:38Z,,[llm failed]
+Xuchen-Li/cv-arxiv-daily,https://github.com/Xuchen-Li/cv-arxiv-daily,Python,48,2026-11-16T18:23:28Z,0,该仓库是计算机视觉目标跟踪领域的论文列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+rainmana/awesome-rainmana,https://github.com/rainmana/awesome-rainmana,Python,46,2026-11-15T00:26:25Z,0,这是一个个人GitHub星标收藏列表，内容涵盖编程语言、安全、系统工具等，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+biomap-research/PFMBench,https://github.com/biomap-research/PFMBench,Python,45,2025-08-01T05:25:58Z,2,PFMBench是蛋白质基座模型基准测试套件，面向蛋白质序列/结构任务，与单细胞/空间组学、虚拟细胞或生物大语言模型方向无关。
+uhlerlab/spatialfusion,https://github.com/uhlerlab/spatialfusion,Jupyter Notebook,45,2026-11-13T20:27:59Z,6,SpatialFusion 是一个整合空间转录组与H&E病理图像的多模态深度学习框架，利用scGPT等基座模型生成细胞嵌入并映射到空间生态位，虽非虚拟细胞/器官基座模型，但方法可迁移至细胞系统建模。
+gaahrdner/starred,https://github.com/gaahrdner/starred,,43,2026-11-18T07:57:23Z,0,这是一个个人GitHub星标收藏的awesome列表，内容涵盖各种编程语言和项目，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+scverse/ecosystem-packages,https://github.com/scverse/ecosystem-packages,Python,42,2026-11-18T08:43:14Z,2,该仓库是scverse生态包注册列表，仅用于收录和展示单细胞分析工具，不涉及虚拟细胞、基座模型或Agent建模。
+SMRUCC/GCModeller,https://github.com/SMRUCC/GCModeller,Visual Basic .NET,38,2026-11-18T07:12:11Z,3,GCModeller是一个面向基因组学与系统生物学的.NET分析平台，包含单细胞分析工具，但核心是常规基因组注释、转录组和代谢通路分析，不涉及生物基座模型、细胞大语言模型或虚拟细胞建模。
+mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-,https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-,Jupyter Notebook,36,2026-11-18T14:16:25Z,6,这是一个面向生物医学的Agent技能库与运行时平台，涵盖单细胞/空间组学技能及单细胞基座模型（如TranscriptFormer），但核心是通用生物医学Agent编排而非虚拟细胞/器官建模。
+JuneYaooo/awesome-medical-ai,https://github.com/JuneYaooo/awesome-medical-ai,,36,2026-11-17T02:45:18Z,2,这是一个医疗AI项目汇总清单，涵盖医学LLM、影像、多智能体等，但未涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+XuzhaoLi/ro-arxiv-daily,https://github.com/XuzhaoLi/ro-arxiv-daily,Python,36,2026-11-16T17:58:03Z,0,该仓库是路径规划、自动驾驶、大语言模型等领域的论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Lotfollahi-lab/Perturbgen,https://github.com/Lotfollahi-lab/Perturbgen,Python,35,2026-11-17T13:32:59Z,,[llm failed]
+theislab/multigrate,https://github.com/theislab/multigrate,Python,35,2026-11-16T20:14:15Z,,[llm failed]
+hrlblab/computer_vision_spatial_omics,https://github.com/hrlblab/computer_vision_spatial_omics,,35,2026-11-15T21:42:32Z,4,这是一个关于视觉驱动空间组学模型的论文与资源清单，虽涉及空间转录组学，但主要是综述汇总，缺乏模型训练或Agent实现，与虚拟细胞/基座模型方向关联较弱。
+nanxstats/r-rust-pkgs,https://github.com/nanxstats/r-rust-pkgs,R,35,2026-11-13T21:08:22Z,0,该仓库是CRAN上使用Rust的R包列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+thelovelab/fishpond,https://github.com/thelovelab/fishpond,R,33,2026-11-18T13:05:57Z,2,Fishpond是用于RNA-seq差异表达分析（Swish）和定量数据加载的R包，属于常规转录组分析工具，不涉及单细胞/空间组学、细胞基座模型或生物Agent。
+YuzeHao2023/daily-arxiv-ai4chem,https://github.com/YuzeHao2023/daily-arxiv-ai4chem,Python,32,2026-11-16T17:58:46Z,0,该仓库是分子表示、图神经网络等论文的汇总清单，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+Peg-Wu/DeSCOPE,https://github.com/Peg-Wu/DeSCOPE,Python,30,2026-11-17T02:35:22Z,8,DeSCOPE 是一个基于条件变分自编码器和ESM2蛋白语言模型的单细胞扰动预测框架，面向scRNA-seq/scATAC-seq，可迁移至虚拟细胞建模。
+abordage/awesome-mcp,https://github.com/abordage/awesome-mcp,,30,2026-11-18T12:15:54Z,0,这是一个MCP服务器/客户端/框架的通用awesome清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ChrisW09/Python-for-AI-Driven-Automation,https://github.com/ChrisW09/Python-for-AI-Driven-Automation,Jupyter Notebook,29,2026-11-15T15:27:32Z,,[llm failed]
+ratschlab/aestetik,https://github.com/ratschlab/aestetik,Jupyter Notebook,28,2026-11-17T14:21:45Z,6,AESTETIK 是一个面向空间转录组的多模态自编码器表征学习工具，整合转录组、形态和拓扑信息，但主要聚焦于表征学习与聚类，而非虚拟细胞/器官基座模型或生物大语言模型。
+anti43/openyabs,https://github.com/anti43/openyabs,Java,27,2026-11-18T17:25:56Z,0,这是一个面向自由职业者和中小企业的开源商业软件（报价、订单、发票、记账），与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+liuzhenqi77/awesome-stars,https://github.com/liuzhenqi77/awesome-stars,,27,2026-11-15T07:00:35Z,0,这是一个个人GitHub星标收藏的awesome列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+theislab/cellink,https://github.com/theislab/cellink,Python,25,2026-11-17T17:53:42Z,2,cellink 是连接供体基因型与单细胞谱系进行遗传关联分析的流程工具，不涉及虚拟细胞/器官、生物基座模型或 Bio Agent 建模，与课题方向无关。
+CellProfiling/subcell-embed,https://github.com/CellProfiling/subcell-embed,Python,25,2026-11-16T00:03:18Z,4,SubCell 是基于荧光显微图像的蛋白质定位与细胞形态自监督视觉基座模型，不涉及单细胞/空间组学数据或生物大语言模型/Agent，与课题核心方向关联较弱。
+saforem2/awesome-stars,https://github.com/saforem2/awesome-stars,,24,2026-11-18T07:55:17Z,0,这是一个个人GitHub星标汇总列表，内容涵盖系统工具、编程语言、HPC等，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+polyidoit/Arxiv-Quantum,https://github.com/polyidoit/Arxiv-Quantum,Python,24,2026-11-18T05:32:05Z,0,该仓库是量子信息与量子基础物理方向的论文列表，与单细胞/空间组学、生物基座模型或虚拟细胞完全无关。
+jxucoder/Awesome-Tabular-Foundation-Models,https://github.com/jxucoder/Awesome-Tabular-Foundation-Models,,24,2026-11-15T07:29:55Z,0,该仓库是表格基础模型的资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+chengwang96/Awesome-World-Models-for-Healthcare,https://github.com/chengwang96/Awesome-World-Models-for-Healthcare,Python,23,2026-11-18T08:37:27Z,5,这是一个医疗健康领域世界模型的论文与资源清单，涵盖细胞动态与转录组建模，但仅为综述汇总，无模型训练或Agent实现代码。
+JuneYaooo/awesome-medical-ai-skills,https://github.com/JuneYaooo/awesome-medical-ai-skills,,23,2026-11-17T02:45:09Z,0,这是一个医疗AI技能和MCP服务器的精选列表，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+ratschlab/DeepSpot2Cell,https://github.com/ratschlab/DeepSpot2Cell,Python,23,2026-11-14T08:28:11Z,8,DeepSpot2Cell 从 H&E 图像预测虚拟单细胞空间转录组，面向单细胞/空间组学，使用病理基础模型进行细胞级表达预测，与虚拟细胞建模高度相关。
+theislab/embpy,https://github.com/theislab/embpy,Python,23,2026-11-13T15:01:14Z,6,embpy 是一个统一 API 的生物实体嵌入工具包，支持单细胞、基因、蛋白等嵌入生成与比较，但主要聚焦嵌入工具而非虚拟细胞/基座模型训练或 Agent 建模。
+theislab/ReconEval,https://github.com/theislab/ReconEval,Jupyter Notebook,22,2026-11-13T15:18:35Z,7,ReconEval 是一个从单细胞潜在表征重建基因表达的基准，评估多种基座模型（如 scGPT、scConcept）的细胞表征质量，与细胞基座模型评估高度相关，但非直接构建虚拟细胞或Agent。
+AI-in-Transportation-Lab/awesome-kan,https://github.com/AI-in-Transportation-Lab/awesome-kan,JavaScript,21,2026-11-18T05:01:32Z,1,该仓库是Kolmogorov-Arnold网络（KAN）的论文与资源汇总清单，与单细胞/空间组学、虚拟细胞或生物基座模型无直接关联。
+Yixf-Education/killer_tools,https://github.com/Yixf-Education/killer_tools,,21,2026-11-17T01:34:15Z,0,这是一个R语言工具和配色方案的资源清单，与虚拟细胞、单细胞基座模型或生物大语言模型无关。
+Genentech/AssayBench,https://github.com/Genentech/AssayBench,Python,20,2026-09-30T04:01:32Z,2,AssayBench 是一个用于评估表型筛选预测模型的基准，聚焦 CRISPR 筛选基因排序，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+COMBINE-lab/sshash-rs,https://github.com/COMBINE-lab/sshash-rs,Rust,20,2026-11-18T17:16:14Z,0,这是一个k-mer压缩字典的Rust实现，属于序列索引数据结构，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+YuzeHao2023/daily-arxiv-ai4bio,https://github.com/YuzeHao2023/daily-arxiv-ai4bio,Python,20,2026-11-16T18:07:32Z,2,这是一个按主题分类的arXiv论文列表仓库，涵盖蛋白质结构、基因组学、单细胞与空间多组学等，但仅提供论文链接和代码占位，无模型实现或训练代码，与虚拟细胞/基座模型课题关联极弱。
+Lyz103/LLM-Agent-Paper-daily,https://github.com/Lyz103/LLM-Agent-Paper-daily,Python,20,2026-11-16T17:56:06Z,0,该仓库是通用AI Agent论文的汇总列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ZZhangsm/Awesome-Virtual-Spatial-Omics-Generation,https://github.com/ZZhangsm/Awesome-Virtual-Spatial-Omics-Generation,,20,2026-11-14T15:45:53Z,4,该仓库是H&E图像到虚拟空间组学翻译的论文/代码/数据集资源清单，虽涉及空间转录组和生成模型，但核心是图像到组学的翻译而非单细胞基座模型或生物大语言模型，且无模型训练/Agent实现。
+zeleny-ondrej/STNN-Weekly-Arxiv,https://github.com/zeleny-ondrej/STNN-Weekly-Arxiv,Python,20,2026-11-17T04:15:36Z,0,该仓库是通用时空神经网络论文的列表汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+QIANJINYDX/Awesome-DNA-Foundation-Models,https://github.com/QIANJINYDX/Awesome-DNA-Foundation-Models,,18,2026-11-18T00:15:40Z,2,该仓库是DNA基础模型、基因组预训练语料和评估基准的资源清单，聚焦DNA序列而非单细胞/空间组学，与虚拟细胞/生物基座模型方向无关。
+yenanjing/awesome-harness-engineering,https://github.com/yenanjing/awesome-harness-engineering,Python,18,2026-11-18T11:33:05Z,0,该仓库是AI Agent系统构建的harness工程资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Nicolas99-9/llm-agent-simulation-papers,https://github.com/Nicolas99-9/llm-agent-simulation-papers,,18,2026-11-18T00:13:03Z,0,该仓库是LLM智能体与社会模拟论文的每日阅读清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+DiscoAILab/OSWorld-Science,https://github.com/DiscoAILab/OSWorld-Science,Python,17,2026-11-17T12:10:29Z,,[llm failed]
+Genentech/jmpost,https://github.com/Genentech/jmpost,R,17,2026-11-17T10:31:38Z,0,该仓库是用于肿瘤临床试验中生存数据与肿瘤大小纵向数据联合建模的R包，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+FridrichMethod/awesome-skills,https://github.com/FridrichMethod/awesome-skills,Python,17,2026-11-15T10:19:23Z,2,这是一个聚合Claude Code/Codex Agent技能的通用资源库，虽含AI4Protein等生物信息学技能，但非面向单细胞/空间组学的基座模型或虚拟细胞建模，与课题核心方向无关。
+Genentech/scallops,https://github.com/Genentech/scallops,Python,16,2026-11-18T13:57:53Z,0,SCALLOPS是用于光学池化筛选成像数据分析的Python包，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+theislab/ehrdata,https://github.com/theislab/ehrdata,Python,16,2026-11-17T14:22:45Z,0,该仓库是面向电子健康记录（EHR）的数据存储与处理框架，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+bigbio/sdrf-annotated-datasets,https://github.com/bigbio/sdrf-annotated-datasets,Python,16,2026-11-18T09:24:02Z,1,该仓库是蛋白质组学数据集的SDRF元数据注释资源，与单细胞/空间组学、虚拟细胞或生物基座模型方向无关。
+YuzeHao2023/daily-arxiv-ai4physics,https://github.com/YuzeHao2023/daily-arxiv-ai4physics,Python,16,2026-11-16T17:33:11Z,0,该仓库是科学机器学习与物理信息神经网络等领域的论文列表汇总，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+hugefiver/mystars,https://github.com/hugefiver/mystars,,16,2026-11-17T18:11:56Z,0,这是一个个人GitHub星标收藏的通用列表仓库，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+immcantation/immcantation,https://github.com/immcantation/immcantation,Jupyter Notebook,15,2026-11-17T20:19:45Z,0,该仓库是免疫组库（BCR/TCR）测序分析框架，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+COMBINE-lab/piscem-rs,https://github.com/COMBINE-lab/piscem-rs,Rust,15,2026-11-17T22:38:05Z,2,这是一个基于k-mer的读段比对工具，支持单细胞RNA/ATAC数据映射，但属于比对流水线，不涉及细胞表征、基座模型或虚拟细胞建模。
+databricks-industry-solutions/genesis-workbench,https://github.com/databricks-industry-solutions/genesis-workbench,Python,15,2026-11-16T20:52:19Z,7,Databricks 上的生命科学工作台，封装 scGPT、SCimilarity 等单细胞基座模型与工作流，支持细胞注释、相似性搜索、扰动预测，但侧重平台集成而非虚拟细胞/器官建模。
+FengxianJi/The-Library-of-AI-Scientist,https://github.com/FengxianJi/The-Library-of-AI-Scientist,Python,15,2026-11-18T16:46:22Z,2,这是一个AI科学家论文的汇总清单，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+YuzeHao2023/daily-arxiv-ai4math,https://github.com/YuzeHao2023/daily-arxiv-ai4math,Python,15,2026-11-16T17:51:13Z,0,该仓库是形式化方法与自动推理方向的论文列表，与单细胞/空间组学、生物基座模型或虚拟细胞完全无关。
+theislab/interscale,https://github.com/theislab/interscale,Python,14,2026-11-16T20:08:03Z,3,InterScale 是空间转录组数据中细胞相互作用分析的工具包，不涉及生物基座模型、细胞大语言模型或虚拟细胞建模，与课题核心方向关联较弱。
+NEXGEM/STP-Bench,https://github.com/NEXGEM/STP-Bench,Python,14,2026-11-18T14:22:44Z,4,STP-Bench 是一个从病理图像预测空间转录组的基准测试框架，虽涉及空间组学但聚焦图像到基因表达预测，而非细胞基座模型或虚拟细胞建模。
+yenanjing/awesome-ai-for-science,https://github.com/yenanjing/awesome-ai-for-science,Python,14,2026-11-18T11:33:54Z,2,这是一个AI科研自动化工具与智能体的精选列表，涵盖AI科学家框架、深度研究Agent等，但未聚焦单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向关联度低。
+YuzeHao2023/daily-arxiv-ai4cheme,https://github.com/YuzeHao2023/daily-arxiv-ai4cheme,Python,14,2026-11-16T18:10:50Z,0,该仓库是化学工程/过程建模领域的论文列表，与单细胞、空间组学、虚拟细胞或生物基座模型完全无关。
+natemurthy/world-models,https://github.com/natemurthy/world-models,,13,2026-11-18T14:20:04Z,2,这是一份关于通用世界模型架构的综述，虽提及细胞等系统但非面向单细胞/空间组学或生物基座模型，与课题核心方向无关。
+ZhihaoPENG-CityU/Awesome-Self-Evolving-AI-for-Agentic-Healthcare,https://github.com/ZhihaoPENG-CityU/Awesome-Self-Evolving-AI-for-Agentic-Healthcare,Python,13,2026-11-15T04:26:38Z,2,这是一个关于医疗保健领域自进化AI与Agent的论文和资源清单，聚焦临床工作流与多模态临床AI，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+Luffy03/MicroAtlas,https://github.com/Luffy03/MicroAtlas,Jupyter Notebook,13,2026-11-14T03:11:45Z,4,MicroAtlas 是一个跨显微镜模态的细胞分割基础模型，虽涉及空间转录组学分析，但核心是图像分割而非单细胞/空间组学数据驱动的生物基座模型或细胞大语言模型，与课题方向关联较弱。
+BaranziniLab/biorouter,https://github.com/BaranziniLab/biorouter,Rust,13,2026-11-18T08:24:03Z,2,UCSF Biorouter 是一个面向生物医学研究的 AI 智能体环境，侧重隐私保护与临床数据连接，不涉及单细胞/空间组学基座模型或虚拟细胞建模。
+webappski/aeo-platform,https://github.com/webappski/aeo-platform,JavaScript,13,2026-11-16T16:28:10Z,0,这是一个用于衡量品牌在AI搜索引擎中可见度的AEO（答案引擎优化）工具，与单细胞/空间组学、生物基座模型或虚拟细胞等课题完全无关。
+CellArr/cellarr,https://github.com/CellArr/cellarr,Python,12,2026-11-16T21:28:09Z,,[llm failed]
+lucidrains/supermimic-pytorch,https://github.com/lucidrains/supermimic-pytorch,Python,11,2026-11-18T16:57:59Z,0,该仓库是机器人全身控制世界模型的非官方实现，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+acidgenomics/koopa,https://github.com/acidgenomics/koopa,Python,11,2026-11-17T11:23:34Z,0,这是一个用于数据科学的Shell引导加载器，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+AIML-SIG/awesome-ai-ml-pharmacometrics,https://github.com/AIML-SIG/awesome-ai-ml-pharmacometrics,Jupyter Notebook,10,2026-11-15T11:03:36Z,2,这是一个药代动力学/药效学（PK/PD）与临床药理学的AI/ML论文资源清单，聚焦药物剂量、依从性、暴露-反应等，与单细胞/空间组学、虚拟细胞/器官、生物基座模型/Agent方向无关。
+nanduan/nanduan.github.io,https://github.com/nanduan/nanduan.github.io,SCSS,10,2026-11-17T13:19:10Z,0,这是个人学术主页，介绍NLP/AI研究者段楠及其在语言、视觉、具身智能等领域的工作，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+COLA-Laboratory/Awesome-RNA-Foundation-Models,https://github.com/COLA-Laboratory/Awesome-RNA-Foundation-Models,Python,9,2026-11-18T10:53:16Z,3,这是一个RNA序列基础模型资源清单，聚焦RNA序列而非单细胞/空间组学，且为纯列表无模型实现，与虚拟细胞/生物基座方向关联较弱。
+getwilds/wilds-docker-library,https://github.com/getwilds/wilds-docker-library,Dockerfile,9,2026-11-13T00:32:08Z,1,这是一个生物信息学工具的Docker镜像集合，与虚拟细胞/单细胞基座模型等课题方向无关。
+knowlab/KnowLab-seminars,https://github.com/knowlab/KnowLab-seminars,,9,2026-11-16T12:52:22Z,0,该仓库是实验室论文报告日程表，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+Lotfollahi-lab/terra-reproducibility,https://github.com/Lotfollahi-lab/terra-reproducibility,Jupyter Notebook,8,2026-11-17T15:24:14Z,6,该仓库是NicheJEPA的可复现性代码，专注于单细胞/空间转录组数据的tokenization和数据集构建，为细胞基座模型提供数据预处理，但本身不包含模型训练或Agent实现。
+theislab/gh-dashboard,https://github.com/theislab/gh-dashboard,HTML,8,2026-11-18T12:10:19Z,0,这是一个GitHub仓库状态仪表盘，仅列出theislab组织下各仓库的元数据，不包含任何模型、代码或与虚拟细胞/生物基座模型相关的内容。
+LTLA/BiocSingular,https://github.com/LTLA/BiocSingular,R,8,2026-11-18T02:14:40Z,0,该仓库是Bioconductor生态中提供SVD和PCA统一接口的数值计算工具包，与单细胞基座模型、虚拟细胞或生物大语言模型等课题方向无关。
+dingyucanada/Awesome-Medical-AI,https://github.com/dingyucanada/Awesome-Medical-AI,Python,8,2026-11-18T06:16:08Z,,[llm failed]
+awesomezun/awesome-showreels,https://github.com/awesomezun/awesome-showreels,JavaScript,8,2026-11-12T14:36:11Z,0,该仓库是一个用AI生成动态图形展示视频（showreel）的Agent技能，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+anvilproject/anvil-docker,https://github.com/anvilproject/anvil-docker,Shell,7,2026-11-17T15:13:56Z,0,该仓库仅提供AnVIL项目的Docker容器配置，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+mdbabumiamssm/AI-Agentic-Skills-by-Dr.-Mia,https://github.com/mdbabumiamssm/AI-Agentic-Skills-by-Dr.-Mia,Jupyter Notebook,7,2026-11-18T14:16:14Z,2,这是一个多领域AI Agent技能与工作流的综合资源库，虽涉及基因组学但并非聚焦单细胞/空间组学的生物基座模型或虚拟细胞建模，与课题核心方向关联微弱。
+atultiwari/awesome-ai-pathology,https://github.com/atultiwari/awesome-ai-pathology,Python,7,2026-11-18T12:15:25Z,2,这是一个病理学AI资源清单，涵盖病理图像基础模型和视觉语言模型，但核心是组织病理图像而非单细胞/空间组学，且为资源列表而非模型实现，与虚拟细胞/基座模型方向关联弱。
+hrlblab/journal_club,https://github.com/hrlblab/journal_club,,7,2026-11-13T15:21:02Z,0,这是一个论文阅读小组的日程安排仓库，内容涵盖计算机视觉、多模态、Agent等，与单细胞/空间组学/生物基座模型完全无关。
+rootstudioyaml/sprag,https://github.com/rootstudioyaml/sprag,JavaScript,7,2026-11-18T07:41:05Z,0,该仓库是面向Claude Code/Codex的模型路由与成本优化工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+elixir-europe-training/ELIXIR-Training-SPLASH,https://github.com/elixir-europe-training/ELIXIR-Training-SPLASH,HTML,6,2026-11-17T20:26:34Z,,[llm failed]
+Ponkux/DailyArXiv-cp,https://github.com/Ponkux/DailyArXiv-cp,Python,6,2026-11-13T12:12:22Z,0,该仓库是arXiv论文自动抓取列表，主题为具身智能与机器人，与单细胞/空间组学、生物基座模型等课题方向完全无关。
+scverse/cookiecutter-scverse-instance,https://github.com/scverse/cookiecutter-scverse-instance,Python,5,2026-11-18T13:02:52Z,0,这是一个由cookiecutter模板生成的示例仓库，仅用于展示项目结构，与虚拟细胞、单细胞基座模型或生物Agent等课题方向无关。
+GregorLueg/ann-search-rs,https://github.com/GregorLueg/ann-search-rs,Rust,5,2026-11-17T14:00:38Z,3,这是一个面向单细胞数据的高性能近似最近邻搜索库，提供kNN图构建等基础计算能力，但仅作为底层工具，不涉及细胞表征、基座模型或Agent建模。
+YuzeHao2023/daily-arxiv-ai4polymer,https://github.com/YuzeHao2023/daily-arxiv-ai4polymer,Python,5,2026-11-16T18:01:03Z,,[llm failed]
+YuzeHao2023/daily-arxiv-ai4economy,https://github.com/YuzeHao2023/daily-arxiv-ai4economy,Python,5,2026-11-16T17:56:33Z,0,该仓库是经济学与金融NLP方向的论文列表汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Luosanj/VOICE_HE_ST_Pred,https://github.com/Luosanj/VOICE_HE_ST_Pred,Python,5,2026-11-13T01:28:28Z,7,VOICE 是一个从 H&E 图像预测原位单细胞基因表达的视觉-组学基础模型，结合检索与融合，虽非直接面向虚拟细胞/器官或生物大语言模型，但其单细胞空间组学基础建模方法可迁移。
+YuzeHao2023/daily-arxiv-ai4geo,https://github.com/YuzeHao2023/daily-arxiv-ai4geo,Python,5,2026-11-16T17:41:02Z,0,该仓库是地震学与地球物理AI论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+rootrasel/AI-for-Computational-Life-Sciences,https://github.com/rootrasel/AI-for-Computational-Life-Sciences,Python,5,2026-11-17T10:26:42Z,3,这是一个AI生命科学综合课程与代码仓库，覆盖单细胞分析等模块，但核心是教学与常规pipeline，不聚焦虚拟细胞/基座模型/Agent建模。
+Evian-Zhang/awesome-rust-papers,https://github.com/Evian-Zhang/awesome-rust-papers,TeX,5,2026-11-16T07:46:41Z,0,该仓库是Rust编程语言学术论文的精选清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+MMatinGerami/zero-shot-perturbation,https://github.com/MMatinGerami/zero-shot-perturbation,Python,5,2026-11-16T20:39:55Z,6,该仓库是虚拟细胞挑战赛的零样本扰动响应预测基线，基于CRISPRi Perturb-seq数据跨细胞系迁移，虽涉及单细胞和细胞状态预测，但方法为简单线性迁移基线而非基座模型或Agent。
+Kaike-Zhang/Robust_arXiv_daily,https://github.com/Kaike-Zhang/Robust_arXiv_daily,Python,5,2026-11-16T18:08:19Z,0,该仓库是推荐系统鲁棒性方向的论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Boom5426/VCDesign-CED,https://github.com/Boom5426/VCDesign-CED,Python,5,2026-11-14T10:41:17Z,8,VCDesign 面向单细胞 CRISPRi 扰动数据，将虚拟细胞干预设计建模为有限预算排序，结合候选效应蒸馏与生物知识图谱，提供可复现的模型训练与评估代码。
+Lotfollahi-lab/squint,https://github.com/Lotfollahi-lab/squint,Python,4,2026-10-12T16:44:02Z,7,SQUINT 是一个基于图向量量化的变分自编码器，从空间转录组数据中学习离散的细胞身份编码和空间生态位编码，并支持基因表达插补，属于面向空间组学的细胞表征建模方法，但未涉及生物基座模型或大语言模型。
+kanidm/kanidm_ppa_automation,https://github.com/kanidm/kanidm_ppa_automation,Shell,4,2026-09-20T18:01:45Z,0,该仓库是Kanidm身份管理软件的Debian/Ubuntu打包自动化仓库，与单细胞、空间组学、生物基座模型等课题方向完全无关。
+scverse/cupy-stubs,https://github.com/scverse/cupy-stubs,Python,4,2026-11-12T17:11:57Z,0,这是CuPy的类型存根仓库，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+pepkit/pipestat,https://github.com/pepkit/pipestat,Python,4,2026-11-17T17:08:22Z,0,Pipestat 是一个通用的管道结果管理工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+uraraworks/SBO2003,https://github.com/uraraworks/SBO2003,C++,4,2026-11-18T16:13:13Z,0,这是一个2003年个人制作的2D MMORPG游戏项目，与单细胞/空间组学、生物基座模型或虚拟细胞等课题完全无关。
+CHENyiru3/Awesome-single-cell-JEPA-model,https://github.com/CHENyiru3/Awesome-single-cell-JEPA-model,,4,2026-11-18T13:09:27Z,6,这是一个单细胞/空间组学JEPA模型的论文与资源清单，虽聚焦于细胞表征与基座建模，但本身不提供模型训练或Agent实现代码。
+MahanVeisi8/MahanVeisi8,https://github.com/MahanVeisi8/MahanVeisi8,,4,2026-11-18T06:43:22Z,0,这是一个个人GitHub主页，仅包含个人简介、研究兴趣和技术栈，没有提供任何与虚拟细胞、单细胞组学或生物基座模型相关的代码、模型或资源。
+kaikatsumata/awesome-awesome,https://github.com/kaikatsumata/awesome-awesome,Python,4,2026-11-16T04:46:07Z,0,这是一个跨AI领域的awesome列表汇总仓库，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+theneao/CV-SAR-Seg-arxiv-daily,https://github.com/theneao/CV-SAR-Seg-arxiv-daily,Python,4,2026-11-16T18:26:06Z,0,该仓库是CV-SAR图像分割的arXiv论文每日更新列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+sneed-and-feed/projectdarksnail,https://github.com/sneed-and-feed/projectdarksnail,Python,4,2026-11-15T16:33:05Z,,[llm failed]
+theislab/donordata,https://github.com/theislab/donordata,Python,3,2026-11-17T17:52:21Z,,[llm failed]
+theislab/spatialdata-db-client,https://github.com/theislab/spatialdata-db-client,Python,3,2026-11-17T15:27:36Z,2,这是一个spatialdata-db空间组学数据目录的读取客户端，仅提供数据查询和加载功能，不涉及细胞基座模型、生物大语言模型或Agent建模，与课题核心方向无关。
+immcantation/alakazam,https://github.com/immcantation/alakazam,R,3,2026-11-17T19:09:16Z,,[llm failed]
+BiocPy/scrnaseq,https://github.com/BiocPy/scrnaseq,Python,3,2026-11-16T16:36:14Z,2,这是一个单细胞数据集访问与共享的Python包，提供数据下载和元数据管理，但不涉及基座模型、大语言模型或Agent建模，与课题核心方向无关。
+bahattinyunus/hacettepe-stem-cell,https://github.com/bahattinyunus/hacettepe-stem-cell,Python,3,2026-11-12T10:45:20Z,6,该仓库是Hacettepe大学干细胞计算生物学平台，涵盖Waddington表观遗传景观、scRNA-seq轨迹推断、表观遗传时钟及全细胞数字孪生愿景，但核心是教学/研讨会配套工具，缺乏可用的生物基座模型或Agent实现。
+tamnd/hn-daily-index,https://github.com/tamnd/hn-daily-index,Python,3,2026-11-17T23:59:18Z,0,该仓库是Hacker News每日热门故事存档，与单细胞/空间组学、生物基座模型等课题完全无关。
+chitra-lab/SAFFRON,https://github.com/chitra-lab/SAFFRON,Jupyter Notebook,3,2026-11-17T05:08:28Z,6,SAFFRON 是一个用于评估空间转录组基础模型嵌入是否捕获已知空间变异来源的可解释性框架，通过稀疏自编码器分解嵌入，与虚拟细胞/器官建模方向相关但侧重于模型评估而非构建。
+marakeby/scfm-benchscope,https://github.com/marakeby/scfm-benchscope,Jupyter Notebook,3,2026-11-16T17:56:07Z,7,这是一个单细胞基座模型评估框架，用于评测scGPT、Geneformer等模型的嵌入与下游分类性能，虽不直接构建基座模型，但为细胞表征模型提供标准化评测，与课题高度相关。
+Eastmanmd/scFM-tracker,https://github.com/Eastmanmd/scFM-tracker,Python,3,2026-11-16T15:30:52Z,4,该仓库是一个追踪单细胞RNA-seq基础模型引用、下载和可运行性的仪表盘，属于资源追踪工具，不提供模型或训练代码，与虚拟细胞/器官建模方向关联较弱。
+AntoineCollin/scMusketeers,https://github.com/AntoineCollin/scMusketeers,Jupyter Notebook,3,2026-11-16T10:34:08Z,5,scMusketeers是一个模块化自编码器，用于单细胞数据的不平衡细胞类型注释和批次效应校正，虽涉及细胞表征但非基座模型或Agent，建模能力偏弱。
+Steven51516/awesome-unified-bio-fm,https://github.com/Steven51516/awesome-unified-bio-fm,,3,2026-11-16T06:34:45Z,5,这是一个统一生物基座模型的论文/资源清单，涵盖多模态（DNA、RNA、蛋白、细胞等）基座模型，与课题方向相关但仅为汇总，无模型实现代码。
+Amrithasuresh/awesome-index,https://github.com/Amrithasuresh/awesome-index,Python,3,2026-11-15T10:58:14Z,0,这是一个通用的 awesome 列表索引仓库，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Liatir/liatir-app,https://github.com/Liatir/liatir-app,TypeScript,3,2026-11-14T03:10:05Z,5,Liatir 是一个本地优先的生物信息学桌面环境，包含单细胞基座模型（Geneformer、scGPT）与基线方法的基准对比，但核心是通用工具平台而非面向虚拟细胞/器官的建模或Agent实现。
+exopoiesis/arxiv-radar-chemistry,https://github.com/exopoiesis/arxiv-radar-chemistry,Python,3,2026-11-18T06:20:34Z,1,该仓库是材料/化学/分子机器学习论文的自动汇总列表，与单细胞、空间组学、虚拟细胞或生物基座模型完全无关。
+davetang/daily_tips,https://github.com/davetang/daily_tips,Python,3,2026-11-18T08:57:24Z,0,这是一个每日编程技巧和命令行小贴士的仓库，与单细胞、空间组学、生物基座模型或虚拟细胞等课题完全无关。
+tanle-mtr/dsh-plogin-plugin-recommender,https://github.com/tanle-mtr/dsh-plogin-plugin-recommender,JavaScript,3,2026-11-18T12:46:24Z,0,该仓库是DeepSeek Harness插件推荐列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+BorchLab/immLynx,https://github.com/BorchLab/immLynx,R,3,2026-11-17T15:31:45Z,2,immLynx 是面向 TCR 序列分析的 R 接口工具，与单细胞/空间组学基座模型、虚拟细胞或生物 Agent 方向无关。
+paulkooer/CrochetPhoto2Pattern,https://github.com/paulkooer/CrochetPhoto2Pattern,Python,3,2026-11-17T04:50:45Z,0,这是一个钩针玩偶照片转编织图案的本地设计工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+noetl/ai-meta,https://github.com/noetl/ai-meta,Python,2,2026-11-17T15:36:09Z,0,该仓库是NoETL平台的多仓库协调元仓库，聚焦化学实验室云与AI代理工作流编排，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+ErikEnglesson/UncertaintyInAIWorkshop,https://github.com/ErikEnglesson/UncertaintyInAIWorkshop,,2,2026-11-04T09:13:04Z,0,该仓库是神经网络不确定性估计的通用教学workshop，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+liu-yi-xuan/arxiv-agent-science-of-science,https://github.com/liu-yi-xuan/arxiv-agent-science-of-science,Python,2,2026-11-18T16:51:11Z,0,该仓库是AI Agent与科学学交叉领域的arXiv论文自动更新清单，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+EEthanShi/awesome-superposition,https://github.com/EEthanShi/awesome-superposition,JavaScript,2,2026-11-18T08:58:17Z,0,该仓库是神经网络特征叠加（superposition）方向的论文阅读清单与arXiv论文追踪，与单细胞/空间组学、虚拟细胞、生物基座模型等课题完全无关。
+iszhanjiawei/TTS_arxiv_daily,https://github.com/iszhanjiawei/TTS_arxiv_daily,Python,2,2026-11-18T05:59:54Z,0,该仓库是TTS（文本转语音）论文的每日更新列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+dvlan26/daily-arxiv-ai4sensor,https://github.com/dvlan26/daily-arxiv-ai4sensor,Python,2,2026-11-18T04:56:19Z,0,该仓库是跨领域论文列表，涵盖信号处理、时间序列、天文、量子计算等，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+mxqmxqmxq/virtual-cell-radar,https://github.com/mxqmxqmxq/virtual-cell-radar,Python,2,2026-11-18T01:04:50Z,2,这是一个AIVC论文与行业新闻的雷达/聚合工具，自动抓取、评分并生成报告，但不包含任何细胞基座模型、大语言模型或Agent的训练/推理代码，仅作为信息筛选与汇总平台。
+kundajelab/genesis-preprocessing,https://github.com/kundajelab/genesis-preprocessing,Python,2,2026-11-18T02:02:15Z,2,该仓库是植物DAP-seq/ATAC-seq/RNA-seq等表观与转录组预处理流水线，不涉及单细胞/空间组学、细胞基座模型或生物Agent，与课题方向无关。
+zchxhcz1/Morph2Mol,https://github.com/zchxhcz1/Morph2Mol,Python,2,2026-11-17T15:08:49Z,8,Morph2Mol 是一个从 H&E 组织学图像预测单细胞空间转录组的基座模型，通过图像编码器、空间解码器和参考细胞库实现跨模态细胞表征与表达预测，与虚拟细胞/空间组学建模高度相关。
+Biodyn-AI/atlas-comparison,https://github.com/Biodyn-AI/atlas-comparison,HTML,2,2026-11-17T11:49:42Z,8,该仓库对十个单细胞基座模型进行稀疏自编码器可解释性比较，构建跨模型特征图谱，虽非直接建模但深度服务于细胞表征与基座模型评估。
+DZRRRRRR/my_arxiv_daily,https://github.com/DZRRRRRR/my_arxiv_daily,Python,2,2026-11-16T18:23:15Z,0,该仓库是扩散模型论文的通用列表，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+wyh196646/Awesome-AI-Pathology,https://github.com/wyh196646/Awesome-AI-Pathology,Python,2,2026-11-16T15:26:32Z,4,这是一个AI病理学论文清单仓库，虽涉及单细胞和空间组学，但仅为资源汇总，无模型或Agent实现，与虚拟细胞/基座模型方向关联较弱。
+phytometrics/phenopaper-colab-notebooks,https://github.com/phytometrics/phenopaper-colab-notebooks,Jupyter Notebook,2,2026-11-18T10:06:50Z,0,该仓库是植物表型论文的Colab演示笔记本集合，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+Olascoaga/aria-omics,https://github.com/Olascoaga/aria-omics,Python,2,2026-11-18T06:54:15Z,4,ARIA 是一个面向多组学（含单细胞）的受控分析编排与证据治理 Agent 框架，但核心是常规差异分析、质控和可复现报告，不涉及细胞基座模型、大语言模型或虚拟细胞建模。
+SID-6921/SID-6921,https://github.com/SID-6921/SID-6921,Shell,2,2026-11-18T17:23:46Z,0,这是一个个人GitHub主页/简历仓库，展示作者对医学影像和生物医学信号处理的开源贡献，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+zhuyansen/awesome-claude-code-skills-collections,https://github.com/zhuyansen/awesome-claude-code-skills-collections,,2,2026-11-18T16:57:33Z,0,该仓库是Claude Code技能集合的汇总目录，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+febinrenu/ScopeCompose,https://github.com/febinrenu/ScopeCompose,Python,2,2026-11-18T15:26:04Z,0,该仓库研究检索增强生成中条件答案的保真度，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Xuzhen-Li/gene-function-annotation,https://github.com/Xuzhen-Li/gene-function-annotation,Python,2,2026-11-14T09:42:21Z,0,该仓库是基因组功能注释流水线（GO/KEGG/结构域），与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+BioMeDS/onboarding-base-module,https://github.com/BioMeDS/onboarding-base-module,,2,2026-11-18T14:42:06Z,1,这是一个生物信息学入门培训模块，教授项目组织、git和基础Python分析，与虚拟细胞/基座模型等课题方向无关。
+martinuke0/martinuke0.github.io,https://github.com/martinuke0/martinuke0.github.io,HTML,2,2026-11-18T17:25:00Z,0,这是一个个人技术博客仓库，内容涉及系统设计、基础设施和工程，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Rokawoo/RoboticFishProcessing,https://github.com/Rokawoo/RoboticFishProcessing,Python,2,2026-11-18T01:15:12Z,0,该仓库是机器人视觉引导的鱼类抓取与放置系统，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+iSEE/iUSEiSEE,https://github.com/iSEE/iUSEiSEE,TeX,1,2026-11-18T14:50:57Z,1,iUSEiSEE 是 iSEE 交互式数据探索工具的教程仓库，面向通用 SummarizedExperiment 数据可视化，不涉及单细胞基座模型、生物大语言模型或虚拟细胞建模。
+immcantation/enchantr,https://github.com/immcantation/enchantr,R,1,2026-11-18T13:31:36Z,0,enchantR 是用于适应性免疫受体库测序（AIRR-seq）分析的质量控制与报告工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+scverse/repo-health,https://github.com/scverse/repo-health,Python,1,2026-11-18T13:06:16Z,0,该仓库是 scverse 组织的仓库健康度仪表盘，用于检查模板合规、发布安全等工程标准，与单细胞/空间组学基座模型、虚拟细胞或生物Agent建模完全无关。
+iSEE/iSEEde,https://github.com/iSEE/iSEEde,R,1,2026-11-18T11:22:57Z,,[llm failed]
+alfonsosaera/bioinformatics_tools,https://github.com/alfonsosaera/bioinformatics_tools,,1,2026-11-14T11:32:54Z,2,这是一个单细胞与空间组学生物信息学工具的策展目录，仅列出论文和链接，无模型或Agent实现，与虚拟细胞/基座模型方向无关。
+ZSoumia/Backdoor-through-generation-fine-tuning,https://github.com/ZSoumia/Backdoor-through-generation-fine-tuning,Python,1,2026-11-18T16:29:37Z,0,该仓库研究基础模型后门在LoRA微调中的持久性，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+databio/awesome-bio-foundation-models,https://github.com/databio/awesome-bio-foundation-models,Python,1,2026-11-18T10:13:22Z,6,这是一个生物基础模型资源清单，涵盖DNA、RNA、蛋白质及单细胞转录组等模型，其中单细胞部分与课题相关，但整体为列表汇总，缺乏模型实现深度。
+tobias-weiss-ai-xr/riemann-research,https://github.com/tobias-weiss-ai-xr/riemann-research,Python,1,2026-11-18T08:21:24Z,,[llm failed]
+chunqing403/protein-design-radar,https://github.com/chunqing403/protein-design-radar,HTML,1,2026-11-18T07:41:15Z,0,该仓库是蛋白质设计领域的论文雷达/文献汇总工具，不涉及单细胞、空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+LENS-AI4S/awesome-geofm-papers,https://github.com/LENS-AI4S/awesome-geofm-papers,HTML,1,2026-11-18T03:20:17Z,0,该仓库是地理空间、遥感和地球观测基础模型的论文自动汇总清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+RealAndrewRen/RealAndrewRen,https://github.com/RealAndrewRen/RealAndrewRen,,1,2026-11-18T03:11:12Z,0,这是一个个人简历/主页仓库，展示个人技能和项目，与虚拟细胞、单细胞组学或生物基座模型方向无关。
+KaiCobra/AI_Daily,https://github.com/KaiCobra/AI_Daily,Python,1,2026-11-18T02:56:02Z,0,该仓库是AI论文每日阅读与深度解析，聚焦图像生成、表征学习、扩散模型等通用AI方向，与单细胞/空间组学、生物基座模型、虚拟细胞等课题完全无关。
+DoHeyYeah/arXiV-favor,https://github.com/DoHeyYeah/arXiV-favor,Python,1,2026-11-18T00:27:09Z,0,该仓库是机器人操作与计算机视觉方向的论文列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+gomezdj/exerkinemap,https://github.com/gomezdj/exerkinemap,Jupyter Notebook,1,2026-11-17T20:19:50Z,8,EXERKINEMAP 是一个结合基因组/蛋白质语言模型与单细胞/空间组学、面向运动响应信号传导的虚拟细胞世界模型框架，核心聚焦细胞状态转换与跨组织映射，与课题高度匹配。
+enhansome/enhansome-snn-conference-paper,https://github.com/enhansome/enhansome-snn-conference-paper,,1,2026-11-17T18:38:52Z,0,该仓库是脉冲神经网络（SNN）会议论文的汇总清单，与单细胞/空间组学、虚拟细胞或生物基座模型等课题方向完全无关。
+anikethana21/oscc-pattern-classification,https://github.com/anikethana21/oscc-pattern-classification,Python,1,2026-11-17T06:44:41Z,2,这是一个口腔鳞状细胞癌组织病理全切片图像的深度学习分类平台，基于视觉Transformer做组织学模式分类，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+sawale43-star/https-github.com-K-Dense-AI-scientific-agent-skills,https://github.com/sawale43-star/https-github.com-K-Dense-AI-scientific-agent-skills,Python,1,2026-11-17T05:18:16Z,4,这是一个面向多学科科研的177个Agent技能库，虽包含单细胞RNA-seq等生物信息学技能，但并非聚焦虚拟细胞/器官或生物基座模型，属于通用科研Agent工具集。
+ismi-ops/literature-rg,https://github.com/ismi-ops/literature-rg,Python,1,2026-11-18T16:47:38Z,2,这是一个文献检索与筛选Agent，用于发现和评分相关论文，并非面向单细胞/空间组学的生物基座模型或虚拟细胞建模工具。
+EnuhBlaise/Foundational_BioAI_Model,https://github.com/EnuhBlaise/Foundational_BioAI_Model,Jupyter Notebook,1,2026-11-16T14:47:48Z,6,这是一个单细胞转录组基座模型的训练与严格评估框架，强调防泄漏和公平基准，但更偏评估工具而非直接可用的细胞大模型或虚拟细胞建模。
+SeeingBeil/point-cloud-papers,https://github.com/SeeingBeil/point-cloud-papers,Python,1,2026-11-18T10:07:06Z,0,该仓库是3D点云与LiDAR感知方向的论文索引，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+creatorrr/awesome-stars,https://github.com/creatorrr/awesome-stars,,1,2026-11-16T07:08:10Z,0,这是一个个人GitHub星标收藏的awesome列表，内容涵盖编程语言、数据库、Web技术等，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+kaikatsumata/awesome-ai-survey-papers,https://github.com/kaikatsumata/awesome-ai-survey-papers,Python,1,2026-11-15T22:08:28Z,0,这是一个AI领域（尤其是LLM）的综述论文精选清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+xqiu625/scfm-benchmark,https://github.com/xqiu625/scfm-benchmark,Python,1,2026-11-15T20:58:18Z,4,这是一个单细胞基础模型嵌入的供体感知评估基准工具，提供评估框架但本身不实现基座模型或Agent，与虚拟细胞建模方向关联较弱。
+Virelion-Biotech/Virelion-CardiLearn,https://github.com/Virelion-Biotech/Virelion-CardiLearn,Python,1,2026-11-15T23:35:24Z,6,CardiLearn 是一个面向心脏转录组的表征学习研究代码库，采用程序级Transformer和共享/私有潜在表征建模，但尚未验证为心脏基座模型，且未涉及单细胞/空间组学基座模型或生物Agent。
+longevity-genie/longevity-skills,https://github.com/longevity-genie/longevity-skills,Python,1,2026-11-13T23:31:35Z,2,该仓库是面向长寿研究的Agent技能集合，包含新闻摘要和组学重分析检查清单，与虚拟细胞/器官、单细胞基座模型或生物大语言模型核心方向无关。
+gddickinson/cellscope,https://github.com/gddickinson/cellscope,Python,1,2026-11-13T04:15:44Z,2,CellScope 是面向活细胞延时显微图像的细胞检测、追踪与形态分析工具，不涉及单细胞/空间组学数据或生物基座模型/大语言模型/Agent，与课题方向无关。
+databio/awesome-sequence-to-function,https://github.com/databio/awesome-sequence-to-function,Python,1,2026-11-12T10:14:56Z,2,该仓库是DNA序列到功能基因组学预测模型的资源列表，不涉及单细胞/空间组学数据或细胞基座模型/生物大语言模型/Agent，与课题方向无关。
+cmivqa/ro-arxiv-daily,https://github.com/cmivqa/ro-arxiv-daily,Python,1,2026-11-16T19:35:44Z,0,该仓库是通用大语言模型论文与代码的汇总清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+TheJacksonLaboratory/DIANNE,https://github.com/TheJacksonLaboratory/DIANNE,JavaScript,1,2026-11-12T18:52:12Z,3,DIANNE 是一个面向组织病理学全切片图像和空间转录组数据的弱监督空间分类器训练工具，侧重交互式标注与空间推断，不涉及虚拟细胞/器官或生物基座模型/大语言模型/Agent 建模。
+yoshiakiyam/HINGE-Histology-and-gene-guided-cell-matching-ensemble,https://github.com/yoshiakiyam/HINGE-Histology-and-gene-guided-cell-matching-ensemble,Jupyter Notebook,1,2026-11-12T03:20:26Z,,[llm failed]
+ChomchonU/OHMmy,https://github.com/ChomchonU/OHMmy,R,1,2026-11-14T05:32:04Z,2,OHMmy 是一个基于 Seurat v5 的 scRNA-seq 常规分析 R 工具包，专注于去污染、聚类、可视化和富集分析，不涉及生物基座模型、细胞大语言模型或虚拟细胞建模。
+Rishabh-bgp/building-a-virtual-cell-in-python,https://github.com/Rishabh-bgp/building-a-virtual-cell-in-python,Jupyter Notebook,1,2026-11-13T03:34:04Z,7,该仓库用ESM2基因嵌入和神经网络构建虚拟细胞模型，预测基因敲除后的表达变化，核心面向虚拟细胞建模，但仅用伪数据且模型较简单。
+leelieber2025/AnnoTuneAgent,https://github.com/leelieber2025/AnnoTuneAgent,Python,1,2026-11-18T03:01:22Z,6,AnnoTuneAgent 是一个基于微调大语言模型（Qwen3.5-4B + LoRA）的 scRNA-seq 细胞类型注释工具，面向单细胞数据并应用了生物大语言模型方法，但聚焦于注释而非虚拟细胞/器官建模或基座模型训练。
+zhang-lecheng/awesome-aivm-papers,https://github.com/zhang-lecheng/awesome-aivm-papers,Python,1,2026-11-15T01:03:36Z,4,该仓库是AI虚拟代谢（AIVM）论文与资源清单，虽涉及虚拟细胞概念和单细胞代谢推断，但核心是代谢建模与综述汇总，缺乏单细胞/空间组学基座模型或Agent实现，与课题方向匹配度低。
+enuminous/papers,https://github.com/enuminous/papers,HTML,1,2026-11-18T15:57:58Z,0,该仓库是eNuminous项目的论文与实验计划汇总，涉及宇宙学、量子引力等物理理论，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+tfs6492/gaia-gtheory,https://github.com/tfs6492/gaia-gtheory,R,1,2026-11-18T15:19:04Z,0,该仓库研究AI智能体在GAIA基准上的成功率方差分解，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+sumeetmusfirah/axiom-neuro,https://github.com/sumeetmusfirah/axiom-neuro,Python,1,2026-11-18T15:01:23Z,4,该仓库是一个评估语言模型实验设计能力的模拟认知神经科学实验室，虽包含单细胞数据（Axiom-Bio）和Agent，但核心是实验判断评测而非细胞基座模型或虚拟细胞建模。
+JMittelbach/OriginRAG,https://github.com/JMittelbach/OriginRAG,Python,1,2026-11-18T17:11:06Z,0,这是一个面向文献检索与问答的RAG工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+suhaib0764/miRNA-Enrichment-Insight-Engine,https://github.com/suhaib0764/miRNA-Enrichment-Insight-Engine,HTML,1,2026-11-18T09:17:15Z,3,这是一个基于大语言模型的多组学通路富集分析与实验设计辅助工具，不涉及单细胞/空间组学数据、细胞基座模型或虚拟细胞建模，与课题核心方向关联较弱。
+ulises-c/csen-346,https://github.com/ulises-c/csen-346,Python,1,2026-11-18T00:38:26Z,0,该仓库是面向LLM苏格拉底式数学辅导的多智能体教学系统评估项目，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ThomasCpy/Spica-MultiOmics-Integration,https://github.com/ThomasCpy/Spica-MultiOmics-Integration,Python,1,2026-11-17T22:30:26Z,2,Spica 是面向药物靶点筛选的离线桌面软件，整合多组学数据库并支持本地LLM问答，但核心是靶点评估而非单细胞/空间组学的细胞基座模型或虚拟细胞建模。
+simonsoanes/AMQL,https://github.com/simonsoanes/AMQL,C#,1,2026-11-17T21:59:31Z,0,AMQL 是一个面向通用大语言模型的图数据库与模型编辑工具，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+jackyko1991/tensorizer,https://github.com/jackyko1991/tensorizer,Jupyter Notebook,1,2026-11-17T19:44:36Z,0,这是一个将物理方程转换为张量形式并用PyTorch求解可视化的教育工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+buwagaurav/DocuSight,https://github.com/buwagaurav/DocuSight,Python,1,2026-11-17T18:05:06Z,0,DocuSight 是一个面向 PDF/Excel 文档的多模态 RAG 工具，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+simthw/opensourse-mcp,https://github.com/simthw/opensourse-mcp,TypeScript,1,2026-11-17T14:07:06Z,0,这是一个文献检索与筛选的MCP服务器，与虚拟细胞/单细胞基座模型等课题方向完全无关。
+Einstellung/epub-translator,https://github.com/Einstellung/epub-translator,Python,1,2026-11-17T11:34:04Z,0,这是一个 EPUB 双语翻译工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+mims-harvard/SEMPER,https://github.com/mims-harvard/SEMPER,Python,1,2026-11-17T08:43:00Z,6,SEMPER 是一个多模态蛋白质表征模型，将蛋白质语言模型与442个人脑细胞类型的PPI网络对齐，生成细胞类型特异的蛋白质表征，可用于细胞状态相关靶点预测，但核心是蛋白质而非单细胞转录组或虚拟细胞建模。
+bairesearch/GIAANNpy,https://github.com/bairesearch/GIAANNpy,Python,1,2026-11-14T21:31:11Z,,[llm failed]
+dhairyab0069/biot6900,https://github.com/dhairyab0069/biot6900,Jupyter Notebook,1,2026-11-13T00:27:57Z,2,该仓库是阿尔茨海默病药物靶点发现课程项目，基于多组学、蛋白结构、知识图谱等，不涉及单细胞/空间组学、生物基座模型或Bio Agent，与课题方向无关。
+fym0503/SMITH,https://github.com/fym0503/SMITH,Python,1,2026-11-12T04:19:05Z,6,SMITH是一个面向空间组学panel设计的工具，利用多任务学习从单细胞/空间参考数据中选择基因靶标，并集成Agent工作流，虽涉及细胞状态与发育信号但核心是panel选择而非细胞基座模型或虚拟细胞建模。
+OWD-AI/awesome-open-world-discovery,https://github.com/OWD-AI/awesome-open-world-discovery,TeX,1,2026-11-18T15:18:07Z,0,这是一个关于开放世界发现（Open World Discovery）的通用研究指南/论文清单，聚焦于AI智能体在未知环境中获取知识、发现机制，与单细胞/空间组学、虚拟细胞/器官、生物基座模型等课题方向完全无关。
+meyer-lab/vsparse,https://github.com/meyer-lab/vsparse,Python,1,2026-11-17T16:45:35Z,2,这是一个稀疏矩阵压缩存储库，面向单细胞数据的内存优化，但不涉及任何基座模型、大语言模型或Agent建模，与课题核心方向无关。
+Lotfollahi-lab/tripso_reproducibility,https://github.com/Lotfollahi-lab/tripso_reproducibility,Jupyter Notebook,0,2026-11-17T14:42:33Z,0,该仓库仅包含一个名称，无任何内容，与课题方向无关。
+theislab/squidpy-ports,https://github.com/theislab/squidpy-ports,Python,0,2026-11-17T10:43:33Z,2,该仓库是squidpy移植算法的参考输出生成器，涉及空间组学方法（STalign、SpaGE、Tangram）的数值验证，但核心是测试与复现，不涉及基座模型、细胞大语言模型或虚拟细胞建模。
+bowang-lab/CryoDINO,https://github.com/bowang-lab/CryoDINO,Jupyter Notebook,0,2026-11-16T19:47:01Z,2,CryoDINO 是面向冷冻电镜断层扫描的 3D 自监督基础模型，用于细胞器分割，与单细胞/空间组学、虚拟细胞或生物大语言模型方向无关。
+immcantation/presto,https://github.com/immcantation/presto,Python,0,2026-11-18T17:12:43Z,0,pRESTO 是处理 B/T 细胞受体高通量测序读段的序列处理工具包，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+tatami-inc/tatami_test,https://github.com/tatami-inc/tatami_test,C++,0,2026-11-18T02:36:00Z,,[llm failed]
+immcantation/lab,,,0,,0,"无 README/描述/目录树,跳过"
+brentp/SeqLib,https://github.com/brentp/SeqLib,,0,2026-11-17T17:16:50Z,0,SeqLib 是一个 C++ 库，用于处理 BAM/SAM/CRAM 文件、BWA-MEM 比对和序列组装，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+michaelliao/zcode-cli,https://github.com/michaelliao/zcode-cli,,0,2026-11-17T15:04:26Z,0,"无 README/描述/目录树,跳过"
+slowkow/STdeconvolve,https://github.com/slowkow/STdeconvolve,,0,2026-11-17T14:15:18Z,4,STdeconvolve 是无参考的空间转录组细胞类型反卷积工具，虽涉及空间组学但仅做反卷积，不涉及基座模型、大语言模型或Agent建模。
+EperLuo/terminal-bench-science,https://github.com/EperLuo/terminal-bench-science,,0,2026-11-18T12:41:36Z,2,这是一个跨科学领域的AI Agent基准测试仓库，不针对单细胞/空间组学或生物基座模型，与课题方向无关。
+Team-likelion-3rd-Project/likelion-devops-7th-3rd-team03,https://github.com/Team-likelion-3rd-Project/likelion-devops-7th-3rd-team03,Java,0,2026-11-13T05:07:42Z,0,这是一个URL短链接与营销分析平台，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+saleemaldajani/saleemaldajani,https://github.com/saleemaldajani/saleemaldajani,,0,2026-11-18T12:35:38Z,3,这是一个个人学术主页，包含一个用LLM标注单细胞RNA-seq细胞类型的DeepSeq项目，但缺乏基座模型、虚拟细胞或Agent的深度实现，与课题核心方向关联较弱。
+doublepoints/cv-arxiv-daily,https://github.com/doublepoints/cv-arxiv-daily,Python,0,2026-11-18T12:09:28Z,0,该仓库是SLAM/SFM/视觉定位等计算机视觉领域的论文列表，与单细胞、空间组学、生物基座模型等课题完全无关。
+enhansome/enhansome-single-cell,https://github.com/enhansome/enhansome-single-cell,,0,2026-11-18T09:16:10Z,2,这是一个单细胞分析软件包的资源清单，涵盖常规分析工具，但缺乏基座模型、大语言模型或Agent实现，与虚拟细胞/器官建模方向关联弱。
+DoraemonXia/ai-research-papers,https://github.com/DoraemonXia/ai-research-papers,Python,0,2026-11-18T07:33:21Z,0,这是一个按主题整理的AI研究论文列表仓库，不涉及单细胞/空间组学、虚拟细胞或生物基座模型等课题相关内容。
+aliquome/aliquome.github.io,https://github.com/aliquome/aliquome.github.io,JavaScript,0,2026-11-17T14:16:04Z,2,这是一个生物信息学数据库和数据集版本化目录，提供下载链接和基准表，与虚拟细胞/单细胞基座模型或Agent建模无直接关系。
+mhm2026011/awesome-ai-data-labeling,https://github.com/mhm2026011/awesome-ai-data-labeling,Jupyter Notebook,0,2026-11-17T02:52:19Z,3,该仓库是AI辅助与人工数据标注对比的论文与资源汇总，虽涉及单细胞转录组LLM标注，但核心是标注流程评估而非细胞基座模型或虚拟细胞建模。
+iandriver/actinn-jax,https://github.com/iandriver/actinn-jax,Python,0,2026-11-16T18:59:41Z,4,actinn-jax 是一个基于预训练参考的细胞类型注释工具，属于常规单细胞分析流程，不涉及基座模型、大语言模型或虚拟细胞建模。
+holiday01/hcc-annotation-benchmark,https://github.com/holiday01/hcc-annotation-benchmark,Python,0,2026-11-15T01:36:07Z,4,该仓库是HCC单细胞数据细胞类型注释工具的基准测试代码，涉及scGPT等基座模型评估，但核心是注释工具比较而非虚拟细胞/器官建模或基座模型开发。
+zhanxw/Literature,https://github.com/zhanxw/Literature,Python,0,2026-11-14T05:44:32Z,1,该仓库是文献摘要列表，不包含任何模型、代码或单细胞/空间组学基座建模内容，与课题方向无关。
+enhansome/enhansome-computational-biology,https://github.com/enhansome/enhansome-computational-biology,,0,2026-11-18T16:26:55Z,4,这是一个计算生物学资源汇总仓库，虽包含单细胞基座模型和Agent条目，但本质是资源清单而非模型或工具实现，与课题核心方向关联有限。
+athenabio/athenabio-technical-brief,https://github.com/athenabio/athenabio-technical-brief,,0,2026-11-18T14:15:44Z,7,该仓库是卵巢生物学多模态数据与基准构建项目，面向单细胞/空间组学并计划预训练卵巢衰老基座模型，但当前仅为技术简报，无模型或训练代码。
+wwd2019/ODT-main,https://github.com/wwd2019/ODT-main,Jupyter Notebook,0,2026-11-18T12:19:25Z,,[llm failed]
+Bioinfo-Rafael/paper-radar,https://github.com/Bioinfo-Rafael/paper-radar,Python,0,2026-11-18T11:01:38Z,0,这是一个论文监控与推送机器人，用于筛选和分发生物信息学、机器学习等领域的论文，不涉及任何单细胞/空间组学建模、基座模型或生物Agent的实现。
+YankongSJTU/scSet,https://github.com/YankongSJTU/scSet,Python,0,2026-11-18T10:55:33Z,6,scSet 是一个基于单细胞基础模型嵌入的集合编码器与基准测试仓库，聚焦跨队列样本表征的可迁移性，虽涉及细胞表征建模但非基座模型或Agent，且偏向基准评估而非虚拟细胞/器官建模。
+enhansome/trackenhansomelist,https://github.com/enhansome/trackenhansomelist,,0,2026-11-18T09:58:56Z,0,该仓库是跟踪awesome列表更新的工具，与单细胞/空间组学、生物基座模型等课题方向完全无关。
+sialock/DonorShift-Bench,https://github.com/sialock/DonorShift-Bench,Python,0,2026-11-18T01:36:14Z,3,这是一个评估单细胞分类器在跨供体/供体内划分下性能的基准工具，不涉及基座模型、大语言模型或虚拟细胞建模，仅提供简单分类器基线。
+yacine-baghli/yacine-baghli,https://github.com/yacine-baghli/yacine-baghli,,0,2026-11-18T01:03:41Z,2,这是一个个人主页/项目展示仓库，虽涉及DNA扩散模型和单细胞分析，但无具体模型代码或与虚拟细胞/基座模型直接相关的内容。
+enhansome/enhansome-bio-agent-skills,https://github.com/enhansome/enhansome-bio-agent-skills,,0,2026-11-17T21:29:29Z,4,这是一个生物医学AI agent技能（SKILL.md）的精选资源清单，涵盖单细胞分析等类别，但仅为技能索引，无模型训练或Agent实现代码，与虚拟细胞/基座模型核心目标关联较弱。
+rollroyces/rollroyces,https://github.com/rollroyces/rollroyces,Python,0,2026-11-16T12:53:08Z,2,这是一个个人GitHub主页/简历仓库，展示作者在mRNA设计、cfDNA癌症检测和AI工具方面的项目，与虚拟细胞/单细胞基座模型方向无关。
+zxc29051617/zxc29051617,https://github.com/zxc29051617/zxc29051617,Python,0,2026-11-18T05:23:08Z,2,这是一个个人GitHub主页，虽提及虚拟细胞、虚拟胚胎和Agentic scRNA-seq等研究项目，但均为私有仓库且无任何代码、模型或实现细节，属于个人简介而非可用的工具仓库。
+andreaalvarezp3/andreaalvarezp3,https://github.com/andreaalvarezp3/andreaalvarezp3,,0,2026-11-14T15:07:02Z,6,该仓库是研究者个人主页，展示其利用scGPT等基座模型进行单细胞网络医学与药物重定位研究，虽涉及单细胞和基座模型但非完整可用的模型/代码仓库。
+Catchxu/scCAFM,https://github.com/Catchxu/scCAFM,Python,0,2026-11-14T04:43:56Z,,[llm failed]
+prosium/JournalClub,https://github.com/prosium/JournalClub,,0,2026-11-12T07:31:51Z,,[llm failed]
+yiyun-li/CellBench-scFM,https://github.com/yiyun-li/CellBench-scFM,Python,0,2026-11-18T15:15:20Z,8,CellBench 是一个对 13 个单细胞基座模型进行冻结骨干基准测试的代码库，提供模型适配器、下游评估头和数据集清单，直接服务于单细胞基座模型的系统评估与比较。
+likeyi19/Agent,https://github.com/likeyi19/Agent,Python,0,2026-11-18T14:09:29Z,4,这是一个面向单细胞表观组学（scATAC-seq）的自主AI Agent，但聚焦于分析工作流与工具集成，而非虚拟细胞/器官或生物基座模型建模。
+Kays3/geneformer-vs-brainiac,https://github.com/Kays3/geneformer-vs-brainiac,Python,0,2026-11-18T13:56:44Z,5,该仓库对比Geneformer（单细胞基座模型）与BrainIAC（脑MRI模型），并启动斑马鱼脑单细胞基座模型项目，但当前以比较、计划和初步实验为主，缺乏完整模型实现。
+enhansome/ultimate-enhansome,https://github.com/enhansome/ultimate-enhansome,,0,2026-11-18T09:38:03Z,0,这是一个自动生成的各类awesome清单的汇总索引，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Geongyu/Geongyu.github.io,https://github.com/Geongyu/Geongyu.github.io,HTML,0,2026-11-18T07:11:20Z,0,这是个人简历仓库，介绍机器学习研究者的经历与论文，不涉及单细胞/空间组学、生物基座模型或虚拟细胞建模。
+enhansome/enhansome-ai-for-science,https://github.com/enhansome/enhansome-ai-for-science,,0,2026-11-18T07:07:21Z,2,这是一个跨学科的AI for Science资源清单，涵盖文献管理、数据分析和通用科研工具，但未聚焦单细胞/空间组学、虚拟细胞或生物基座模型，与课题核心方向关联极弱。
+enhansome/enhansome-Awesome-RL-for-LRMs,https://github.com/enhansome/enhansome-Awesome-RL-for-LRMs,,0,2026-11-18T04:32:36Z,0,该仓库是强化学习用于大型推理模型的论文与项目汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Wait021/ArxivDaily,https://github.com/Wait021/ArxivDaily,Python,0,2026-11-18T03:27:49Z,0,该仓库是一个论文日报自动翻译与摘要工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+TK13-lab/BreMAP,https://github.com/TK13-lab/BreMAP,Python,0,2026-11-18T03:10:51Z,6,BReMAP 是一个可配置的单细胞参考映射与基因程序分析工具，支持 scGPT/Geneformer 嵌入和教师-学生蒸馏，但核心是参考映射而非虚拟细胞/器官基座模型或 Agent。
+njuxka2333/HE-mIF-Benchmark,https://github.com/njuxka2333/HE-mIF-Benchmark,Python,0,2026-11-18T03:07:40Z,2,该仓库是H&E到多重免疫荧光虚拟染色的病理学基准测试，涉及病理基础模型评估，但与单细胞/空间组学、虚拟细胞/器官、生物基座模型或Bio Agent方向无关。
+enhansome/enhansome-ChatGPT-repositories,https://github.com/enhansome/enhansome-ChatGPT-repositories,,0,2026-11-18T01:55:33Z,0,这是一个ChatGPT相关开源仓库的精选资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+sunnweiwei/science-speedrun,https://github.com/sunnweiwei/science-speedrun,Python,0,2026-11-18T01:34:13Z,,[llm failed]
+SIITW/SIITW,https://github.com/SIITW/SIITW,,0,2026-11-18T01:33:29Z,4,这是一个个人学术主页仓库，虽涉及单细胞大语言模型（scLLM）相关工作，但本身不提供模型、代码或数据集，仅作为个人简介与项目链接入口。
+enhansome/enhansome-biological-image-analysis,https://github.com/enhansome/enhansome-biological-image-analysis,,0,2026-11-18T01:17:37Z,1,这是一个生物图像分析工具和资源的汇总清单，聚焦于显微镜图像处理、分割和可视化，与单细胞/空间组学的生物基座模型、细胞大语言模型或虚拟细胞建模无关。
+hujambo-dunia/expanding-universe,https://github.com/hujambo-dunia/expanding-universe,Python,0,2026-11-18T00:30:17Z,,[llm failed]
+bprathamesh20/ai-jobs-uk-netherlands-visa-sponsors,https://github.com/bprathamesh20/ai-jobs-uk-netherlands-visa-sponsors,Python,0,2026-11-18T00:17:10Z,0,该仓库是英国与荷兰AI/ML岗位招聘信息汇总，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+enhansome/enhansome-conformal-prediction,https://github.com/enhansome/enhansome-conformal-prediction,,0,2026-11-17T23:50:35Z,0,该仓库是共形预测（conformal prediction）的资源清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+LingyuLi-math/Hist2Pheno,https://github.com/LingyuLi-math/Hist2Pheno,Jupyter Notebook,0,2026-11-17T23:38:33Z,3,Hist2Pheno 从 H&E 组织学图像预测细胞表型并映射空间分布，属于病理图像分析，不涉及单细胞/空间转录组数据或生物基座模型/大语言模型/Agent，与课题核心方向关联度低。
+enhansome/enhansome-healthcare,https://github.com/enhansome/enhansome-healthcare,,0,2026-11-17T23:34:13Z,0,这是一个医疗健康开源软件资源列表，涵盖EHR、影像等，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+drdoubleb/neural-networks,https://github.com/drdoubleb/neural-networks,JavaScript,0,2026-11-17T21:11:14Z,2,这是一个面向病理学教学的交互式单页神经网络可视化工具，虽涉及细胞核图像和基础模型概念，但核心是教学演示，不面向单细胞/空间组学数据或生物基座模型/Agent建模。
+sarwanpasha/fm_transfer-,https://github.com/sarwanpasha/fm_transfer-,Python,0,2026-11-17T18:48:16Z,6,该仓库用核岭回归预测单细胞CRISPR筛选中的遗传互作残差，并分析scGPT/Geneformer/scVI等基座模型嵌入的几何性质，虽涉及细胞表征与基座模型嵌入，但核心是遗传互作预测而非虚拟细胞/器官或细胞状态建模。
+gm-oogway/geneformer-tcga-hnsc,https://github.com/gm-oogway/geneformer-tcga-hnsc,Python,0,2026-11-17T18:22:36Z,5,该仓库将单细胞预训练基座模型Geneformer零样本应用于TCGA头颈癌bulk RNA-seq，评估其聚类与临床关联，虽涉及细胞基座模型迁移，但对象为bulk转录组而非单细胞/空间组学，且未构建新模型或Agent。
+unaite-bio/virtual-tissue,https://github.com/unaite-bio/virtual-tissue,Jupyter Notebook,0,2026-11-17T17:24:14Z,,[llm failed]
+qklee-lz/vmif-hgsoc,https://github.com/qklee-lz/vmif-hgsoc,Python,0,2026-11-17T17:03:37Z,2,该仓库评估H&E图像虚拟多重免疫荧光模型在卵巢癌中的表现，与单细胞/空间组学、细胞基座模型或生物Agent无关。
+nbrosse/nbrosse,https://github.com/nbrosse/nbrosse,,0,2026-11-17T15:13:32Z,2,这是一个个人学术主页，虽提及单细胞建模和生物基础模型经历，但无具体仓库实现，与课题核心方向关联微弱。
+JimYuhaoWu/eCR_navigator,https://github.com/JimYuhaoWu/eCR_navigator,Python,0,2026-11-17T12:58:58Z,6,该仓库是MEF→iPSC重编程中区域驱动评分与靶点提名的前端工具，基于多种基因组基础模型（如ChromBERT、GET）的嵌入差异来识别细胞状态转换的驱动区域，与细胞状态转换建模相关，但非单细胞/空间组学数据，且不直接构建细胞基座模型或Agent。
+danielchen26/teddy_mm,https://github.com/danielchen26/teddy_mm,Python,0,2026-11-17T09:32:40Z,2,该仓库是TEDDY单细胞模型的可审计性/决策层诊断工具，聚焦CRISPR扰动下蛋白响应在模型各阶段的可恢复性，不涉及虚拟细胞/器官建模、基座模型或生物Agent训练。
+pleiadian53/ssl-lab,https://github.com/pleiadian53/ssl-lab,Python,0,2026-11-17T06:32:17Z,8,ssl-lab 开发基于 JEPA 的生成式自监督模型，核心目标是单细胞扰动数据生成与虚拟细胞建模，方法上实现条件流先验与解码器，与课题高度匹配。
+maiziezhoulab/interpreTFM,https://github.com/maiziezhoulab/interpreTFM,Python,0,2026-11-17T05:29:07Z,7,interpreTFM 是一个用稀疏自编码器逐层评估转录组基础模型（scGPT、Geneformer、C2S-Scale）可解释性的框架，面向单细胞和空间转录组数据，虽不直接构建基座模型或Agent，但为细胞表征建模提供深度评估工具，与课题方向高度相关。
+jam-sudo/vcc2026-writeup,https://github.com/jam-sudo/vcc2026-writeup,Python,0,2026-11-17T02:38:57Z,6,该仓库记录作者在2026年虚拟细胞挑战赛中的尝试，通过跨细胞系迁移CRISPRi扰动效应来预测单细胞RNA计数，涉及细胞状态响应建模，但未提供通用基座模型或Agent实现。
+landedjobs/ai-salaries,https://github.com/landedjobs/ai-salaries,,0,2026-11-17T00:45:21Z,0,该仓库是AI岗位薪资汇总列表，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+AmierHan030121/scientific-agent-skills,https://github.com/AmierHan030121/scientific-agent-skills,Python,0,2026-11-17T00:07:10Z,4,这是一个面向多学科科研的Agent技能库，虽包含单细胞RNA-seq技能，但非聚焦虚拟细胞/基座模型，属于边缘相关。
+haotian-zhuang/BCRFoundation,https://github.com/haotian-zhuang/BCRFoundation,Python,0,2026-11-16T22:45:02Z,6,BCRFoundation 是一个基于单细胞基因表达与BCR序列配对数据的多模态基座模型，支持B细胞特性预测和零样本BCR到RNA预测，与细胞基座建模方向相关但聚焦B细胞而非虚拟细胞/器官。
+pleiadian53/tabular-icl-lab,https://github.com/pleiadian53/tabular-icl-lab,Jupyter Notebook,0,2026-11-16T21:55:43Z,4,该仓库研究表格基座模型与上下文学习在科学数据上的应用，涉及单细胞扰动响应预测，但非面向虚拟细胞/器官或生物基座大模型/Agent，核心是通用表格学习。
+teslajoy/omicstra,https://github.com/teslajoy/omicstra,Python,0,2026-11-17T17:08:22Z,8,omicstra 是一个面向空间生物学（H&E 与空间转录组）的多智能体 MCP 服务器，实现跨模态嵌入对齐与基于证据的路由，核心涉及细胞/组织微环境表征与基座模型集成，与虚拟细胞/器官建模方向高度相关。
+Rook1echen/arxiv-daily,https://github.com/Rook1echen/arxiv-daily,Python,0,2026-11-16T18:12:26Z,0,该仓库是网络安全渗透测试方向的论文与工具汇总，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+jawa23bio/pert-prior-bench,https://github.com/jawa23bio/pert-prior-bench,Python,0,2026-11-16T17:29:38Z,4,该仓库是一个扰动预测基准测试，评估线性模型在预测基因扰动效应时是否受益于调控网络先验，虽使用单细胞数据但聚焦于扰动效应预测而非细胞基座模型或虚拟细胞建模。
+r-andrese/terra-ligand-perturbation,https://github.com/r-andrese/terra-ligand-perturbation,Python,0,2026-11-16T15:10:09Z,8,基于空间转录组基座模型TERRA，对肿瘤微环境中成纤维细胞配体CSF1进行零样本扰动模拟，评估巨噬细胞状态表征变化，属于虚拟细胞/器官建模方向的高价值应用仓库。
+Xydik1otto/algorithms-code-archive,https://github.com/Xydik1otto/algorithms-code-archive,Python,0,2026-11-16T13:31:24Z,0,该仓库是通用算法与数据结构实现索引，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+hossainlab/dmg_atlas,https://github.com/hossainlab/dmg_atlas,Python,0,2026-11-16T10:25:13Z,4,该仓库是弥漫中线胶质瘤的单细胞参考图谱，基于scVI/scANVI整合与细胞状态注释，但未涉及生物基座模型、大语言模型或Agent，属于常规单细胞整合分析资源。
+greasebig/awesome-agent-everything,https://github.com/greasebig/awesome-agent-everything,HTML,0,2026-11-16T08:21:31Z,0,这是一个AI Agent仓库的元索引/资源汇总，与单细胞、空间组学、虚拟细胞或生物基座模型完全无关。
+wtbxsjy/my_skills,https://github.com/wtbxsjy/my_skills,Python,0,2026-11-16T06:34:58Z,0,该仓库是 Claude Code 环境 Skills/插件/设置的管理集合，与单细胞、空间组学、生物基座模型或虚拟细胞方向无关。
+zhyzhy12512/DyMoE-Pert,https://github.com/zhyzhy12512/DyMoE-Pert,Python,0,2026-11-16T03:59:00Z,8,DyMoE-Pert 是基于单细胞扰动数据、融合知识图谱与scGPT基座表征的动态混合专家模型，用于预测基因扰动对细胞表达的影响，属于细胞系统建模与基座模型应用方向。
+LuyuNiu/scfm-repro,https://github.com/LuyuNiu/scfm-repro,Python,0,2026-11-15T21:26:36Z,4,该仓库用于复现并修复单细胞基座模型（UCE、scPRINT、scGPT）嵌入的随机采样问题，虽涉及单细胞基座模型，但核心是复现性检查工具而非模型训练或Agent实现，与虚拟细胞/器官建模方向关联较弱。
+EdisonTKPcom/Awesome-Craft-DNA,https://github.com/EdisonTKPcom/Awesome-Craft-DNA,Python,0,2026-11-15T16:30:53Z,2,这是一个DNA/基因组/合成生物学的开源工具清单，虽含单细胞和AI模型条目，但本质是资源汇总，不聚焦虚拟细胞/基座模型/Agent建模。
+uzamakimiko74-maker/paul,https://github.com/uzamakimiko74-maker/paul,Python,0,2026-11-18T02:52:04Z,0,这是一个ChatGPT相关开源仓库的精选列表，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ms6124/ml4fg,https://github.com/ms6124/ml4fg,Python,0,2026-11-15T04:34:41Z,4,该仓库聚焦视网膜细胞类型注释的紧凑基因面板选择，属于常规单细胞分类任务，未涉及基座模型、大语言模型或虚拟细胞建模。
+Khachdallak02/Khachdallak02,https://github.com/Khachdallak02/Khachdallak02,,0,2026-11-14T22:20:51Z,6,个人学术主页，展示单细胞基座模型、多模态虚拟细胞等研究方向，但无具体代码或模型实现，仅提供背景与思路。
+lolsripal/fm-low-data-cancer,https://github.com/lolsripal/fm-low-data-cancer,Python,0,2026-11-14T20:57:00Z,4,该仓库评估基因基座模型Geneformer在低数据癌症检测中的表现，但基于bulk转录组而非单细胞/空间组学，且不涉及虚拟细胞或细胞系统建模，仅作为基座模型迁移的对照研究。
+Jiayu-Xu88/Sparse-Autoencoder-Bottlenecks,https://github.com/Jiayu-Xu88/Sparse-Autoencoder-Bottlenecks,Python,0,2026-11-14T12:39:19Z,2,该仓库是病理基础模型的数据质量审计工具，基于稀疏自编码器检测低质量图像块，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+IlariaPapillo/scgpt-zero-shot-evaluation,https://github.com/IlariaPapillo/scgpt-zero-shot-evaluation,Jupyter Notebook,0,2026-11-14T12:24:40Z,7,该仓库评估scGPT-spatial在空间转录组上的零样本性能，虽非新模型开发，但直接面向空间组学基座模型的应用与验证，具有可迁移的建模思路。
+tom-snir/bmfm-rna-zero-shot,https://github.com/tom-snir/bmfm-rna-zero-shot,Python,0,2026-11-14T09:48:51Z,6,该仓库是IBM BMFM-RNA单细胞基座模型的零样本应用与评估示例，验证了模型在细胞类型注释和克隆邻近性上的表现，但本身不提供新模型或训练代码。
+bobyu89/skill-bank,https://github.com/bobyu89/skill-bank,Python,0,2026-11-14T04:14:52Z,0,这是一个通用的SKILL收藏库，涵盖学术写作、护理、医学论文等，与虚拟细胞、单细胞组学或生物基座模型无关。
+nyanovsky/scfm-perturbation-failure-modes,https://github.com/nyanovsky/scfm-perturbation-failure-modes,HTML,0,2026-11-14T04:11:47Z,7,该仓库评估单细胞基座模型（scGPT、scPRINT、TranscriptFormer）的扰动查询预测基因敲低响应的能力，发现静态基因嵌入优于模拟扰动响应，属于对细胞基座模型能力的批判性验证，与虚拟细胞建模方向相关但非直接构建模型。
+xmashaxxx/research_assistant,https://github.com/xmashaxxx/research_assistant,Python,0,2026-11-14T00:23:58Z,0,这是一个通用科研文献综述与实验代码生成的Agent工具，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+wgsim/biology-foundation-model-learning,https://github.com/wgsim/biology-foundation-model-learning,Jupyter Notebook,0,2026-11-13T23:56:18Z,7,这是一个面向中级到专家水平的生物学基础模型学习路线图，包含单细胞FM模块和批判性评估，但主要是教学资源而非可直接使用的模型或Agent实现。
+iandriver/actinn-jax-benchmark,https://github.com/iandriver/actinn-jax-benchmark,Rich Text Format,0,2026-11-13T15:33:50Z,6,这是一个单细胞标签映射方法的基准测试仓库，比较了多种方法（含基座模型scPRINT）的准确率、速度和内存，并提出了两阶段分层标注思路，但本身不提供基座模型或Agent训练代码。
+badozor/biomarkfinder,https://github.com/badozor/biomarkfinder,JavaScript,0,2026-11-13T14:08:44Z,3,这是一个基于R/Python的生物标志物发现流水线仓库，虽提及基因表达基座模型但无实现，与虚拟细胞/单细胞基座建模方向关联薄弱。
+younggon2/Kidney-Aging-Signature-from-PAS,https://github.com/younggon2/Kidney-Aging-Signature-from-PAS,Python,0,2026-11-13T07:03:34Z,2,该仓库基于PAS组织学图像估计肾脏组织衰老评分，虽源于单细胞空间转录组学定义，但核心是病理图像回归模型，不涉及细胞基座模型、大语言模型或Agent，与课题方向关联微弱。
+Supersynergy/awesome-codedesign,https://github.com/Supersynergy/awesome-codedesign,Shell,0,2026-11-13T03:07:14Z,0,该仓库是可视化工具清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Kays3/Kays3,https://github.com/Kays3/Kays3,,0,2026-11-13T02:00:08Z,6,个人研究主页，展示基于Geneformer的单细胞基座模型微调与扰动工作流，但缺乏完整模型/Agent实现，偏向方法记录与教程。
+hank08819/QFM,https://github.com/hank08819/QFM,Python,0,2026-11-12T23:35:22Z,,[llm failed]
+yuanyehome/Awesome-Multimodal-Evaluation-Papers,https://github.com/yuanyehome/Awesome-Multimodal-Evaluation-Papers,,0,2026-11-12T17:52:29Z,,[llm failed]
+tristanseltec/quantome,https://github.com/tristanseltec/quantome,Python,0,2026-11-12T17:22:09Z,2,这是一个从GMAT数学到生物医学AI的开源数学教科书，虽涉及基因组学和AI但核心是教学，不面向单细胞/空间组学基座模型或虚拟细胞建模。
+combioconference/bibm2026-workshop,https://github.com/combioconference/bibm2026-workshop,,0,2026-11-12T17:12:23Z,0,这是一个IEEE BIBM 2026研讨会的征稿通知，不是代码仓库，与虚拟细胞/基座模型方向无直接关系。
+daleeshen/scDrugPred_benchmark,https://github.com/daleeshen/scDrugPred_benchmark,Python,0,2026-11-12T14:30:28Z,4,该仓库是单细胞药物反应预测模型的系统基准测试代码库，虽涉及单细胞数据和scGPT/scFoundation基座模型评估，但核心是药物反应预测而非虚拟细胞/器官或细胞系统建模，与课题方向关联较弱。
+helicalAI/heli-plugin,https://github.com/helicalAI/heli-plugin,Python,0,2026-11-12T13:27:31Z,6,这是一个Claude Code/Codex插件，用于通过MCP远程调用Helical平台，提供单细胞数据基础模型嵌入计算、微调和虚拟扰动技能，与课题方向相关但本身不包含模型实现。
+VincenzoJust/lung-cell-annotation-benchmark,https://github.com/VincenzoJust/lung-cell-annotation-benchmark,Jupyter Notebook,0,2026-11-12T12:09:53Z,6,该仓库比较了经典方法与Geneformer/scGPT等基座模型在COVID-19肺细胞标签转移上的表现，聚焦单细胞数据与基座模型评估，但非模型开发或虚拟细胞建模。
+mapengsen/DNAKit,https://github.com/mapengsen/DNAKit,Python,0,2026-11-12T07:48:33Z,3,DNAKit 是一个面向 DNA 序列分析的综合工具包，整合了 284 个软件和 6698 个操作，支持 MCP/Agent 调用，但核心是 DNA 序列而非单细胞/空间组学，与虚拟细胞/基座模型方向关联较弱。
+moon-s/RRScore,https://github.com/moon-s/RRScore,Python,0,2026-11-12T05:45:58Z,2,该仓库是RLS疾病多组学整合与风险调控评分的分析代码，不涉及单细胞/空间组学基座模型、细胞大语言模型或生物Agent，与课题核心方向无关。
+enhansome/enhansome-pathology,https://github.com/enhansome/enhansome-pathology,,0,2026-11-18T17:12:00Z,2,这是一个数字病理学与计算病理学工具和资源的汇总清单，主要面向组织切片图像分析，与单细胞/空间组学基座模型、虚拟细胞或生物大语言模型方向无关。
+enhansome/enhansome-image-registration,https://github.com/enhansome/enhansome-image-registration,,0,2026-11-18T14:22:09Z,0,该仓库是图像配准领域的论文与资源汇总清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+enhansome/enhansome_ai_agents,https://github.com/enhansome/enhansome_ai_agents,,0,2026-11-18T09:30:10Z,0,这是一个通用AI Agent资源汇总仓库，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+TrakkerHQ/freshman-cs-jobs,https://github.com/TrakkerHQ/freshman-cs-jobs,Python,0,2026-11-18T03:42:45Z,0,这是一个大一计算机专业实习机会的汇总仓库，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+TrakkerHQ/sophomore-cs-jobs,https://github.com/TrakkerHQ/sophomore-cs-jobs,Python,0,2026-11-18T03:42:44Z,0,该仓库是计算机科学大二学生实习机会汇总列表，与虚拟细胞、单细胞组学或生物基座模型完全无关。
+PranjalVerma08/PranjalVerma08,https://github.com/PranjalVerma08/PranjalVerma08,,0,2026-11-18T04:49:41Z,,[llm failed]
+enhansome/enhansome-segment-anything,https://github.com/enhansome/enhansome-segment-anything,,0,2026-11-17T23:40:05Z,,[llm failed]
+enhansome/enhansome-Awesome-Medical-Dataset,https://github.com/enhansome/enhansome-Awesome-Medical-Dataset,,0,2026-11-17T20:04:13Z,0,该仓库是医学影像与电子病历数据集的资源清单，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+danielchen26/bio-fm-audit,https://github.com/danielchen26/bio-fm-audit,Python,0,2026-11-17T00:04:49Z,2,该仓库审计生物基础模型，评估其是否测量生物学而非仪器伪影，涉及蛋白质多模态FM和病理FM，但与单细胞/空间组学、虚拟细胞或生物基座模型无直接关联。
+ShogoMakishima22/ShogoMakishima22.github.io,https://github.com/ShogoMakishima22/ShogoMakishima22.github.io,,0,2026-11-16T03:05:58Z,1,这是一个个人学术博客/简历仓库，主要涉及医学影像和病理学，与虚拟细胞/单细胞基座模型方向无关。
+prazg/Histology_FM_Portal,https://github.com/prazg/Histology_FM_Portal,Python,0,2026-11-15T17:06:56Z,4,该仓库是组织病理学基础模型的前端门户，虽涉及空间转录组和基础模型，但核心是病理图像而非单细胞/空间组学，且无细胞基座模型或Agent实现。
+prazg/Animal_Pathology_FM_Portal,https://github.com/prazg/Animal_Pathology_FM_Portal,Python,0,2026-11-15T16:52:03Z,2,这是一个面向啮齿类/兽医病理学的组织病理学基础模型门户，不涉及单细胞/空间组学或虚拟细胞/器官建模，与课题方向无关。
+miguelrosell/tileparity,https://github.com/miguelrosell/tileparity,Python,0,2026-11-14T10:40:31Z,3,该仓库是H&E组织切片与空间转录组对齐的tiling工具，用于公平比较图像特征提取器，不涉及单细胞/空间组学的基座模型或生物Agent建模。
+SobiaNoorAI/histology-to-expression-probe,https://github.com/SobiaNoorAI/histology-to-expression-probe,Jupyter Notebook,0,2026-11-14T07:38:35Z,3,该仓库用冻结的病理图像基础模型特征预测空间基因表达，属于跨模态回归分析，不涉及单细胞/空间组学的基座模型、细胞大语言模型或生物Agent建模，与课题核心方向关联较弱。
+shaokangW/LLM-wisdom,https://github.com/shaokangW/LLM-wisdom,,0,2026-11-13T17:30:31Z,0,该仓库是LLM安全、知识编辑、Agent攻击等方向的论文列表，与虚拟细胞/单细胞/生物基座模型完全无关。
+leegaa734-afk/AortaST,https://github.com/leegaa734-afk/AortaST,Python,0,2026-11-13T09:35:53Z,3,AortaST 是一个从H&E图像预测主动脉空间基因表达的模型，虽涉及空间转录组学，但核心是图像到表达预测，而非细胞基座模型或虚拟细胞建模。
+Shomao1998/merfish-celltype-annotation,https://github.com/Shomao1998/merfish-celltype-annotation,Python,0,2026-11-13T03:04:00Z,4,该仓库是MERFISH空间转录组数据上60种神经元细胞类型分类的竞赛项目，使用传统机器学习集成模型，不涉及生物基座模型、大语言模型或Agent，仅作为常规单细胞/空间组学分类任务，与课题核心方向关联较弱。
+wpuzhu/BIOINF-590-Final-Team-Project,https://github.com/wpuzhu/BIOINF-590-Final-Team-Project,Python,0,2026-11-13T00:40:16Z,4,该仓库是空间转录组与空间蛋白组信息映射与迁移的课程项目，涉及细胞表征与基础模型方法，但非虚拟细胞/器官或生物基座模型核心方向。
+dongzhuoyao/awesome-flow-matching-autoupdate,https://github.com/dongzhuoyao/awesome-flow-matching-autoupdate,Python,0,2026-11-12T14:38:16Z,0,这是一个自动更新的流匹配论文列表，涵盖机器人、语音、图像等通用领域，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+shalinirmn/shalinirmn,https://github.com/shalinirmn/shalinirmn,,0,2026-11-12T04:32:09Z,2,这是一个个人学术主页，介绍研究兴趣和技能，不包含任何可用的模型、代码或数据集，与虚拟细胞/生物基座模型方向无关。
+nikhildehariya/cellrank-lineage-benchmark,https://github.com/nikhildehariya/cellrank-lineage-benchmark,Python,0,2026-11-18T16:52:36Z,7,该仓库是一个基于CellRank的scRNA-seq细胞命运动力学AI推理基准测试，用于评估大语言模型和Agent在细胞状态转换推理上的能力，与课题方向高度相关但本身不提供模型训练或Agent实现。
+TizzuLab/Blockrophage,https://github.com/TizzuLab/Blockrophage,Python,0,2026-11-18T17:04:49Z,1,这是一个巨噬细胞生物学实验教学课程仓库，包含湿实验和单细胞数据比较，但核心是教学而非生物基座模型或虚拟细胞建模。
+enhansome/enhansome-top-pharma50,https://github.com/enhansome/enhansome-top-pharma50,,0,2026-11-17T22:31:56Z,0,该仓库是制药公司开源软件排行榜，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+enhansome/enhansome-toolsdk-mcp-registry,https://github.com/enhansome/enhansome-toolsdk-mcp-registry,,0,2026-11-17T19:08:13Z,0,这是一个通用的MCP服务器注册表与网关项目，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+pranakkin/Recluster,https://github.com/pranakkin/Recluster,Python,0,2026-11-13T18:10:33Z,2,这是一个单细胞RNA-seq分析稳健性检验工具，用于验证分析结论的可靠性，不涉及基座模型、大语言模型或虚拟细胞建模。
+thirtysix/scView,https://github.com/thirtysix/scView,Python,0,2026-11-17T06:23:18Z,4,scView 是一个带AI助手和溯源的单细胞RNA-seq交互式分析工作台，虽涉及单细胞和AI辅助，但核心是常规分析与可视化，未实现细胞基座模型、大语言模型或虚拟细胞建模。
+stefaniazoibb/neurobridge,https://github.com/stefaniazoibb/neurobridge,HTML,0,2026-11-16T14:25:44Z,6,NeuroBridge 是一个面向胶质母细胞瘤的多模态生物医学发现 Agent 平台，整合单细胞与空间转录组分析，但核心是假设检验与证据报告，而非细胞基座模型或虚拟细胞建模。
+Terranimus/TerranSoul,https://github.com/Terranimus/TerranSoul,JavaScript,0,2026-11-15T03:22:08Z,0,这是一个本地运行的3D AI伴侣项目，专注于外部记忆架构，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+Learnerhua/scRNA_scripts,https://github.com/Learnerhua/scRNA_scripts,R,0,2026-11-14T14:18:06Z,,[llm failed]
+gottn/recall-guard,https://github.com/gottn/recall-guard,Python,0,2026-11-18T17:03:00Z,0,这是一个用于长上下文语言模型召回回归测试和修复的工程仓库，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+rajarshighoshal/stagewise-source-binding,https://github.com/rajarshighoshal/stagewise-source-binding,Python,0,2026-11-18T16:51:52Z,0,该仓库研究大语言模型指令遵循的后训练阶段行为，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+JieZheng-ShanghaiTech/PromptCASL,https://github.com/JieZheng-ShanghaiTech/PromptCASL,Jupyter Notebook,0,2026-11-18T14:27:38Z,4,PromptCASL 是一个基于生物医学语言模型预测细胞系特异性合成致死率的框架，虽使用细胞系分子谱和语言模型，但核心是合成致死预测而非虚拟细胞/器官或细胞基座模型建模。
+savvykitt-create/tablescan-local,https://github.com/savvykitt-create/tablescan-local,Python,0,2026-11-18T14:24:09Z,0,该仓库是本地表格扫描识别工具，用于将扫描或拍摄的表格转为Excel，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+IngenixAI/Thalamus-Decision,https://github.com/IngenixAI/Thalamus-Decision,Python,0,2026-11-18T13:55:30Z,7,Thalamus-Decision 是一个基于表达谱（含单细胞）的决策模型推理引擎，面向细胞状态判别与Agent决策，但非基座模型训练代码，且未聚焦虚拟细胞/类器官建模。
+faltenff-star/Excel-Seo-Optimization-Kit,https://github.com/faltenff-star/Excel-Seo-Optimization-Kit,HTML,0,2026-11-18T12:52:42Z,0,这是一个Excel SEO分析插件，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+featherbitplatform/feathercritty,https://github.com/featherbitplatform/feathercritty,Rust,0,2026-11-18T12:08:59Z,0,这是一个终端模拟库（Alacritty 的分支），与单细胞/空间组学、生物基座模型或虚拟细胞完全无关。
+Caizhaohui/News-Rust-bioinformation,https://github.com/Caizhaohui/News-Rust-bioinformation,Rust,0,2026-11-18T11:36:17Z,2,这是一个Rust生物信息学工具与生态的目录/雷达仓库，涵盖基因组、宏基因组等常规分析，与单细胞/空间组学基座模型、虚拟细胞或生物Agent方向无关。
+ahmedanees-m/mmc,https://github.com/ahmedanees-m/mmc,Python,0,2026-11-18T16:48:26Z,4,该仓库比较单细胞扰动数据中不同调控结构来源（含语言模型提议）的预测能力，涉及LLM但非细胞基座模型或生物Agent，核心是结构比较而非细胞系统建模。
+albert-ying/AgingAgentBench,https://github.com/albert-ying/AgingAgentBench,Python,0,2026-11-18T10:30:18Z,4,AgingAgentBench 是一个评估生物分析系统（含Agent/LLM）能否复现衰老时钟文献效应的基准，虽涉及生物Agent评估，但核心是衰老时钟而非单细胞/空间组学基座模型或虚拟细胞建模。
+mertydn/olit-thesis,https://github.com/mertydn/olit-thesis,,0,2026-11-18T09:34:41Z,4,Olit 是一个在浏览器端运行的 Galaxy 平台 AI 协同科学家，用于辅助生物信息学工作流构建与执行，但未聚焦单细胞/空间组学或细胞基座模型/虚拟细胞建模。
+semonlu/semonlu,https://github.com/semonlu/semonlu,,0,2026-11-18T08:42:08Z,0,这是一个个人学术主页/简历仓库，介绍作者在肌骨康复、医疗AI评测和生物医学数据科学方面的研究，与虚拟细胞/器官、单细胞基座模型或生物Agent方向无关。
+rob-c/voxanim,https://github.com/rob-c/voxanim,Python,0,2026-11-18T08:38:59Z,0,该仓库是用numpy和Pillow制作卷积、神经网络和Transformer动画的可视化项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Weptune/nematica,https://github.com/Weptune/nematica,Python,0,2026-11-18T17:14:11Z,2,NEMATICA 是线虫全脑神经活动的仿真与基准测试项目，聚焦于人工大脑与真实大脑的保真度比较，不涉及单细胞/空间组学数据或生物基座模型/大语言模型/Agent 方法。
+enhansome/enhansome-csstuff,https://github.com/enhansome/enhansome-csstuff,,0,2026-11-18T07:47:58Z,0,该仓库是计算机科学通用资源列表，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+atong01/atong01,https://github.com/atong01/atong01,,0,2026-11-18T06:14:07Z,3,这是个人学术主页，虽涉及单细胞动力学与生成模型，但无具体仓库代码或面向虚拟细胞/基座模型的实现。
+danielpham-cs/sheettwin,https://github.com/danielpham-cs/sheettwin,Python,0,2026-11-18T05:54:27Z,0,SheetIR 是一个将 Excel 工作簿解析为可查询中间表示并支持审计和问答的本地系统，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+VahaPython/VahaPython,https://github.com/VahaPython/VahaPython,,0,2026-11-18T04:58:40Z,0,这是一个个人GitHub主页/简历仓库，展示作者背景和两个变异注释/纤毛基因数据库项目，与虚拟细胞、单细胞基座模型或生物Agent方向无关。
+pradip25215-sudo/pradip25215-sudo,https://github.com/pradip25215-sudo/pradip25215-sudo,Python,0,2026-11-18T04:53:43Z,2,这是一个个人GitHub主页/简历仓库，展示作者在生物信息学、LLM Agent和癌症基因组学方面的项目，但本身不是面向虚拟细胞/单细胞基座模型的可复用工具或代码库。
+combio-dku/mlbi-workshop,https://github.com/combio-dku/mlbi-workshop,Jupyter Notebook,0,2026-11-18T03:11:22Z,2,该仓库是韩国某实验室的教学工作坊材料，涵盖机器学习、生物信息学和单细胞RNA-seq分析，但主要是教学示例和常规分析流程，不涉及生物基座模型、细胞大语言模型或虚拟细胞建模。
+RobertT4n/Seq-Browser,https://github.com/RobertT4n/Seq-Browser,,0,2026-11-18T00:53:50Z,2,这是一个测序方法目录数据库，面向单细胞/空间组学方法分类与检索，但无细胞表征、基座模型或Agent建模，与课题核心方向无关。
+enhansome/enhansome-vdj,https://github.com/enhansome/enhansome-vdj,,0,2026-11-18T00:30:58Z,2,这是一个VDJ/HLA免疫组库分析工具与资源的精选清单，聚焦TCR/BCR序列分析，与单细胞/空间组学基座模型、虚拟细胞或生物大语言模型方向无关。
+Qwuantabee/epistasis-ceiling,https://github.com/Qwuantabee/epistasis-ceiling,Python,0,2026-11-17T23:40:58Z,0,该仓库研究蛋白质双突变体的加性效应预测，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+bhuvaneshkarthiknilavalagan/biot6900,https://github.com/bhuvaneshkarthiknilavalagan/biot6900,Jupyter Notebook,0,2026-11-17T22:15:49Z,4,该仓库是生物信息学课程作业合集，包含单细胞/空间组学分析，但仅做常规整合与可视化，未涉及生物基座模型、细胞大模型或Agent建模。
+enhansome/enhansome-prompts,https://github.com/enhansome/enhansome-prompts,,0,2026-11-17T21:50:53Z,0,这是一个通用LLM提示词与Agent生态的awesome清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Masmae/paperoftheday,https://github.com/Masmae/paperoftheday,JavaScript,0,2026-11-17T21:45:03Z,2,这是一个每日推荐AI与组学相关论文的网站/工作流，属于论文筛选与摘要工具，不涉及单细胞/空间组学建模、基座模型或Agent实现，与课题核心方向无关。
+bioc/immLynx,https://github.com/bioc/immLynx,R,0,2026-11-17T21:31:49Z,2,immLynx 是面向 TCR 序列分析的 R 包，整合多种 TCR 分析工具，与单细胞数据接口，但聚焦免疫受体序列而非细胞状态或基座模型，与课题方向关联弱。
+arsr/fern-publish,https://github.com/arsr/fern-publish,Python,0,2026-11-17T15:34:15Z,0,FERN 是面向文本到SQL的表检索排序工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+jbrosens92/Modillion-Website,https://github.com/jbrosens92/Modillion-Website,HTML,0,2026-11-17T15:27:34Z,0,该仓库是一个房地产运营公司网站及内部仪表盘项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+rabiul-ai/Agentic-AI-in-Biomedical-and-Healthcare,https://github.com/rabiul-ai/Agentic-AI-in-Biomedical-and-Healthcare,,0,2026-11-17T11:57:33Z,4,这是一篇关于生物医学与医疗领域Agentic AI的系统综述，虽涉及生物信息学模态，但未聚焦单细胞/空间组学、虚拟细胞或生物基座模型，与课题核心方向关联较弱。
+alephme/ap2e-artifact,https://github.com/alephme/ap2e-artifact,JavaScript,0,2026-11-17T09:17:51Z,0,该仓库是关于代理支付协议中零知识证明验证购买决策的，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+munimtechnologies/dbgap-cohort-finder,https://github.com/munimtechnologies/dbgap-cohort-finder,Python,0,2026-11-17T09:02:53Z,2,这是一个面向dbGaP队列可行性检索的文本检索与排序工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+man4ish/omnibioai-local-llm-benchmark,https://github.com/man4ish/omnibioai-local-llm-benchmark,Python,0,2026-11-17T06:33:50Z,4,该仓库是本地LLM在计算生物学任务上的性能基准测试，涉及单细胞转录组学场景，但仅做推理评估，无细胞基座模型或Agent建模实现。
+antrymen/JURE,https://github.com/antrymen/JURE,Python,0,2026-11-17T05:54:49Z,4,该仓库面向单细胞遗传扰动数据，结合统计发现与多Agent证据调查，但核心是机制探索而非细胞基座模型或虚拟细胞建模，与课题方向关联较弱。
+dmiao623/lit-review,https://github.com/dmiao623/lit-review,,0,2026-11-17T03:48:24Z,2,这是一个个人论文阅读笔记和阅读清单仓库，虽包含单细胞发育轨迹等文献，但无模型或代码实现，与虚拟细胞/基座模型课题关联极弱。
+IshanMaheshwari01/IshanMaheshwari01,https://github.com/IshanMaheshwari01/IshanMaheshwari01,,0,2026-11-16T22:36:24Z,1,个人简历仓库，仅包含常规单细胞分析项目，与虚拟细胞/基座模型/生物Agent方向无关。
+taslater/databricks-explore,https://github.com/taslater/databricks-explore,TypeScript,0,2026-11-16T21:02:43Z,0,这是一个用于浏览Databricks Unity Catalog和构建SQL查询画布的本地工具，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+articlesmli/omniSpatial_multiscale,https://github.com/articlesmli/omniSpatial_multiscale,Python,0,2026-11-16T17:05:20Z,8,这是一个多尺度生物数字孪生框架，结合单细胞空间转录组、结构生物学和代谢建模，通过条件扩散模型预测细胞扰动状态，与虚拟细胞建模方向高度相关。
+sydneyani/FormulAI,https://github.com/sydneyani/FormulAI,HTML,0,2026-11-16T16:48:45Z,0,这是一个将自然语言问题转换为Excel公式的Flask应用，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Ege-Guney/Ege-Guney,https://github.com/Ege-Guney/Ege-Guney,,0,2026-11-16T16:16:30Z,2,个人开发者作品集，核心是支付技术、AI治理界面和果蝇全脑仿真，虽涉及果蝇神经仿真但非单细胞/空间组学基座模型或生物大语言模型，与课题方向关联极弱。
+julgrandvallet/julgrandvallet,https://github.com/julgrandvallet/julgrandvallet,,0,2026-11-16T14:14:43Z,0,这是一个个人学术主页，展示生物信息学家的简历、技能和私有项目，不包含任何与虚拟细胞、生物基座模型或单细胞建模相关的代码或资源。
+sjaakd/mcp-virtual-groundwater-heads,https://github.com/sjaakd/mcp-virtual-groundwater-heads,Java,0,2026-11-16T10:18:55Z,0,"无 README/描述/目录树,跳过"
+WilltheRanger/NASASpaceAppChallenge-Propagators,https://github.com/WilltheRanger/NASASpaceAppChallenge-Propagators,TypeScript,0,2026-11-16T19:39:54Z,0,该仓库是NASA卫星火灾热点数据校准与可视化项目，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+masterevan27/lancer-npc-pilot,https://github.com/masterevan27/lancer-npc-pilot,JavaScript,0,2026-11-16T05:31:55Z,0,这是一个用于桌面角色扮演游戏LANCER的AI副驾驶模块，与单细胞/空间组学、生物基座模型或虚拟细胞建模完全无关。
+GeoByteBrew/BurningActivityAtlas,https://github.com/GeoByteBrew/BurningActivityAtlas,TypeScript,0,2026-11-15T21:50:02Z,0,该仓库是处理全球卫星火灾活动数据的遥感项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+hypneum-lab/bouba_sens,https://github.com/hypneum-lab/bouba_sens,Python,0,2026-11-15T21:34:36Z,1,该仓库研究人工神经系统的跨模态可塑性基准，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+Jimbotz/astro-burritos,https://github.com/Jimbotz/astro-burritos,TypeScript,0,2026-11-15T21:28:47Z,,[llm failed]
+fMindstormer/tokcpu,https://github.com/fMindstormer/tokcpu,Python,0,2026-11-15T18:11:43Z,0,该仓库利用Hugging Face tokenizer执行图灵机程序，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+SubhamBhat/HALO_CVPR,https://github.com/SubhamBhat/HALO_CVPR,Python,0,2026-11-15T17:52:06Z,0,该仓库是CVPR长尾视觉识别优化方法，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ZhaoXM-Lab/BrainTwin,https://github.com/ZhaoXM-Lab/BrainTwin,Python,0,2026-11-15T16:08:17Z,6,BrainTwin 是一个面向脑科学的多模态知识图谱与文献检索 Agent，包含单细胞案例，但核心是知识检索而非细胞基座模型或虚拟细胞建模。
+ibo-agentic/clock-interp,https://github.com/ibo-agentic/clock-interp,Python,0,2026-11-15T06:42:51Z,,[llm failed]
+vibecoder1998/earth-buddy-analyst,https://github.com/vibecoder1998/earth-buddy-analyst,Python,0,2026-11-15T04:32:42Z,,[llm failed]
+rsolerortuno/agentic-colitis-atlas,https://github.com/rsolerortuno/agentic-colitis-atlas,HTML,0,2026-11-18T16:41:57Z,4,该仓库是一个面向溃疡性结肠炎的多组学药物靶点筛选系统，利用AI Agent整合单细胞、空间转录组等证据，但核心是疾病靶点发现而非虚拟细胞/器官或细胞基座模型建模。
+dustincorder/seto,https://github.com/dustincorder/seto,Python,0,2026-11-14T18:55:19Z,0,这是一个面向通用多语言文本的轻量级语言模型训练项目，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+ADjayantan/signbridge-,https://github.com/ADjayantan/signbridge-,JavaScript,0,2026-11-14T04:36:55Z,0,SignBridge 是一个面向手语对话的实时通信与手语识别应用，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+divyasak07/queue-manag-sof.,https://github.com/divyasak07/queue-manag-sof.,,0,2026-11-14T03:59:21Z,0,这是一个Python生态库的通用清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+gylee-94/personaAI,https://github.com/gylee-94/personaAI,Python,0,2026-11-14T03:13:35Z,3,该仓库是PersonaAI辅助的论文复现仓库，包含人类遗传学和单细胞衰老图谱分析流程，但核心是常规单细胞分析和统计遗传学，不涉及生物基座模型、细胞大语言模型或虚拟细胞建模。
+yashikiDEV/ys_loRA_Training,https://github.com/yashikiDEV/ys_loRA_Training,Jupyter Notebook,0,2026-11-13T20:04:20Z,1,这是一个通用的LLM LoRA/QLoRA微调工具，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+hcchengithub/playground-yr07d3ss,https://github.com/hcchengithub/playground-yr07d3ss,Python,0,2026-11-13T19:28:00Z,0,该仓库是 peforth 2.1.0 Forth 编程语言在 Python 上的实现，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+rsolerortuno/agentic-kidney-atlas,https://github.com/rsolerortuno/agentic-kidney-atlas,HTML,0,2026-11-13T15:21:27Z,3,该仓库是肾癌药物靶点筛选的多组学证据整合与Agent报告生成项目，虽使用单细胞/空间数据但核心是靶点筛选而非细胞基座模型或虚拟细胞建模。
+JeremyHennessy/AI-Research,https://github.com/JeremyHennessy/AI-Research,Python,0,2026-11-14T17:13:02Z,2,该仓库是AI与人工生命研究的知识库与文献综述，不涉及单细胞/空间组学数据、生物基座模型或细胞大语言模型的实现，与课题方向无关。
+ajinkya-awari/ajinkya-awari,https://github.com/ajinkya-awari/ajinkya-awari,Python,0,2026-11-13T13:33:07Z,1,这是一个个人简历/作品集仓库，展示ML工程与生物医学AI项目，但核心是可靠性评估与MLOps，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+ada-th25/fire-impact-curves,https://github.com/ada-th25/fire-impact-curves,Jupyter Notebook,0,2026-11-13T11:46:42Z,0,该仓库是森林碳损失与火灾影响曲线分析项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+zdfgu113/puzzle-coach,https://github.com/zdfgu113/puzzle-coach,Python,0,2026-11-13T11:16:43Z,0,这是一个教授ARC逻辑谜题的AI辅导工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+divyasak07/AWESOME-PY-SYSTEM,https://github.com/divyasak07/AWESOME-PY-SYSTEM,,0,2026-11-13T10:33:41Z,0,这是一个Python生态库的通用清单，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+ReproducibleBioinformatics/JupyDo-Assistant,https://github.com/ReproducibleBioinformatics/JupyDo-Assistant,Python,0,2026-11-13T08:12:13Z,1,这是一个为JupyDo平台提供容器镜像推荐的小型AI服务，与单细胞/空间组学、生物基座模型或虚拟细胞建模无关。
+Tahsin-Mayeesha/reasoning-recontextualisation,https://github.com/Tahsin-Mayeesha/reasoning-recontextualisation,Jupyter Notebook,0,2026-11-13T03:36:51Z,0,该仓库是逻辑谜题重述与语言模型评估工具，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+Supersynergy/awesome-awesome-best-of-repo-lists,https://github.com/Supersynergy/awesome-awesome-best-of-repo-lists,,0,2026-11-13T03:07:40Z,0,这是一个收集各类开源资源列表的通用仓库，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+aryabhanushali/TKG_MIMIC,https://github.com/aryabhanushali/TKG_MIMIC,Python,0,2026-11-12T22:07:43Z,0,该仓库基于MIMIC-IV电子病历构建时序知识图谱，预测心血管疾病风险，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+SiddonGTang/qinyan-academic-skills,https://github.com/SiddonGTang/qinyan-academic-skills,Python,0,2026-11-12T21:46:57Z,0,这是一个面向学术写作的AI agent技能库，与单细胞/空间组学、生物基座模型或虚拟细胞方向无关。
+AttieLab-Systems-Genetics/Heureka,https://github.com/AttieLab-Systems-Genetics/Heureka,,0,2026-11-12T16:24:39Z,7,HeurekaBench 是一个面向单细胞生物学、用于评估 AI 共科学家（科学 Agent）的基准测试框架，与生物 Agent 方向相关，但本身不提供模型训练或推理实现。
+gunnerwang/Contract-Based-Production-Autonomy,https://github.com/gunnerwang/Contract-Based-Production-Autonomy,Python,0,2026-11-12T15:05:54Z,0,该仓库是面向制造业的LLM驱动生产自治治理框架，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Sejung98/Jige,https://github.com/Sejung98/Jige,Python,0,2026-11-12T08:06:19Z,2,Jige 是一个面向 HPC 的基因组数据获取与 nf-core 流水线编排的 DataOps 工具，不涉及单细胞/空间组学基座模型、细胞大语言模型或虚拟细胞建模，与课题方向无关。
+rakesh-vayigandla/biot6900,https://github.com/rakesh-vayigandla/biot6900,Jupyter Notebook,0,2026-11-12T03:39:38Z,2,该仓库是生物信息学课程作业，涵盖多组学靶点发现、蛋白语言模型、结构可成药性、变异解读、PRS、知识图谱和单细胞/空间转录组分析，但未涉及生物基座模型、细胞大语言模型或Bio Agent，与课题核心方向关联微弱。
+Diya-Sharma-DS/Evaluating-Information-Overload-Jailbreaks-in-Large-Language-Models,https://github.com/Diya-Sharma-DS/Evaluating-Information-Overload-Jailbreaks-in-Large-Language-Models,Jupyter Notebook,0,2026-11-12T00:41:11Z,0,该仓库是评估大语言模型信息过载越狱攻击的安全研究项目，与单细胞/空间组学、生物基座模型或虚拟细胞方向完全无关。
+acycliq/pciSeq_viewer,https://github.com/acycliq/pciSeq_viewer,JavaScript,0,2026-11-17T17:55:36Z,2,这是一个用于可视化pciSeq空间转录组分析结果的桌面应用，附带AI对话界面，但核心是可视化工具而非细胞基座模型或虚拟细胞建模。
+enhansome/enhansome-agentic-world-modeling,https://github.com/enhansome/enhansome-agentic-world-modeling,,0,2026-11-18T11:51:54Z,0,该仓库是通用智能体世界建模的论文与基准资源清单，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+enhansome/enhansome-agi-cocosci,https://github.com/enhansome/enhansome-agi-cocosci,,0,2026-11-18T03:48:09Z,0,该仓库是通用人工智能与计算认知科学领域的论文与资源清单，不涉及单细胞/空间组学、虚拟细胞或生物基座模型，与课题方向无关。
+enhansome/enhansome-Awesome-World-Model,https://github.com/enhansome/enhansome-Awesome-World-Model,,0,2026-11-17T23:28:54Z,0,该仓库是自动驾驶/机器人世界模型的论文与资源清单，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+suruoxi/WorldModel-VLA-arxiv-daily,https://github.com/suruoxi/WorldModel-VLA-arxiv-daily,Python,0,2026-11-16T17:37:25Z,0,该仓库是具身智能/世界模型领域的论文列表，与单细胞、空间组学、虚拟细胞或生物基座模型完全无关。
+wyywyy999/DeSCORT_script,https://github.com/wyywyy999/DeSCORT_script,Python,0,2026-11-13T06:45:59Z,4,DeSCORT 是基于细胞形态学（Cell Painting）数据的扰动响应基座模型，虽含虚拟细胞预测，但对象非单细胞/空间组学，与课题核心方向关联较弱。
+Rishabh-bgp/Rishabh-bgp,https://github.com/Rishabh-bgp/Rishabh-bgp,Python,0,2026-11-18T07:49:04Z,0,这是一个个人AI/ML研究者的简历/作品集仓库，内容涵盖风能预测、脑肿瘤MRI分类、量子机器学习等，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+gvkhosla/bio-harness,https://github.com/gvkhosla/bio-harness,TypeScript,0,2026-11-15T18:54:27Z,2,Bio Harness 是一个面向生物学家的工作流管理工具，用于脚本和样本表格的输入检查、人工审核和运行报告，不涉及单细胞/空间组学数据、细胞基座模型或生物大语言模型，与课题核心方向无关。
+eersin1/virtual-cell,https://github.com/eersin1/virtual-cell,Jupyter Notebook,0,2026-11-14T02:04:35Z,6,该仓库用基因描述和蛋白序列预测未见过基因敲低后的转录组响应，虽涉及细胞状态预测但非单细胞基座模型，方法为传统机器学习集成，与虚拟细胞/基座模型方向部分相关。
+Rishabh-bgp/coda-synth,https://github.com/Rishabh-bgp/coda-synth,TypeScript,0,2026-11-13T03:34:17Z,,[llm failed]
+Rishabh-bgp/Meeting-of-Machines-Consumer-Agents-Seller-Agents-and-Hidden-Fulfilment-Risk-in-Online-Retail,https://github.com/Rishabh-bgp/Meeting-of-Machines-Consumer-Agents-Seller-Agents-and-Hidden-Fulfilment-Risk-in-Online-Retail,Jupyter Notebook,0,2026-11-13T03:33:49Z,0,该仓库是电商多智能体履约风险的信息系统案例研究，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+Rishabh-bgp/Brain-Computer-Interfaces-and-Cognitive-Computing-An-Introduction,https://github.com/Rishabh-bgp/Brain-Computer-Interfaces-and-Cognitive-Computing-An-Introduction,Jupyter Notebook,0,2026-11-13T03:33:44Z,0,这是一本脑机接口与认知计算的入门教材，与单细胞/空间组学、虚拟细胞或生物基座模型无关。
+Rishabh-bgp/Agentic-Engineering-Ebook,https://github.com/Rishabh-bgp/Agentic-Engineering-Ebook,Jupyter Notebook,0,2026-11-13T03:33:43Z,0,该仓库是一本关于AI辅助SaaS开发的工程实践书籍，与单细胞/空间组学、虚拟细胞或生物基座模型完全无关。
+rpinho/ai-biology,https://github.com/rpinho/ai-biology,Python,0,2026-11-18T17:21:12Z,2,该仓库是个人用AI代理参与生物挑战赛和调试他人软件的结果汇总，不涉及单细胞/空间组学基座模型或虚拟细胞建模，与课题核心方向无关。
+lm203688/vec-trust-kit,https://github.com/lm203688/vec-trust-kit,Python,0,2026-11-16T08:53:20Z,3,这是一个面向虚拟胚胎预测模型的可信度诊断工具包，提供基线对比和覆盖审计，但不训练模型，仅作为评估辅助，与生物基座模型/大语言模型/Agent核心方向关联较弱。
+lm203688/vec-license-atlas,https://github.com/lm203688/vec-license-atlas,Python,0,2026-11-16T08:53:18Z,0,这是一个虚拟细胞/虚拟胚胎领域代码、权重、数据的许可图谱工具，不涉及任何模型训练、推理或Agent实现，与课题核心方向无关。
+zurek-jiri/LibreOrgan,https://github.com/zurek-jiri/LibreOrgan,C++,0,2026-11-18T15:52:10Z,0,这是一个管风琴音频采样器软件，与单细胞/空间组学、生物基座模型或虚拟细胞等课题完全无关。

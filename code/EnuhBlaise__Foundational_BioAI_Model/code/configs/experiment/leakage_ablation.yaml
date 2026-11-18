@@ -1,0 +1,14 @@
+# @package _global_
+# Measures how much apparent performance is batch memorization: identical
+# model and data, split at random instead of by donor. The gap against
+# pretrain_synthetic is the inflation a random split would have bought.
+defaults:
+  - override /data: synthetic
+  - override /data/splitter: random
+  - override /model: small
+  - override /execution: local_cpu
+
+seed: 0
+train: {epochs: 20, early_stop_patience: 4}
+data:
+  fail_on_leakage: false     # the leak is the measurement here

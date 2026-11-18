@@ -1,0 +1,37 @@
+# Default disease pipeline for Grubman 2019 entorhinal cortex.
+dataset: Grubman2019
+h5ad: data/singlecell/grubman_2019_alzheimer_entorhinal_cortex_clean.h5ad
+output_dir: cases/singlecell/output/Grubman2019_disease
+
+cell_type_key: cell_type
+condition_key: case_control
+disease_group: case
+control_group: control
+donor_key: null
+# auto: use this layer if it already looks log-normalized; otherwise
+# normalize_total + log1p a working copy when X is raw counts.
+layer: auto
+
+species: human
+disease: Alzheimer disease
+tissue: entorhinal cortex
+
+padj_max: 0.05
+min_abs_log2fc: 0.25
+top_n_genes: 50
+
+# enrich: gseapy Enrichr. model: BrainTwin proposes functions, not a statistical enrichment.
+function_mode: enrich
+gene_set: GO_Biological_Process_2023
+organism: human
+
+reuse_intermediates: true
+run_braintwin: true
+
+cell_type_labels:
+  oligo: Oligodendrocyte
+  astro: Astrocyte
+  OPC: Oligodendrocyte progenitor cell
+  neuron: Neuron
+  mg: Microglia
+  endo: Endothelial cell

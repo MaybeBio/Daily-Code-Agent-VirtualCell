@@ -1,0 +1,68 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+# Copyright (c) Microsoft. All rights reserved.
+
+import asyncio
+from urllib.request import urlopen
+
+from semantic_kernel.prompt_template import PromptTemplateConfig
+
+try:
+    from PIL import Image
+
+    pil_available = True
+except ImportError:
+    pil_available = False
+
+from semantic_kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion, OpenAITextToImage
+from semantic_kernel.contents import ChatHistory, ChatMessageContent, ImageContent, TextContent
+from semantic_kernel.functions.kernel_arguments import KernelArguments
+
+
+async def main():
+    kernel = Kernel()
+    dalle3 = OpenAITextToImage()
+    kernel.add_service(dalle3)
+    kernel.add_service(OpenAIChatCompletion(service_id="default"))
+
+    image = await dalle3.generate_image(
+        description="a painting of a flower vase", width=1024, height=1024, quality="hd", style="vivid"
+    )
+    print(image)
+    if pil_available:
+        img = Image.open(urlopen(image))  # nosec
+        img.show()
+
+    result = await kernel.invoke_prompt(
+        prompt="{{$chat_history}}",
+        prompt_template_config=PromptTemplateConfig(allow_dangerously_set_content=True),
+        arguments=KernelArguments(
+            chat_history=ChatHistory(
+                messages=[
+                    ChatMessageContent(
+                        role="user",
+                        items=[
+                            TextContent(text="What is in this image?"),
+                            ImageContent(uri=image),
+                        ],
+                    )
+                ]
+            )
+        ),
+    )
+    print(result)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

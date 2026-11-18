@@ -1,0 +1,21 @@
+# ~20M params. A reasonable single-GPU pretraining size.
+d_model: 512
+pool: mean
+normalize_embedding: false
+stem:
+  name: expression
+  n_genes: AUTO
+  n_value_bins: AUTO
+  dropout: 0.1
+backbone:
+  name: set_transformer
+  n_layers: 8
+  n_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.1
+heads:
+  masked_value:
+    name: masked_value
+    n_value_bins: AUTO
+    mode: classification
+    loss_weight: 1.0

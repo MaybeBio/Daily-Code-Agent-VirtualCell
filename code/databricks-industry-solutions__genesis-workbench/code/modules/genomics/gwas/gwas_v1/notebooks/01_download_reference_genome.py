@@ -1,0 +1,145 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Download Reference Genomes
+# MAGIC
+# MAGIC Downloads the GRCh38 reference genome and index files to a UC Volume
+# MAGIC for use by Parabricks alignment and Glow variant normalization.
+# MAGIC
+# MAGIC Also downloads a sample VCF from 1000 Genomes for demo purposes.
+
+# COMMAND ----------
+
+dbutils.widgets.text("catalog", "genesis_workbench", "Catalog")
+dbutils.widgets.text("schema", "genesis_schema", "Schema")
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+# COMMAND ----------
+
+import os
+
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.gwas_reference")
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {catalog}.{schema}.gwas_data")
+
+genome_path = f"/Volumes/{catalog}/{schema}/gwas_reference/genomes"
+os.makedirs(genome_path, exist_ok=True)
+
+os.environ['GENOME_PATH'] = genome_path
+os.environ['CATALOG'] = catalog
+os.environ['SCHEMA'] = schema
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Download GRCh38 reference genome
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC cd /local_disk0/
+# MAGIC mkdir -p tmp_ref
+# MAGIC
+# MAGIC if [ ! -f "$GENOME_PATH/GRCh38_full_analysis_set_plus_decoy_hla.fa" ]; then
+# MAGIC   echo "Downloading GRCh38 reference genome..."
+# MAGIC   wget -q https://1000genomes.s3.amazonaws.com/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa -P tmp_ref/
+# MAGIC   cp tmp_ref/GRCh38_full_analysis_set_plus_decoy_hla.fa $GENOME_PATH/
+# MAGIC   echo "Downloaded GRCh38 FASTA"
+# MAGIC else
+# MAGIC   echo "GRCh38 FASTA already exists, skipping"
+# MAGIC fi
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC if [ ! -f "$GENOME_PATH/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai" ]; then
+# MAGIC   echo "Downloading GRCh38 FASTA index..."
+# MAGIC   wget -q https://1000genomes.s3.amazonaws.com/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai -P /local_disk0/tmp_ref/
+# MAGIC   cp /local_disk0/tmp_ref/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai $GENOME_PATH/
+# MAGIC   echo "Downloaded GRCh38 FASTA index"
+# MAGIC else
+# MAGIC   echo "GRCh38 FASTA index already exists, skipping"
+# MAGIC fi
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Download BWA index files (required by Parabricks fq2bam)
+
+# COMMAND ----------
+
+# MAGIC %sh
+# MAGIC BASE_URL="https://1000genomes.s3.amazonaws.com/technical/reference/GRCh38_reference_genome"
+# MAGIC REF_BASE="GRCh38_full_analysis_set_plus_decoy_hla.fa"
+# MAGIC
+# MAGIC for ext in bwt sa ann amb pac; do
+# MAGIC   if [ ! -f "$GENOME_PATH/${REF_BASE}.${ext}" ]; then
+# MAGIC     echo "Downloading BWA index: ${REF_BASE}.${ext}..."
+# MAGIC     wget -q "${BASE_URL}/${REF_BASE}.${ext}" -P /local_disk0/tmp_ref/
+# MAGIC     cp "/local_disk0/tmp_ref/${REF_BASE}.${ext}" "$GENOME_PATH/"
+# MAGIC     echo "Downloaded ${REF_BASE}.${ext}"
+# MAGIC   else
+# MAGIC     echo "BWA index ${REF_BASE}.${ext} already exists, skipping"
+# MAGIC   fi
+# MAGIC done
+# MAGIC echo "BWA index files complete"
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Download sample VCF from 1000 Genomes (for demo)
+
+# COMMAND ----------
+
+import os, subprocess
+
+sample_vcf_dir = f"/Volumes/{catalog}/{schema}/gwas_data/sample_vcf"
+os.makedirs(sample_vcf_dir, exist_ok=True)
+
+# 1000 Genomes Phase 3 chr6 genotypes, lifted to GRCh38 positions (matches the
+# GRCh38 reference genome above). Served from the AWS Open Data S3 mirror — the EBI
+# HTTPS host is unusably slow from the workshop (multi-GB downloads time out). The
+# 20190312 biallelic release is NOT on the S3 bucket; this Phase 3 GRCh38 release is,
+# and its 2504 samples (HG00096, HG00097, ...) exactly match breast_cancer_phenotype.tsv.
+vcf_filename = "ALL.chr6.phase3_shapeit2_mvncall_integrated_v3plus_nounphased.rsID.genotypes.GRCh38_dbSNP_no_SVs.vcf.gz"
+vcf_dest = os.path.join(sample_vcf_dir, vcf_filename)
+
+# Size-checked guard: a prior timeout can leave a truncated file — re-download unless
+# the existing file is plausibly complete (chr6 VCF is ~1 GB).
+MIN_VCF_BYTES = 1_000_000
+if os.path.exists(vcf_dest) and os.path.getsize(vcf_dest) > MIN_VCF_BYTES:
+    print(f"Sample VCF already exists at {vcf_dest} "
+          f"({os.path.getsize(vcf_dest) / (1024*1024):.0f} MB), skipping")
+else:
+    if os.path.exists(vcf_dest):
+        print(f"Existing VCF is truncated ({os.path.getsize(vcf_dest)} bytes), re-downloading")
+        os.remove(vcf_dest)
+    vcf_url = f"https://1000genomes.s3.amazonaws.com/release/20130502/supporting/GRCh38_positions/{vcf_filename}"
+    print(f"Downloading sample VCF to {vcf_dest}...")
+    # Download to local disk first, then copy to Volume (avoids FUSE write issues)
+    local_tmp = f"/local_disk0/tmp_ref/{vcf_filename}"
+    os.makedirs("/local_disk0/tmp_ref", exist_ok=True)
+    result = subprocess.run(["wget", "-q", "-O", local_tmp, vcf_url], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"wget failed for {vcf_url}: {result.stderr}")
+    elif os.path.exists(local_tmp) and os.path.getsize(local_tmp) > MIN_VCF_BYTES:
+        import shutil
+        shutil.copy2(local_tmp, vcf_dest)
+        print(f"Downloaded sample VCF: {os.path.getsize(vcf_dest) / (1024*1024):.0f} MB")
+    else:
+        got = os.path.getsize(local_tmp) if os.path.exists(local_tmp) else 0
+        raise RuntimeError(f"Downloaded VCF is missing or too small ({got} bytes) from {vcf_url}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Reference genome setup complete
+# MAGIC 04_gwas_analysis reads the reference straight from this UC Volume (with its .fai index);
+# MAGIC no DBFS copy is needed — /Volumes is FUSE-readable by the classic-cluster executors.
+
+# COMMAND ----------
+
+print("Reference genome setup complete:")
+for f in os.listdir(genome_path):
+    size_mb = os.path.getsize(os.path.join(genome_path, f)) / (1024 * 1024)
+    print(f"  {f} ({size_mb:.0f} MB)")

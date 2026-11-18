@@ -1,0 +1,763 @@
+# omic<span style="color:#5DCAA5">stra</span>
+
+a multi-agent MCP server for cross-modal embedding alignment, fusion, and evidence-based routing in spatial biology. it exposes fixed scientific protocols as tools and returns evidence; the client holds the model. alignments are evaluated against declared metrics, and questions are routed from a cohort's own recorded evidence, refusing when that evidence is absent. foundation model encoders are pluggable; integration strategy is a configurable experimental dimension, not a fixed pipeline choice.
+
+the seed implementation evaluates 92 TNBC patients from [Wang et al. 2024](https://www.nature.com/articles/s41467-024-54145-w) using H&E morphology (Virchow2) and spatial transcriptomics (Novae GNN).
+
+[![release](https://github.com/teslajoy/omicstra/actions/workflows/release.yml/badge.svg)](https://github.com/teslajoy/omicstra/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22754114-1682D4)](https://doi.org/10.5281/zenodo.22754114)
+
+`v1.0.0` · `v1.1.0` · `v1.2.0` · `v1.3.0`  `ResearchHub Foundation grant`  `Brenden-Colson Center / Sears Lab, OHSU`  [changelog](https://github.com/teslajoy/omicstra/blob/HEAD/CHANGELOG.md)
+
+---
+
+## analysis pipeline
+
+![cross-modal alignment of histopathology and spatial transcriptomics at niche scale](https://github.com/teslajoy/omicstra/raw/HEAD/docs/images/analysis_pipeline.png)
+
+**Figure 1 | Cross-modal alignment of histopathology and spatial transcriptomics
+at niche scale.**
+
+A single 16 µm section is stained and imaged for H&E, after which the coverslip is
+removed and the same section is permeabilised in situ for spatial transcriptomics,
+so morphology and expression share physical coordinates with no registration error
+between them (one of three consecutive sections per frozen block; Wang et al.
+2024). The unit of analysis is a niche of seven neighbouring spots (100 µm spot
+diameter, 150 µm centre-to-centre; ~1,200-1,400 cells).
+
+**Left** - two measurements yield three representations. Virchow2 encodes seven
+H&E tiles per niche as a 7 × 1280 matrix; Novae encodes the spatial counts as a
+64-d vector; gpath2vec encodes Reactome pathway activity inferred from those same
+counts as a 512-d vector, concatenated with Novae to a 576-d molecular vector. All
+encoders are frozen.
+
+**Centre** - ten arms differ only in how the two sides are joined. Six are trained
+contrastively (labelled R) and four are closed-form baselines with no training
+(labelled B). Five contrastive arms mean-pool the seven tiles into a single 1280-d
+vector before the two sides meet - four over the full molecular vector (R1, R2,
+R3, R5) and one with the pathway representation removed (R6) - while a sixth
+leaves the tiles un-pooled and lets the molecular side attend over them
+individually (R4, cross-attention). The baselines join the two sides directly by
+canonical correlation (B1), orthogonal Procrustes rotation (B2), principal
+components (B3), or a random projection as an untrained control (B4). Inputs, the
+patient-stratified split (85/15, seed 42) and all downstream evaluation are held
+identical across arms.
+
+**Right** - every arm projects to a shared 512-d space and is evaluated on
+35,594 niches from 14 held-out patients: cross-modal retrieval (H1; Recall@K,
+MRR, median rank, alignment gap, AUC, CKA), preservation of biological structure
+(H2; ARI, silhouette) and pathway interpretability (H3; canonical correlation
+against a permutation null).
+
+---
+
+## evidence, defined
+
+**Evidence is a measurement of how well a method performs one task on this cohort, scored against a stated reference, compared to a floor, and traced to the artifact that produced it.**
+
+Five parts, all required:
+
+1. **Units** - what was scored, and how held out. Here: niches, held out by patient.
+2. **Reference** - the ground truth for that question.
+3. **Statistic** - the maths applied: area under the receiver operating characteristic curve (AUC), adjusted Rand index (ARI), canonical correlation analysis (CCA), or a z-score against a permutation null.
+4. **Floor or null** - what the number must beat to mean anything.
+5. **Guards** - conditions that would make the number misleading even when it is high.
+
+**the reference is per question**
+
+| question | ground truth | where it comes from |
+|---|---|---|
+| cross-modal retrieval | the known pairing - which haematoxylin and eosin (H&E) niche *is* which spatial transcriptomics (ST) niche | the assay itself, same physical section |
+| tissue state grouping | `mc_megacluster`, 14-class non-negative matrix factorisation (NMF) label. Normalised mutual information (NMI) 0.539 against patient identity, above the 0.5 bar - so ARI here is diagnostic and cannot rank the aligned methods against each other; the 9-archetype label is worse (0.645) and was dropped | per-spot NMF, molecular |
+| subject identity suppression | tumour immune microenvironment (TIME) class, defined on global pseudobulk expression, one per patient - so the label is patient-level by construction, which is why only cross-patient pairs are scored and the null permutes labels between patients | expression, patient-level pseudobulk |
+| morphology decode | tertiary lymphoid structure (TLS) gene-signature score | molecular, continuous |
+| pathway transfer | Reactome pathway membership | curated knowledge graph, no human label |
+| compartment agreement | pathologist annotation (Wang: 15 categories). Not bound on the seed cohort, so this question routes to compute rather than to evidence | pathologist annotation |
+
+Pathologist annotations and molecular clusters are both references - each for the questions where it is the right one. Retrieval needs no label at all, because the correspondence *is* the truth. Pathway transfer uses a knowledge graph and a permutation null instead of a label.
+
+**A number without all five parts is not evidence. An ARI with no floor, or one scored against a label that encodes patient identity, is a number, and the guard is what says so.**
+
+---
+
+## using omicstra
+
+A question travels in three steps. A model reads the question and picks the task family; a rule does everything after that. The server itself holds no model.
+
+```
+human question  ->  task family  ->  route(task_id)  ->  outcome + why
+   (a model)         (7 defined)       (a rule)          (recorded)
+```
+
+**ask which method answers a question**
+
+> *"Given a piece of tissue image, which method best finds its matching expression profile?"*
+
+A model maps that to the family `cross_modal_retrieval` and calls the `route` tool. On the command line:
+
+```
+$ omicstra route cross_modal_retrieval --project-id tnbc-92
+
+[RECOMMEND] InfoNCE, cross-attention
+  why: AUC, matched vs mismatched pairs, cross-subarray patient-held-out:
+       0.8591 [0.8576, 0.8608]. below the floor: random-init projection,
+       unaligned principal components
+  record_id: ccbcf5ec8e9b
+```
+
+**name a method, and the evidence can decline it**
+
+> *"Can I use canonical correlation analysis to pool across patients?"*
+
+That is the family `subject_identity_suppression`, with a method named:
+
+```
+$ omicstra route subject_identity_suppression --proposed-method B1_v3
+
+CCA is contraindicated for this task. It scores below what the raw un-aligned
+modality already achieves: bio/patient ratio 0.071 [0.053, 0.088], below the
+raw H&E floor of 0.137. patient z 113.0 against raw H&E 36.8.
+proceed anyway? [y/N]
+```
+
+Proceeding is permitted, and is recorded as a decision taken against the evidence.
+
+**check the evidence still holds**
+
+> *"Do the published numbers still come out of the data?"*
+
+```
+$ omicstra run --project-id tnbc-92 --diff projects/tnbc-92/routing_evidence.json
+  ok embed_he  ok embed_st  ok niche_join  ok align  ok eval  ok promote
+  diff: 1 disagreement - pathway_transfer/B3_v3 absent_from_curated
+```
+
+Every routed number traces to a named artifact; this is the check that says so.
+
+**ask what a run will cost before spending it**
+
+> *"I have my own cohort. What do I need to produce the embeddings, and can this machine do it?"*
+
+That is `describe_compute_plan`. Units come from the inventory, seconds and
+bytes per unit from the encoder's own measurements, free space from the volume
+being written to. Nothing here is extrapolated:
+
+```
+280 shards, 286,250 tiles, none done yet
+  5.8 h on mps      1.47 GB out      6.3 GB peak
+  verdict: fits - run it here
+  measured on: the published extraction, 280 subarrays
+```
+
+An encoder with no measurement on this device refuses instead of guessing, and
+a resource the pool declares no value for is reported as unchecked rather than
+as passed. If the plan says the output will not fit where the cohort declared
+it, the declaration stops standing and the gate re-opens.
+
+**produce the embeddings, and survive the run being interrupted**
+
+> *"Run it. What happens if my laptop sleeps four hours in?"*
+
+Extraction runs through the same surface a client uses, not through a script
+around it. Each modality is its own agent, because they ask different questions:
+the H&E arm asks about gated weights and a tile geometry, the ST arm about the
+encoder's prototype floor and the edge scale.
+
+```
+he_encode(compute=True)                      -> awaiting_answer: 3 gates
+runs_resume(run_id, answers={...})           -> submitted, in 0.3 s
+                                                (submission returns; the run does not)
+runs_status(run_id)                          -> running  2/4  missing [sec2, sec3]
+```
+
+Gates arrive as interrupts carrying their evidence and what accepting forecloses,
+so nobody accepts a caution without seeing the diagnostic behind it. An answer
+already in the cohort's declarations closes its gate without asking.
+
+One shard per section, three attempts each, and the output file is the only
+record of what finished - so resume is decided by the filesystem rather than by
+a ledger that can disagree with it. Kill the process mid-shard and a second
+process, given only the `run_id`, reads the missing sections off disk, resumes,
+and does not rewrite what landed. A shard that fails every attempt is recorded
+as failed rather than staying indistinguishable from a slow one - one unreadable
+slide does not cost the other 279.
+
+Two executors, and the record names which one ran, because they promise
+different things:
+
+| | what survives a restart |
+|---|---|
+| in-process | the output files and the checkpoint. the thread does not; `runs_resume` re-dispatches what is missing |
+| Temporal | the workflow history. a worker that never met the submitting process finishes the run |
+
+**two traces, and only one of them is free**
+
+```
+the LEDGER      who decided what, on what authority, over which bytes.
+                committed, citable, always on, and it never leaves the machine.
+                `runs_record` is one run's; `runs_trace` is that run as a
+                timeline; the report reads the cohort's
+LANGSMITH       what a node received, how long it took, where it stalled.
+                richer, and it sends node inputs and outputs to a third party
+```
+
+LangSmith is **opt-in through the environment and is not a dependency** - it
+ships transitively with LangGraph, which instruments itself from two variables,
+so turning it on takes no code:
+
+```bash
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY=...
+```
+
+That is exactly why there is a guard. Node inputs are cohort content, and
+`data_contract.json#data_classification` declares per cohort whether content
+`may_leave_host`. A cohort declared `restricted` - the **default**, so forgetting
+to declare fails closed - refuses to run with external tracing on, rather than
+quietly sending it. The classification is a person's statement at `omicstra init`
+and is never inferred from paths or content.
+
+There is a third state, and the SDK provides it: mask the payloads before
+anything is sent, and a restricted cohort can be traced for **structure** -
+spans, timings, errors, which node stalled - without its content leaving.
+
+```bash
+export LANGSMITH_HIDE_INPUTS=true LANGSMITH_HIDE_OUTPUTS=true
+```
+
+Both are required; hiding one and sending the other sends the content. What
+still leaves is run names, timings, token counts and error strings - step ids
+like `preflight_encode` are the package's vocabulary, not a cohort's - and a
+project id would travel in metadata, which `LANGSMITH_HIDE_METADATA` masks in
+turn.
+
+On Temporal the submit returns at submission, so something has to be polling the
+queue. That is the other half of the claim and it ships as a command:
+
+```bash
+export OMICSTRA_TEMPORAL_ADDRESS=localhost:7233
+omicstra worker                       # until signalled
+omicstra worker --max-seconds 7200    # inside a job allocation with a wall clock
+```
+
+The worker needs no cohort, no project root and no knowledge of the run: a shard
+carries its own geometry, gene axis, paths and encoder name, and the activity
+bodies close over nothing. So it may be started before or after the submitter,
+outlive it, or run on another machine, and because a shard is idempotent on its
+output file a worker joining a run already in flight re-runs nothing that landed.
+An encoder a cohort brought itself is made resolvable there with
+`--preload <module>`.
+
+**check the vectors are the ones the published grid used**
+
+The 75 GB embedding cache is the oracle, and it is read, never written. A port
+is verified by diffing against it rather than by re-extracting:
+
+```
+6 shards, 6 accepted, 0 rejected
+  drift 2.2e-06 to 4.7e-06   against a 1e-05 tolerance
+  cosine 0.9999998           knn top-6 set 1.000
+```
+
+Bit-identity is available for alignment - deterministic linear algebra, 13/13
+metrics at exactly zero - and is not available for a 631M-parameter float32
+transformer across backends. The two backends on one machine differ by as much
+as either differs from the cache, so the tolerance is declared and the run is
+labelled a tolerance run rather than an exact one. The dispatcher refuses any
+shard whose output would land inside a path the cohort declares read-only.
+
+**start a new cohort**
+
+> *"What can this dataset answer?"*
+
+```
+omicstra init --project-dir projects/mine   # scaffold the declarations
+omicstra inventory                          # what the data is
+omicstra gate                               # is it usable
+omicstra families                           # what it can answer, and what it cannot
+```
+
+A cohort with no evidence of its own is not routable, and the server says so rather than reusing another cohort's winner.
+
+**the tools**
+
+| tool | answers |
+|---|---|
+| `list_task_families` | which questions this cohort can be asked |
+| `route` | which method answers one question, or why none does |
+| `describe_data_structure` | what the data is, as declared |
+| `describe_encoder_fit` | whether the declared encoders were built for this kind of data |
+| `check_eda_gate` | is the cohort admissible, and on what grounds |
+| `run_eda_step` | re-run one admissibility check, with its permutation null |
+| `plot_spatial_autocorrelation` | the spatial signal behind that check, as a figure |
+| `plot_evidence` | the evidence behind one answer, as a figure |
+| `decision_record` | what has been decided here, by rule and by person |
+| `check_compute_gates` | what a compute run would need answered first |
+| `describe_compute_plan` | what a run would cost, read, write, and leave untouched |
+| `he_encode` | run the H&E morphology agent; returns a run handle |
+| `st_encode` | run the spatial-transcriptomics agent; its own gates, not a mode of the above |
+| `runs_status` | what a run is doing, counted from the output files rather than remembered |
+| `runs_resume` | answer an open gate, or re-dispatch the sections a dead run left missing |
+| `runs_record` | the run's half of the ledger: every gate, who answered it, from which declaration |
+| `runs_trace` | the timeline of a run: every step in order, duration, and which actor decided it |
+| `align_run` | resolve a cohort's alignment grid from its recorded artifacts, behind a run handle |
+| `evaluate_run` | return a verdict on H1/H2/H3 for a cohort, behind a run handle |
+| `evaluate_measure` | compute a verdict from a cohort's own arrays, rather than reading one from a curated pack |
+| `unit_notebook` | write one analysis unit as a rerunnable notebook plus a markdown trace |
+
+**what that lets you do today**
+
+```
+1  point it at a cohort it has never seen          hest-breast, 3 sections encoded
+2  ask what the data is and whether the declared    no compute
+   encoders were built for it
+3  run the admissibility checks per section         pass / fail / not_run /
+   across the whole cohort, each with its null      not_applicable, never a guess
+4  ask what an encode would cost                    no compute
+5  start an H&E or ST encode, answer its gates,     submission returns in 0.3 s
+   and walk away
+6  kill the process, come back, resume by run_id    finishes without redoing work
+7  read the record: which gate, which answer,       and whether a person or a
+   from which declaration                           client supplied it
+8  ask which fusion answers which question          tnbc-92 only - a cohort with
+   on the seed cohort, and why                      no evidence is not routable
+```
+
+Two claims in there are separate and are tested separately: **resume** is
+verified by killing a process mid-shard on both executors, and **byte-identity**
+by re-encoding sections of the seed cohort and diffing against the published
+cache - exact on the ST side, within a declared tolerance on H&E.
+
+Four of the ten admissibility checks return `not_run` on the seed cohort for want
+of a cohort declaration, and three are declared in the contract with no
+implementation registered behind them. The gate reports that rather than reaching
+a verdict on silence - and a check that finds none of its declared genes returns
+`not_run` with the missing list, because a check that measured nothing must not
+read as a pass.
+
+**what it cannot do yet**
+
+```
+fuse or align on a second cohort         v1.3 commitment, not yet delivered.
+                                         tracked: completion_roadmap WS 10
+produce that cohort's own evidence pack  v1.3 commitment, not yet delivered.
+                                         the release claim it was named for
+a package path for the pathway arm       v1.3 commitment, partially delivered.
+                                         bridge wired, persistence TODO (WS 6)
+registration across sections             declared, not built. both cohorts are
+                                         same-section, so nothing here needs it
+mitochondrial-fraction exclusion         not implemented. a proposal commitment,
+                                         recorded in open_items.md #18
+SLURM                                    not implemented
+```
+
+for a full table of supported questions, required data, methods, outputs and limitations per task family, see [docs/capability_matrix.md](https://github.com/teslajoy/omicstra/blob/HEAD/docs/capability_matrix.md).
+
+tracked in [open_items.md](https://github.com/teslajoy/omicstra/blob/HEAD/docs/open_items.md) and
+[completion_roadmap.md](https://github.com/teslajoy/omicstra/blob/HEAD/design/completion_roadmap.md).
+
+---
+
+## hypotheses
+
+| | | metrics |
+|---|---|---|
+| **H1** | aligned embeddings retrieve better cross-modal matches than any unaligned baseline | Recall@K - MRR - median rank - alignment gap - AUC - CKA |
+| **H2** | manifold alignment preserves biological structure better than either modality alone | |
+| &nbsp;&nbsp;&nbsp;&nbsp;*A* | spatial states cluster more coherently in the aligned space than in either modality alone | ARI - silhouette |
+| &nbsp;&nbsp;&nbsp;&nbsp;*B* | alignment quality varies across compartments - morphologically distinct ones (tumour, TLS, necrosis) above ambiguous ones (high- vs low-TIL stroma) | matched-pair cosine per compartment |
+| **H3** | shared space encodes interpretable biological pathway signals | CCA vs permutation null |
+
+early vs late fusion is an experimental variable, not an assumption. 
+
+---
+
+## seed cohort results (v3, 10-run grid)
+
+evaluated on **35,594 niches across 14 held-out TNBC patients** (zero patient leakage across train / val / test). 6 contrastive runs (R1-R6) + 4 classical baselines (B1-B4):
+
+- **H1 (cross-modal retrieval).** R4 wins. AUC 0.859 (95% CI 0.855-0.862). R4 is the only run using cross-attention - the other 5 contrastive runs use late fusion (mean-pooled H&E + independent MLPs).
+- **H2 (biology preservation).** Split outcome. Late-fusion contrastive (R1, R6) wins K-means MC ARI; R4 still encodes MC biology at linear-probe parity. KMeans-ARI is geometry-biased - load-bearing diagnostic is the linear probe.
+- **H3 (pathway transfer).** R4 wins again. 15/15 cells BH-FDR < 0.05 cross-patient (Welch z 3.8-5.7). At DAG resolution, R4 stays best (78% sig nodes) on clinically interpretable hits: BTLA checkpoint, IL signaling, IFN regulation, ECM collagen biology.
+
+**R4 = the only non-late-fusion run** (cross-attention between the niche's 7 Virchow2 tile tokens and the 576-d ST vector). H1 + H3 both reward keeping local morphological heterogeneity un-pooled.
+
+---
+
+## the loop
+
+a **level** is what code is allowed to do (LEVEL 0/1/2 in the tree below); the
+**loop** is the order a cohort goes through. they are different axes and the
+words are easy to confuse:
+
+```
+layer 0: EDA (gate)
+  is data usable? quality? signal? modalities alignable?
+  -> proceed / proceed with caution / stop
+
+layer 1: pipeline (execution)
+  embed -> align -> eval
+  fixed protocol, deterministic with seed
+
+layer 2: karpathy loop (outer optimization)
+  editable asset: alignment_config.json
+  scalar metric: Recall@K or MRR (fixed)
+  proposes config -> runs pipeline -> scores -> keeps or discards
+  output: git log of validated decisions + winner.json
+```
+
+program.md defines search space, constraints, stopping criteria.
+
+embedding dimensions: Virchow2 1280d - Novae GNN 64d (novae_latent) -> shared 512d
+
+alignment strategies (experimental variable):
+```
+  late interaction  - tiles aggregated per spot (mean/max),
+                      then independent MLPs -> shared 512d (InfoNCE)
+  early interaction - tile-level cross-attention between H&E tokens
+                      and ST spot before projection (~4M params, local K tiles)
+  comparison: does tile-level morphological detail lost at aggregation
+              matter for cross-modal alignment quality?
+```
+
+---
+
+## repo structure
+
+audited against the filesystem 2026-10-27. `·` is built, `○` is named in the design and **not yet built** - kept here because the name is referenced elsewhere, not because it exists.
+
+```
+omicstra/
+│
+· CLAUDE.md                          # north star for Claude Code
+· EDA.md                             # gate - data quality checks before pipeline
+· PLAN_RULES.md                      # constraints - no alignment until EDA passes
+· MODELS.md                          # training provenance + tissue compatibility per model
+· MODALITY_TEMPLATE.md               # the contract a new modality generates against
+· CITATION.cff  server.json          # citation metadata - MCP registry entry
+· .mcp.json  .env.example            # MCP server entry - optional tracing only
+│
+· design/                            # the planning tree - tracked, this is where "what next" lives
+│   · v1_1_scope.md                  # what shipped in 1.1
+│   · v1_2_scope.md                  # what shipped in 1.2
+│   · v1_3_scope.md                  # the LIVE plan. read before starting anything
+│   · graph.md                       # the route: which file owns which step, one page
+│   · analysis_pipeline_steps.md     # every operation in the chain, one line each
+│   · mcp_plan.md  workflow.md       # engineering plan - the executable graph
+│   · decisions.md                   # what is decided, and by whom
+│   · progress.md  status.md         # build log - repo snapshot
+│
+· src/omicstra/                      # the pip-installable package - src layout
+│   · graph.py                       # LEVEL 0 - the only entry, the only checkpointer
+│   · graphs/                        # LEVEL 1 - one per gate, each can interrupt()
+│   │   · eda.py                     #   inventory -> profile -> gate -> escalate
+│   │   · route.py                   #   orchestrator -> 3 agents -> judge -> ask_human
+│   │   · encode.py  st.py           #   compute agents, one per modality
+│   │   · align.py  evaluate.py      #   alignment grid · H1/H2/H3 verdicts
+│   │   · promote.py  submit.py      #   reviewed evidence step · shard dispatch
+│   · protocols/                     # LEVEL 2 - order, applicability, authority. no maths
+│   │   · inventory.py               #   8 steps: files .. bind - "what is this data"
+│   │   · eda.py                     #   10 checks registered - "is it usable"
+│   │   · align.py                   #   contrastive + classical LCEL chains. resolve or compute
+│   │   · evaluate.py                #   6 guards, and the H1-H3 gates
+│   │   · encode.py  join.py         #   encode protocol · niche join
+│   │   · pathway.py  promote.py     #   gpath2vec · pack promotion
+│   · measures/                      # the MATHS. pure functions, no ctx, no order,
+│   │   · __init__.py  evaluation.py #   no authority. callable from a notebook
+│   │   · tiling.py                  #   niche + tile geometry, diffed against the cache
+│   · contracts/                     # READS a declaration, decides nothing
+│   │   · project.py                 #   a cohort's project.json
+│   │   · declarations.py            #   absent means refuse with a reason, never a default
+│   │   · routing.py  eda.py         #   contract + evidence · contract + calibration
+│   · configs/                       # the CONTRACTS, inside the wheel so an
+│   │   · data_contract.json         #   installed server can find them. 8 declared
+│   │   · eda_contract.json          #   roles · which checks, which criteria
+│   │   · routing_contract.json      #   task taxonomy, outcome vocabulary, rules
+│   │   · compute_contract.json      #   6 gates: 5 preflight, 1 mid-run
+│   · adapters/                      # data loading and conversion, no protocol logic
+│   │   · canonical.py               #   the input contract: .h5ad + a coordinates table
+│   │   · alignment_data.py          #   niche-join loading, splitting, test artifact io
+│   │   · evaluation.py  join.py     #   eval data adapters · niche join builder
+│   · models/                        # architectures and numerics, independently callable
+│   │   · encoders.py                #   the encoder registry. spec() is metadata; load() needs torch
+│   │   · alignment.py               #   contrastive models (LateFusion, CrossAttention) and losses
+│   │   · alignment_classical.py     #   CCA, Procrustes, unaligned PCA baselines
+│   │   · fit.py                     #   model fitting utilities
+│   · training/alignment.py          # contrastive training loop. torch-dependent
+│   · dispatch/                      # shard submission and worker activity bodies
+│   │   · bodies.py  temporal.py     #   the one name table · Temporal executor
+│   · agents/modality.py             # he / st / pathway agents - read recorded evidence
+│   · mcp/server.py                  # 21 tools, 2+2 resources, stdio + http. zero model calls
+│   · records.py  artifacts.py       # the record contract - inventory/eda_summary io
+│   · settings.py  cli.py            # 15 commands. settings imports nothing from omicstra
+│   · routing.py  eda.py  figures.py # resolve + ledger · gate · plots
+│   · run.py  report.py  notebook.py # the whole chain · pack+ledger->markdown · analysis units
+│   · labels.py  seed.py             # label handling · deterministic seeding
+│   · trace.py  tracing.py           # run trace · LangSmith integration
+│
+│   the rule: a thing gets its own graph only if it can ask a human;
+│   everything else is a protocol.
+│
+· configs/v3/                        # R1_v3 .. R6_v3 + B1_v3 .. B4_v3 run configs (cohort runs, not contracts)
+│
+· projects/                          # committed - one directory per cohort
+│   · {project_id}/
+│       · project.json  program.md   # encoders, runs, metric · search space + constraints
+│       · cohort.json                # DECLARED: subject_id_column, classification,
+│       │                            #   compute_backend, pool, client_model_backend -
+│       │                            #   fail closed
+│       · platform.json              # DECLARED per sample: platform, position_columns, pitch
+│       · inventory.json             # inventory protocol output - conformance report
+│       · eda_summary.json           # EDA gate output
+│       · routing_evidence.json      # this cohort's measured evaluation - never inherited
+│
+· site/{institution}/  [ignored]     # compute.md governance.md - served as MCP resources
+· scripts/                           # the chain behind the published results
+· tests/                             # 1158 - conformance, routing, eda authority,
+│                                    #   tiling oracle, ingest paths, alignment parity,
+│                                    #   chain execution, classical baselines
+│   · fixtures/                      #   the pinned H1 summary, sha-guarded
+○ knowledge/reactome/                # shared domain assets - git-IGNORED, not in a clone.
+│                                    #   only scripts/build_pathway_class.py reads it
+· docs/                              # -> teslajoy.github.io/omicstra
+· notebooks/                         # exploration - embeddings - experiments - final
+· runs/  data/  demo/  [ignored]     # traces - inputs + embeddings - talk assets
+```
+
+---
+
+## extending to a new modality
+
+`MODALITY_TEMPLATE.md` is the contract a new modality agent (single-cell, protein, electron microscopy, etc.) must satisfy: a frozen foundation-model encoder, a niche-aggregation step, a clean ST/H&E-equivalent feature parquet shape, and the construct-validity guards the eval agent enforces. each modality adds one row to the alignment grid and one entry to the routing contract.
+
+---
+
+## seed cohort
+
+[Wang et al. 2024](https://www.nature.com/articles/s41467-024-54145-w) - 92 TNBC patients, co-registered ST + H&E WSI. platform: original Spatial Transcriptomics (Stahl et al. 2016, KTH/Spatial Transcriptomics AB) - 1934 spots/array, 100um diameter, 150um center-to-center.
+
+| resource | url |
+|---|---|
+| processed data | [doi:10.5281/zenodo.14204217](https://doi.org/10.5281/zenodo.14204217) (mc-labels release also at [doi:10.5281/zenodo.8135721](https://doi.org/10.5281/zenodo.8135721)) |
+
+---
+
+## quick start
+
+```bash
+pip install omicstra                # serves, routes, gates - no numpy, no tensor libraries
+pip install "omicstra[measure]"     # + the numerics, for computing inventory and EDA steps
+```
+
+the package ships its contracts and no cohort. point it at one:
+
+```bash
+export OMICSTRA_PROJECT_DIR=/path/to/projects/tnbc-92
+omicstra selftest        # start here: asserts the routing rules hold on this cohort
+omicstra describe        # what the cohort declares - platform, encoders, roles
+omicstra families        # which questions it can answer, and which it cannot yet
+omicstra route cross_modal_retrieval
+```
+
+`omicstra --help` lists all fifteen. Four answer *what is this cohort* -
+`describe`, `inventory`, `gate`, `families`. Four answer *what does it say* -
+`route`, `selftest`, `decisions`, `report`. Five do the work - `eda`, `align`'s
+grid through `run`, the whole walk through `chain`, `promote`, and `worker` for
+the encode queue. One starts a cohort - `init`. One writes the record a reader
+opens - `notebook`, which emits an analysis unit as a rerunnable notebook plus
+its trace. **`selftest` first** - it tells a new cohort owner whether their
+declarations and evidence hang together before they spend time on anything
+else.
+
+**stdio** - the usual client config:
+
+```json
+{ "mcpServers": { "omicstra": {
+    "command": "python", "args": ["-c", "from omicstra.mcp.server import serve; serve()"],
+    "env": { "OMICSTRA_PROJECT_DIR": "/path/to/projects/tnbc-92" } } } }
+```
+
+**streamable-http** - `serve(mode="http")`, then note the envelope:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{
+        "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities":{}}}}'
+```
+
+the `_meta` block is not optional and is the first thing a new http caller gets
+wrong. protocol revision 2026-07-28 removed the initialize handshake, so the
+version travels on **every** request rather than being negotiated once. a call
+without it is refused with `-32602`, naming the two keys it wants.
+
+**the modality agents are client-callable, not CLI commands.** `omicstra --help`
+covers the read path and the chain; `he_encode` and `st_encode` are MCP tools,
+because each fires gates a client has to answer and returns a run handle a later
+request resumes. Driving them from a shell would mean inventing a way to answer
+an interrupt.
+
+A worked run, on a cohort the package had never seen - three sections, two gene
+identifier spaces and three different edge scales in one call:
+
+```
+st_encode(platform="original_st", samples=["SPA125","SPA126","SPA99"], compute=True)
+  -> awaiting_answer: encoder_compatibility, platform_floor, capacity
+
+runs_resume(run_id, answers={
+    "encoder_compatibility": "proceed_anyway_recorded_as_dissent",
+    "platform_floor": "run_and_mark",
+    "capacity": "continue"})
+  -> submitted                       executor in_process, returns in 0.0 s
+     scale_to_microns   [0.6894, 0.6911, 0.6971]   per_sample: true
+     gene_axis_route    ["ensembl->symbol", "symbol->symbol"]
+     gene_axis_map      ensembl_to_symbol.tsv @ 3d6e353cc58391fa
+
+runs_status(run_id)   -> complete 3/3
+runs_record(run_id)   -> preflight_encode  selection  actor=client  confirmed_by=null
+                         encode_dispatch   dispatch   actor=system  executor=in_process
+```
+
+The gates are interrupts carrying their evidence and what accepting forecloses,
+so nobody accepts a caution without the diagnostic behind it. An answer already
+in the cohort's declarations closes its gate without asking, and an answer given
+through the surface is recorded `actor=client` - the server sees a tool call, not
+a person, and the pack cites gate answers.
+
+**Refusals are per section, and they name the missing declaration.** Before this
+cohort declared a `gene_mapping`, the same call returned:
+
+```
+n_shards 2    skipped 1
+  SPA99  [gene_mapping]  section is 'ensembl', encoder needs 'symbol',
+                         cohort declares no gene_mapping
+```
+
+Two sections encoded, one named what it needed. The alternative is what happened
+first: the encoder's own `AssertionError: Too few genes (0) are known` from inside
+a worker, on whichever section happened to be indexed differently.
+
+a cohort with no evidence pack is **not routable**, and the compute path refuses
+rather than improvising: `route` declines instead of inheriting another cohort's
+winner, and `run_align` raises `ComputeUnavailable` naming the missing artifact
+and the script that builds it. that refusal is the expected first response on a
+fresh install, not a failure.
+
+---
+
+## stack
+
+| layer | tool |
+|---|---|
+| orchestration | LangGraph StateGraph |
+| model | supplied by the MCP client; the server ships none |
+| tracing | OpenTelemetry-ready; LangSmith optional via env, not a dependency |
+| resources | `omicstra://eda-contract`, `routing-contract`, `project/{id}/routing-evidence`, `project/{id}/eda-summary` |
+| H&E foundation model | Virchow2 (1280-d) |
+| ST foundation model | Novae GNN |
+| pathway | gpath2vec + biological pathway embeddings |
+| alignment | contrastive MLP + cross-attention bridge |
+| compute | laptop (v1.0); SLURM planned |
+| interface | Model Context Protocol |
+
+---
+
+## reproducibility
+
+every run writes `runs/{project_id}/{run_id}/` - config, QC, embeddings, alignment, evaluation, synthesis. `notebooks/final/` contains the best run as a notebook, drafted with a model from the run trace and reviewed by hand; reruns go top-to-bottom with a fixed seed.
+
+---
+
+## deliverables
+
+- [x] v3 10-run alignment grid on TNBC-92
+- [x] pip-installable MCP server (MIT) - verified on python 3.11 / 3.12 / 3.14
+- [x] alignment checkpoint + model card ([teslajoy/omicstra-r4-v3](https://huggingface.co/teslajoy/omicstra-r4-v3))
+- [ ] embeddings and niche join deposited (Zenodo)
+- [ ] second-modality plug-in via `MODALITY_TEMPLATE.md` (target: CODA or CyCIF)
+
+---
+
+## how the evidence pack is produced
+
+The router reads `projects/{id}/routing_evidence.json`. **No script writes it.**
+
+```
+eval summaries  ──▶  proposed evidence   deterministic: winners, margins, refusals
+                ──▶  a person reviews, edits the notes, approves
+                ──▶  routing_evidence.json
+```
+
+Deciding which metric answers which task family, what the floors are, and which
+caveat attaches to which candidate is editorial work - the file's own notes
+argue with the report in places. Generating it would invent the judgements it
+records, so `run_eval` scores the grid and **resolves** the pack; it never
+produces one.
+
+**`omicstra promote`** computes the half that is computable - candidates,
+intervals, floors, guard verdicts and the contract's outcome - and asks a person
+for the rest. It is a gate rather than a protocol because it pauses, and it
+refuses a pack in which a measurement was authored. Rebuilding this cohort
+reproduces every value and interval in the curated pack.
+
+The acceptance test for the port is pinned in `tests/fixtures/`: a full-grid
+rerun with one retrained baseline reproduced every numeric field of the H1
+summary, and the fixture is checked against the evidence pack so the router can
+never quote a number nothing produced.
+
+---
+
+## declared deviation from the proposal
+
+The registered report put a model **inside** the orchestration: one model for
+intent classification and routing, another for hypothesis evaluation, with
+conditional routing in the graph.
+
+**The build moved the model to the client and made routing a deterministic rule
+over evidence.** The server holds no model, generates no code, and executes
+nothing a model wrote. A model has three narrow jobs, all on the client side:
+classify a question into a closed task set, choose among enumerated options at a
+gate, and write the "why". Everything downstream resolves from lookup tables.
+
+The reason is reviewability. A server with no model is portable across clients,
+has no second router to reason about, and can be reviewed for what it does rather
+than what it might decide. It also means swapping the model cannot change a route
+- the same question reaches the same method, because the method came from
+recorded evidence rather than from inference.
+
+**Deliverables, metrics and hypotheses are unchanged.**
+
+---
+
+## team
+
+**Nasim Sanati, M.S.** - AI/ML systems - MCP server - agent orchestration - embedding pipelines  
+
+Brenden-Colson Center for Pancreatic Care / Sears Lab, OHSU
+
+---
+
+## citation
+
+```bibtex
+@software{sanati2026omicstra,
+  author  = {Sanati, Nasim},
+  title   = {omicstra: a multi-agent MCP server for cross-modal embedding alignment
+             and evidence-based routing in spatial biology},
+  year    = {2026},
+  doi     = {10.5281/zenodo.22754114},
+  url     = {https://github.com/teslajoy/omicstra},
+  license = {MIT}
+}
+```
+
+that is the **concept** DOI - it resolves to the newest archived version and
+never goes stale. cite it unless you need to pin one release, in which case use
+that release's own version DOI from the Zenodo record.
+
+*funded by ResearchHub Foundation ([doi:10.55277/researchhub.6ou1w3h3](https://doi.org/10.55277/researchhub.6ou1w3h3))*  
+*nonprofit recipient: OHSU Foundation - EIN 23-7083114*  
+*seed cohort: Wang et al. 2024, Nat. Commun. 15:10232*

@@ -1,0 +1,779 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import catalogJson from '../../runtime-boxes/catalog.json';
+import { APP_VERSION } from '../../scripts/app-version.mjs';
+import {
+  LIATIR_TOOL_RUNTIME_CATALOG,
+  RUNTIME_BOX_AI_MODEL_REGISTRY,
+  runtimeBoxTargetId,
+  type LiatirRuntimeBoxCiCatalog,
+} from '../../packages/liatir-core/src';
+import {
+  foundationMatrix,
+  numericVersionAtLeast,
+  resolveCiTarget,
+  runtimeBoxEvidenceOptions,
+  validateRunnerExecutionContext,
+  validateRuntimeBoxCiCatalog,
+} from '../../scripts/runtime-box-ci.mjs';
+
+const catalog = catalogJson as LiatirRuntimeBoxCiCatalog;
+
+describe('Runtime Box CI catalog', () => {
+  it('validates repository identities, legal gates, recipes, runners, and publication evidence', () => {
+    expect(() => validateRuntimeBoxCiCatalog(catalog, { requireWorkflows: false })).not.toThrow();
+  });
+
+  // Owner decision of 2026-09-09: Windows is an app host, never a payload platform. It reaches a
+  // component through WSL2 running the Linux box. Three published boxes predating that decision
+  // were kept at first and retired on 2026-09-11, when version 3 forced a rebuild of all of them
+  // anyway — WSL2 is already a hard requirement of Liatir on Windows, so a native Windows box asks
+  // a user for a second toolchain to get what the Linux one already gives them.
+  it('authors no native Windows target at all', () => {
+    const nativeWindows = catalog.components.flatMap((component) => component.targets
+      .filter((target) => target.target.platform === 'windows')
+      .map((target) => `${component.componentId}/${target.targetId}/${target.status}`));
+
+    expect(nativeWindows).toEqual([]);
+  });
+
+  it('reaches Windows through WSL2 on every component that supports it', () => {
+    const wsl2 = catalog.components.flatMap((component) => component.targets
+      .filter((target) => target.hostEnvironments?.includes('windows-wsl2'))
+      .map((target) => `${component.componentId}/${target.targetId}`));
+
+    expect(wsl2).toEqual([
+      // The first three replace the native Windows boxes retired on 2026-09-11.
+      'ctheodoris-geneformer-v1-10m/linux-x86_64-cuda12.9',
+      'bowang-scgpt-whole-human/linux-x86_64-cpu',
+      'bowang-scgpt-whole-human/linux-x86_64-cuda12.9',
+      'openvax-mhcflurry-class1-presentation/linux-x86_64-cpu',
+      'openvax-mhcflurry-class1-presentation/linux-x86_64-cuda12.9',
+      'griffithlab-pvactools-pvacseq/linux-x86_64-cpu',
+      'openmm-openmm/linux-x86_64-cpu',
+      'openmm-openmm/linux-x86_64-cuda12.9',
+      'autodock-vina-molecular-docking/linux-x86_64-cpu',
+      'mdanalysis-molecular-analysis/linux-x86_64-cpu',
+      'cobrapy-metabolic-modeling/linux-x86_64-cpu',
+      'pysb-biochemical-simulation/linux-x86_64-cpu',
+      'physicell-multicellular-simulation/linux-x86_64-cpu',
+      'gnina-pose-rescoring/linux-x86_64-cuda12.8',
+      'jwohlwend-boltz-2/linux-x86_64-cuda12.9',
+      'bytedance-protenix-base-v1-0-0/linux-x86_64-cuda12.6',
+    ]);
+    // A WSL2 claim is only real if the signed scroll carries it too.
+    for (const entry of wsl2) {
+      const [componentId, targetId] = entry.split('/');
+      const component = catalog.components.find((item) => item.componentId === componentId)!;
+      const boxId = component.boxId;
+      const scroll = JSON.parse(readFileSync(
+        new URL(`../../runtime-boxes/scrolls/${boxId}/${targetId}/scroll.json`, import.meta.url),
+        'utf8',
+      ));
+      expect(scroll.compatibility.hostEnvironments, entry).toEqual(['native', 'windows-wsl2']);
+    }
+  });
+
+  it('enables only the reviewed macOS and Linux CPU oncology native targets', () => {
+    const oncologyIds = new Set([
+      'openvax-mhcflurry-class1-presentation',
+      'griffithlab-pvactools-pvacseq',
+    ]);
+    const enabled = catalog.components
+      .filter((component) => oncologyIds.has(component.componentId))
+      .flatMap((component) => component.targets
+        .filter((target) => target.nativeCiEnabled)
+        .map((target) => `${component.componentId}/${target.targetId}`));
+
+    expect(enabled).toEqual([
+      'openvax-mhcflurry-class1-presentation/macos-aarch64-metal',
+      'openvax-mhcflurry-class1-presentation/linux-x86_64-cpu',
+      'griffithlab-pvactools-pvacseq/macos-aarch64-cpu',
+      'griffithlab-pvactools-pvacseq/linux-x86_64-cpu',
+    ]);
+    const mhcflurry = catalog.components.find(
+      (component) => component.componentId === 'openvax-mhcflurry-class1-presentation',
+    );
+    expect(mhcflurry?.targets.find((target) => target.targetId === 'macos-aarch64-metal'))
+      .toMatchObject({ status: 'published', nativeCiEnabled: true });
+    expect(mhcflurry?.targets.find((target) => target.targetId === 'linux-x86_64-cpu'))
+      .toMatchObject({ status: 'published', nativeCiEnabled: true });
+    expect(mhcflurry?.targets
+      .filter((target) => !['macos-aarch64-metal', 'linux-x86_64-cpu'].includes(target.targetId))
+      .every((target) => target.status === 'planned' && !target.nativeCiEnabled)).toBe(true);
+    const pvactools = catalog.components.find(
+      (component) => component.componentId === 'griffithlab-pvactools-pvacseq',
+    );
+    expect(pvactools?.targets.find((target) => target.targetId === 'macos-aarch64-cpu'))
+      .toMatchObject({ status: 'published', nativeCiEnabled: true });
+    expect(pvactools?.targets.find((target) => target.targetId === 'linux-x86_64-cpu'))
+      .toMatchObject({ status: 'published', nativeCiEnabled: true });
+    for (const component of catalog.components.filter((entry) => oncologyIds.has(entry.componentId))) {
+      expect(readFileSync(component.callerWorkflow, 'utf8')).toContain('"runtime-boxes/catalog.json"');
+      const linux = component.targets.find((target) => target.targetId === 'linux-x86_64-cpu');
+      const scroll = JSON.parse(readFileSync(
+        new URL(`../../runtime-boxes/scrolls/${component.boxId}/${linux?.targetId}/scroll.json`, import.meta.url),
+        'utf8',
+      ));
+      expect(scroll.compatibility.hostEnvironments).toEqual(['native', 'windows-wsl2']);
+    }
+  });
+
+  // The app refuses a box whose signed Liatir range excludes it. Every box was once published for
+  // 0.2.1 while the released app called itself 0.1.1, so no AI Model could be installed at all.
+  it('publishes no target that this version of Liatir would refuse', () => {
+    for (const component of catalog.components) {
+      for (const target of component.targets.filter((entry) => entry.status === 'published')) {
+        const entry = `${component.componentId}/${target.targetId}`;
+        const { compatibility } = JSON.parse(readFileSync(
+          new URL(`../../runtime-boxes/scrolls/${component.boxId}/${target.targetId}/scroll.json`, import.meta.url),
+          'utf8',
+        ));
+        expect(numericVersionAtLeast(APP_VERSION, compatibility.minLiatirVersion), entry).toBe(true);
+        if (compatibility.maxLiatirVersionExclusive) {
+          expect(numericVersionAtLeast(APP_VERSION, compatibility.maxLiatirVersionExclusive), entry).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('keeps every core target aligned with a published catalog target', () => {
+    for (const record of catalog.components) {
+      const component = record.componentKind === 'ai-model'
+        ? RUNTIME_BOX_AI_MODEL_REGISTRY.find((candidate) => candidate.id === record.componentId)
+        : LIATIR_TOOL_RUNTIME_CATALOG.find((candidate) => candidate.id === record.componentId);
+      const appTargets = component?.install.runtimeBox.publishedTargets ?? [];
+      const catalogTargets = record.targets.filter((target) => target.status === 'published');
+
+      // Planned component records belong to CI, not to the product catalog. Exposing one before
+      // any exact target has passed publication would give the app an install button that cannot
+      // resolve a signed release.
+      if (catalogTargets.length === 0) {
+        expect(component, `${record.componentId} is exposed before its first published target`)
+          .toBeUndefined();
+        continue;
+      }
+      expect(component?.install.runtimeBox.boxId).toBe(record.boxId);
+      expect(component?.install.runtimeId).toBe(record.runtimeId);
+      expect(appTargets.length).toBeGreaterThan(0);
+      for (const candidate of appTargets) {
+        const targetId = runtimeBoxTargetId(candidate.target);
+        const target = catalogTargets.find((value) => value.targetId === targetId);
+        expect(target, `${record.componentId}/${targetId} is exposed before publication`).toBeDefined();
+        expect(candidate.hostEnvironments).toEqual(target?.hostEnvironments);
+        // The installer compares these with the signed release and refuses any difference, so a
+        // mismatch is an Install button that can only fail.
+        const { compatibility } = JSON.parse(readFileSync(
+          new URL(`../../runtime-boxes/scrolls/${record.boxId}/${targetId}/scroll.json`, import.meta.url),
+          'utf8',
+        ));
+        expect(candidate.minNvidiaDriverVersion, `${record.componentId}/${targetId} driver`)
+          .toEqual(compatibility.minNvidiaDriverVersion);
+        if (candidate.minRamGb !== undefined) {
+          expect(candidate.minRamGb, `${record.componentId}/${targetId} memory`).toBe(compatibility.minRamGb);
+        }
+      }
+    }
+  });
+
+  it('resolves runner labels only through an exact model, recipe, target, and mode tuple', () => {
+    const resolved = resolveCiTarget(
+      catalog,
+      'ctheodoris-geneformer-v1-10m',
+      'geneformer-v1-10m-macos-arm64-metal',
+      'macos-aarch64-metal',
+      'scientific',
+    );
+    expect(resolved.runner).toMatchObject({
+      runsOn: 'liatir-macos-arm64-heavy',
+      platform: 'macos',
+      arch: 'aarch64',
+      selfHosted: expect.any(Object),
+    });
+    expect(() => resolveCiTarget(
+      catalog,
+      'ctheodoris-geneformer-v1-10m',
+      'geneformer-v1-10m-macos-arm64-metal',
+      'macos-aarch64-metal',
+      'arbitrary-mode',
+    )).toThrow(/mode arbitrary-mode is not approved/);
+  });
+
+  it('derives the Linux CPU recipe and runner only from the checked model and target', () => {
+    const resolved = resolveCiTarget(
+      catalog,
+      'bowang-scgpt-whole-human',
+      undefined,
+      'linux-x86_64-cpu',
+      'native-lifecycle',
+    );
+    expect(resolved.target).toMatchObject({
+      recipeId: 'scgpt-whole-human-linux-x86_64-cpu',
+      condaDependencyLicenseAudit: 'runtime-boxes/legal/audits/scgpt-whole-human-linux-x86_64-cpu.json',
+    });
+    expect(resolved.runner).toMatchObject({ runsOn: 'liatir-linux-selfhosted', gpu: false });
+  });
+
+  it('derives the checked Linux CUDA recipe and exact self-hosted GPU runner contract', () => {
+    const resolved = resolveCiTarget(
+      catalog,
+      'bowang-scgpt-whole-human',
+      undefined,
+      'linux-x86_64-cuda12.9',
+      'native-lifecycle',
+    );
+    expect(resolved.target).toMatchObject({
+      recipeId: 'scgpt-whole-human-linux-x86_64-cuda12.9',
+      status: 'published',
+      timeoutMinutes: 120,
+      gpuRequired: true,
+      dependencyLockSha256: '3bc87da78d23f009d4f654f3da734f7ca226489f700f9ad5e355163b4a729194',
+    });
+    expect(resolved.runner).toMatchObject({
+      runsOn: 'liatir-linux-cuda-selfhosted',
+      gpu: true,
+      minimumComputeCapability: '7.5',
+      minimumGpuMemoryBytes: 7_500_000_000,
+      selfHosted: { ephemeral: true, maxConcurrency: 1 },
+    });
+    // Floors, not an exact card: pinning a model is what blocked the move off the hosted T4.
+    expect(resolved.runner).not.toHaveProperty('expectedGpuModel');
+    expect(resolved.runner).not.toHaveProperty('expectedComputeCapability');
+  });
+
+  it('derives the Linux CPU recipe and self-hosted runner from checked catalog state', () => {
+    // This was the Windows CPU target until it was retired; scGPT now reaches Windows through
+    // WSL2 with the very box a Linux host runs, so that is the one a resolution must find.
+    const resolved = resolveCiTarget(
+      catalog,
+      'bowang-scgpt-whole-human',
+      undefined,
+      'linux-x86_64-cpu',
+      'native-lifecycle',
+    );
+    expect(resolved.target).toMatchObject({
+      recipeId: 'scgpt-whole-human-linux-x86_64-cpu',
+      condaDependencyLicenseAudit: 'runtime-boxes/legal/audits/scgpt-whole-human-linux-x86_64-cpu.json',
+      hostEnvironments: ['native', 'windows-wsl2'],
+    });
+    expect(resolved.runner).toMatchObject({ runsOn: 'liatir-linux-selfhosted', gpu: false });
+  });
+
+  it('accepts any GPU that clears the declared floors, not one exact card', () => {
+    const cuda = catalog.runnerProfiles.find((candidate) => candidate.id === 'linux-x64-cuda-selfhosted');
+    const floor = cuda?.minimumComputeCapability as string;
+
+    // The hardware the CI actually moved between: hosted Tesla T4 (7.5) and local RTX 4060 Ti (8.9).
+    expect(numericVersionAtLeast('7.5', floor)).toBe(true);
+    expect(numericVersionAtLeast('8.9', floor)).toBe(true);
+    // A card below the baseline the scientific tolerances were established on is still refused.
+    expect(numericVersionAtLeast('6.1', floor)).toBe(false);
+
+    // The RTX 4060 Ti's ~8.19 GB clears the VRAM floor; a 4 GB card does not.
+    expect(8_585_740_288).toBeGreaterThanOrEqual(cuda?.minimumGpuMemoryBytes as number);
+    expect(4_294_967_296).toBeLessThan(cuda?.minimumGpuMemoryBytes as number);
+  });
+
+  it('compares NVIDIA driver versions component by component', () => {
+    expect(numericVersionAtLeast('590.48.01', '550.54.14')).toBe(true);
+    expect(numericVersionAtLeast('550.54.14', '550.54.14')).toBe(true);
+    expect(numericVersionAtLeast('550.54.2', '550.54.14')).toBe(false);
+    expect(numericVersionAtLeast('not-a-version', '550.54.14')).toBe(false);
+  });
+
+  it('derives the small native fixture matrix from checked runner profiles', () => {
+    expect(foundationMatrix(catalog)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ recipeId: 'installer-fixture-linux-x86_64', runsOn: 'liatir-linux-selfhosted', heartbeatSeconds: 300 }),
+      expect.objectContaining({ recipeId: 'installer-fixture-windows-x86_64', runsOn: 'liatir-windows-selfhosted' }),
+      expect.objectContaining({ recipeId: 'installer-fixture-macos-arm64', runsOn: 'macos-15' }),
+    ]));
+    expect(foundationMatrix(catalog, 'installer-fixture-linux-x86_64')).toEqual([
+      expect.objectContaining({
+        recipeId: 'installer-fixture-linux-x86_64',
+        runsOn: 'liatir-linux-selfhosted',
+      }),
+    ]);
+    expect(() => foundationMatrix(catalog, 'missing')).toThrow(/unknown or ambiguous/);
+  });
+
+  it('keeps the checked cost policy manual, serial, uncached, and low-noise', () => {
+    expect(catalog.costPolicy).toEqual({
+      maxPaidRunnerConcurrency: 1,
+      maxComponentsPerGpuJob: 1,
+      maxTargetsPerGpuJob: 1,
+      heartbeatSeconds: 300,
+      gpuManualOnly: true,
+      scheduledGpuWorkflows: false,
+      linuxCudaBeforeWindowsCuda: true,
+      cacheModelWeightsOrArchives: false,
+    });
+  });
+
+  it('checks the paid native host under pinned Node before authentication or setup downloads', () => {
+    const workflow = readFileSync(new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url), 'utf8');
+    const releaseJob = workflow.slice(workflow.indexOf('\n  release:\n'));
+    const setupNode = releaseJob.indexOf('actions/setup-node@v4');
+    const npmInstall = releaseJob.indexOf('run: npm ci');
+    const hostProbe = releaseJob.indexOf('npm run runtime-box:ci -- host-probe');
+    const releaseAuth = releaseJob.indexOf('id: release-auth');
+    const trackedBuild = releaseJob.indexOf('runtime-box:ci -- tracked-build');
+    expect(setupNode).toBeGreaterThanOrEqual(0);
+    // `npm ci` sits between pinned Node and the probe rather than after it: the probe runs
+    // through the CI entry point, which imports the published Scrollcase contract and cannot
+    // start without node_modules. It is a prerequisite of probing, not a paid download.
+    expect(setupNode).toBeLessThan(npmInstall);
+    expect(npmInstall).toBeLessThan(hostProbe);
+    // What the probe actually guards is unchanged: no credential, and nothing that downloads a
+    // pixi environment or a model weight, happens until the host has been accepted.
+    expect(hostProbe).toBeLessThan(releaseAuth);
+    expect(hostProbe).toBeLessThan(trackedBuild);
+    expect(trackedBuild).toBeGreaterThanOrEqual(0);
+  });
+
+  it('keeps macOS Runtime Box temp paths below the Unix-socket limit', () => {
+    const validation = readFileSync(
+      new URL('../../.github/workflows/_runtime-box-validate.yml', import.meta.url),
+      'utf8',
+    );
+    const release = readFileSync(
+      new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url),
+      'utf8',
+    );
+    const platformTemp = "TMPDIR: ${{ startsWith(inputs.target_id, 'macos-') && '/tmp' || runner.temp }}";
+
+    // pVACtools imports pymp, whose manager creates an AF_UNIX socket. A long self-hosted runner
+    // root made production run 33328650028 fail before publication even though its build passed.
+    expect(release.split(platformTemp)).toHaveLength(3);
+    expect(validation.split(platformTemp)).toHaveLength(3);
+    expect(release).not.toContain('TMPDIR: ${{ runner.temp }}');
+    expect(validation).not.toContain('TMPDIR: ${{ runner.temp }}');
+  });
+
+  it('suppresses npm wrapper output before parsing one canonical validator result', () => {
+    const ciSource = readFileSync(new URL('../../scripts/runtime-box-ci.mjs', import.meta.url), 'utf8');
+    expect(ciSource).toContain("['run', '--silent', script]");
+    expect(ciSource).toContain('JSON.parse(result.stdout.trim())');
+  });
+
+  it('maps workflow receipt flags to the evidence API contract', () => {
+    expect(runtimeBoxEvidenceOptions(new Map([
+      ['publish-receipt', 'publish.json'],
+      ['promotion-receipt', 'promotion.json'],
+      ['product-lifecycle', 'product.json'],
+    ]))).toEqual({
+      publishReceipt: 'publish.json',
+      promotionReceipt: 'promotion.json',
+      productLifecycle: 'product.json',
+    });
+  });
+
+  it('routes UCE native CI only to the repository-scoped ephemeral heavy runner', () => {
+    const uce = catalog.components.find((model) => model.boxId === 'uce-4layer');
+    const runner = catalog.runnerProfiles.find((candidate) => candidate.id === uce?.targets[0].runnerProfileId);
+    expect(uce?.targets[0]).toMatchObject({
+      status: 'published',
+      requiredBuildDiskBytes: 36_507_222_016,
+      nativeCiEnabled: true,
+      runnerProfileId: 'macos-arm64-heavy',
+    });
+    // The floor must stay strictly under the runner's bootstrap floor, or a target could be
+    // registered that its own runner is never allowed to accept.
+    expect(uce?.targets[0].requiredBuildDiskBytes)
+      .toBeLessThan(runner?.selfHosted?.minimumBootstrapFreeDiskBytes);
+    expect(runner).toMatchObject({
+      runsOn: 'liatir-macos-arm64-heavy',
+      platform: 'macos',
+      arch: 'aarch64',
+      selfHosted: {
+        scope: 'repository',
+        ephemeral: true,
+        maxConcurrency: 1,
+        cleanWorkDirectory: true,
+        runnerNamePrefix: 'liatir-macos-heavy-',
+        minimumBootstrapFreeDiskBytes: 37_580_963_840,
+      },
+    });
+  });
+
+  it('routes scGPT macOS Metal validation to the self-hosted Apple-Silicon runner', () => {
+    const scgpt = catalog.components.find((model) => model.boxId === 'scgpt-whole-human');
+    const macos = scgpt?.targets.find((target) => target.targetId === 'macos-aarch64-metal');
+    const runner = catalog.runnerProfiles.find((candidate) => candidate.id === macos?.runnerProfileId);
+
+    expect(macos).toMatchObject({
+      recipeId: 'scgpt-whole-human-macos-arm64-metal',
+      nativeCiEnabled: true,
+      runnerProfileId: 'macos-arm64-heavy',
+    });
+    expect(runner).toMatchObject({
+      runsOn: 'liatir-macos-arm64-heavy',
+      platform: 'macos',
+      arch: 'aarch64',
+      selfHosted: expect.any(Object),
+    });
+  });
+
+  it('rejects a self-hosted heavy job outside the exact checked runner context', () => {
+    const runner = catalog.runnerProfiles.find((candidate) => candidate.id === 'macos-arm64-heavy');
+    expect(() => validateRunnerExecutionContext(runner, {
+      GITHUB_ACTIONS: 'true',
+      RUNNER_ENVIRONMENT: 'self-hosted',
+      RUNNER_NAME: 'liatir-macos-heavy-1721600000-1234',
+    })).not.toThrow();
+    expect(() => validateRunnerExecutionContext(runner, {
+      GITHUB_ACTIONS: 'true',
+      RUNNER_ENVIRONMENT: 'github-hosted',
+      RUNNER_NAME: 'Mac-1',
+    })).toThrow(/must execute on a self-hosted runner/);
+    expect(() => validateRunnerExecutionContext(runner, {
+      GITHUB_ACTIONS: 'true',
+      RUNNER_ENVIRONMENT: 'self-hosted',
+      RUNNER_NAME: 'unreviewed-runner',
+    })).toThrow(/does not match prefix/);
+  });
+
+  it('guards heavy native allocation and preserves OIDC signing plus unconditional cleanup', () => {
+    const validation = readFileSync(new URL('../../.github/workflows/_runtime-box-validate.yml', import.meta.url), 'utf8');
+    const release = readFileSync(new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url), 'utf8');
+    const launcher = readFileSync(new URL('../../scripts/run-runtime-box-selfhosted-runner.sh', import.meta.url), 'utf8');
+    const validationPreflight = validation.slice(
+      validation.indexOf('\n  preflight:\n'),
+      validation.indexOf('\n  native:\n'),
+    );
+    const validationNative = validation.slice(validation.indexOf('\n  native:\n'));
+    const releaseJob = release.slice(release.indexOf('\n  release:\n'));
+
+    expect(validation).toContain('Require main before any native runner allocation');
+    expect(validation).toContain('test "${{ github.ref }}" = "refs/heads/main"');
+    expect(validationPreflight.indexOf('run: npm ci'))
+      .toBeLessThan(validationPreflight.indexOf('Clean stale Runtime Box state'));
+    expect(validationNative.indexOf('run: npm ci'))
+      .toBeLessThan(validationNative.indexOf('Clean stale Runtime Box state'));
+    expect(validationNative.indexOf('Clean stale Runtime Box state')).toBeLessThan(validationNative.indexOf('host-probe'));
+    expect(validationNative).toContain('if: always()');
+    expect(releaseJob.indexOf('Clean stale Runtime Box state')).toBeLessThan(releaseJob.indexOf('host-probe'));
+    expect(release).toContain('id-token: write');
+    expect(releaseJob).toContain('LIATIR_RUNTIME_BOX_SIGNER_ID_TOKEN');
+    expect(releaseJob).not.toContain('keygen');
+    expect(launcher).toContain('RUNNER_VERSION="2.338.2"');
+    expect(launcher).toContain('25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388');
+    expect(launcher).toContain('--ephemeral');
+    expect(launcher).toContain('--no-default-labels');
+    expect(launcher).toContain('RUNNER_ONLINE_TIMEOUT_SECONDS=11400');
+  });
+
+  // GitHub refuses a dispatch whose input is not among a choice's options, so a catalog target
+  // missing here cannot be released at all: the GNINA release of 2026-11-05 was refused with
+  // HTTP 422 because linux-x86_64-cuda12.8 had never been added to the target list.
+  it('offers every catalog model and target as a release input', () => {
+    const release = readFileSync(
+      new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url),
+      'utf8',
+    );
+    const models = release.slice(release.indexOf('\n      model_id:\n'), release.indexOf('\n      target_id:\n') + 1);
+    const targets = release.match(/\n      target_id:\n(?: {8}.*\n)*? {8}options: \[(.*)\]\n/)?.[1].split(', ');
+    expect(targets).toBeDefined();
+    for (const model of catalog.components) {
+      expect(models, model.modelId).toContain(`\n          - ${model.modelId}\n`);
+      for (const target of model.targets) {
+        expect(targets, `${model.modelId}/${target.targetId}`).toContain(target.targetId);
+      }
+    }
+  });
+
+  // The release drives each model's real product lifecycle through an end-to-end spec, and every
+  // spec pins its own box and component. The runner used to hardcode Geneformer's, which only worked
+  // while Geneformer was the only model with a native lifecycle: run 31288741734 published the
+  // scGPT Linux CPU box and then failed the lifecycle with "Unsupported native Runtime Box test
+  // target: ctheodoris-geneformer-v1-10m/linux-x86_64-cpu". Every supported OS now runs this
+  // lifecycle before promotion.
+  it('resolves one product lifecycle spec per model, and never a hardcoded default', () => {
+    const runner = readFileSync(
+      new URL('../../scripts/run-runtime-box-product-lifecycle.mjs', import.meta.url),
+      'utf8',
+    );
+    const release = readFileSync(
+      new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url),
+      'utf8',
+    );
+
+    const specs = catalog.components.map((model) => model.productLifecycleSpec);
+    expect(specs.every((spec) => spec.startsWith('tests/e2e/specs/'))).toBe(true);
+    // One spec per model: a shared spec would validate the wrong box for someone.
+    expect(new Set(specs).size).toBe(specs.length);
+    for (const model of catalog.components) {
+      const spec = readFileSync(new URL(`../../${model.productLifecycleSpec}`, import.meta.url), 'utf8');
+      expect(spec, model.modelId).toContain(`'${model.modelId}'`);
+      expect(spec, model.modelId).toContain(`'${model.boxId}'`);
+    }
+
+    // The runner must read the spec from the catalog and be told which model it is releasing.
+    expect(runner).toContain('productLifecycleSpec');
+    expect(runner).toContain('LIATIR_RUNTIME_BOX_MODEL_ID');
+    expect(runner).toContain('tests/e2e/specs/runtime-box-release-candidate.e2e.mjs');
+    expect(runner).not.toContain("'tests/e2e/specs/runtime-box-native.e2e.mjs'");
+    // Every platform lifecycle step carries the component, or one silently picks the wrong spec.
+    expect(release.match(/LIATIR_RUNTIME_BOX_MODEL_ID: \$\{\{ inputs\.model_id \}\}/g))
+      .toHaveLength(3);
+    expect(release.match(/\n          LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: \$\{\{ inputs\.model_id \}\}/g))
+      .toHaveLength(3);
+    expect(release).toContain('Run the macOS candidate through the component\'s product lifecycle spec');
+    expect(release).toContain('openvax-mhcflurry-class1-presentation');
+    expect(release).toContain('griffithlab-pvactools-pvacseq');
+    expect(release).toContain('macos-aarch64-cpu');
+    expect(release).toContain('VITE_LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: ${{ inputs.model_id }}');
+    expect(release).toContain('Upload bounded product lifecycle failure diagnostics');
+    expect(release).toContain('tests/.artifacts/screenshots/');
+    expect(release).toContain('tests/.artifacts/tauri-logs/');
+  });
+
+  it('keeps both self-hosted launchers on one pinned runner release and one cleanup contract', () => {
+    const posix = readFileSync(new URL('../../scripts/run-runtime-box-selfhosted-runner.sh', import.meta.url), 'utf8');
+    const windows = readFileSync(new URL('../../scripts/run-runtime-box-selfhosted-runner.ps1', import.meta.url), 'utf8');
+
+    // Same pinned runner release on every OS, each with its own reviewed archive digest.
+    expect(posix).toContain('RUNNER_VERSION="2.338.2"');
+    expect(windows).toContain("$RunnerVersion = '2.338.2'");
+    expect(posix).toContain('baebf204307bac6193480852732f0aba2ae97b6c5597c244f4d5558390147c40');
+    expect(windows).toContain('a1f17aa987fc8158bc7521d284912267a0d01b7c2c4684b33c86783b5e8221cc');
+
+    // The ephemeral, single-job, no-default-label contract holds on both.
+    for (const launcher of [posix, windows]) {
+      expect(launcher).toContain('--ephemeral');
+      expect(launcher).toContain('--disableupdate');
+      expect(launcher).toContain('--no-default-labels');
+      expect(launcher).toContain('.liatir-runtime-box-runner');
+      expect(launcher).toContain('actions/runners/registration-token');
+      expect(launcher).toContain('--method DELETE');
+    }
+    expect(windows).toContain('$RunnerOnlineTimeoutSeconds = 11400');
+    expect(windows).toContain('$MaxWindowsCondaPrefixLength = 150');
+    expect(windows).toContain('$resolved.build_dir_relative');
+    expect(windows).toContain('$expectedCondaPrefix.Length -gt $MaxWindowsCondaPrefixLength');
+
+    // Operational parameters come from the catalog, never hardcoded in a launcher.
+    for (const launcher of [posix, windows]) {
+      expect(launcher).toContain('runtime-box-ci.mjs');
+      expect(launcher).toContain('resolve-foundation');
+      expect(launcher).not.toContain('liatir-linux-selfhosted');
+      expect(launcher).not.toContain('liatir-windows-selfhosted');
+    }
+
+    // WSL: a multi-gigabyte conda prefix must never land on the 9p Windows mount.
+    expect(posix).toContain('/mnt/*');
+
+    // A hand-invoked launcher must refuse a target belonging to another OS before registering.
+    for (const launcher of [posix, windows]) {
+      expect(launcher).toContain('runner_platform');
+      expect(launcher).toContain('runner_arch');
+    }
+  });
+
+  it('keeps every Linux and Windows model target off the paid hosted runners', () => {
+    // Phase 3 retired the paid native runners. Coordination jobs stay hosted on purpose — the
+    // resolve job is what tells the operator which self-hosted runner to bring online, so putting
+    // it behind one would deadlock.
+    const paidLabels = ['ubuntu-24.04', 'windows-2025', 'liatir-linux-t4', 'liatir-windows-t4'];
+    expect(catalog.runnerProfiles.map((runner) => runner.runsOn))
+      .toEqual(expect.not.arrayContaining(['liatir-linux-t4', 'liatir-windows-t4']));
+
+    for (const model of catalog.components) {
+      for (const target of model.targets) {
+        if (target.target.platform === 'macos') continue;
+        const runner = catalog.runnerProfiles.find((candidate) => candidate.id === target.runnerProfileId);
+        expect(runner?.selfHosted, `${model.boxId}/${target.targetId} is not self-hosted`).toBeDefined();
+        expect(paidLabels, `${model.boxId}/${target.targetId} still uses a paid runner`)
+          .not.toContain(runner?.runsOn);
+      }
+    }
+  });
+
+  it('exposes the resolved runner host so a launcher can refuse a foreign target', () => {
+    const resolution = execFileSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('../../scripts/runtime-box-ci.mjs', import.meta.url)),
+        'resolve',
+        '--model', 'snap-stanford-uce-4layer',
+        '--target', 'macos-aarch64-metal',
+        '--mode', 'native-lifecycle',
+        '--native-requested', 'false',
+      ],
+      { encoding: 'utf8' },
+    );
+    const resolved = JSON.parse(resolution.trim().split('\n').at(-1) as string);
+    expect(resolved).toMatchObject({
+      self_hosted: 'true',
+      runner_platform: 'macos',
+      runner_arch: 'aarch64',
+    });
+  });
+
+  it('declares reviewed self-hosted Linux and Windows runner profiles for the pixi substrate', () => {
+    const expected = [
+      { id: 'linux-x64-selfhosted', runsOn: 'liatir-linux-selfhosted', platform: 'linux', gpu: false },
+      { id: 'linux-x64-cuda-selfhosted', runsOn: 'liatir-linux-cuda-selfhosted', platform: 'linux', gpu: true },
+      { id: 'windows-x64-selfhosted', runsOn: 'liatir-windows-selfhosted', platform: 'windows', gpu: false },
+      { id: 'windows-x64-cuda-selfhosted', runsOn: 'liatir-windows-cuda-selfhosted', platform: 'windows', gpu: true },
+    ];
+
+    for (const { id, runsOn, platform, gpu } of expected) {
+      const runner = catalog.runnerProfiles.find((candidate) => candidate.id === id);
+      expect(runner, `missing runner profile ${id}`).toBeDefined();
+      expect(runner).toMatchObject({
+        runsOn,
+        platform,
+        arch: 'x86_64',
+        gpu,
+        selfHosted: {
+          scope: 'repository',
+          ephemeral: true,
+          maxConcurrency: 1,
+          cleanWorkDirectory: true,
+          runnerNamePrefix: `${runsOn}-`,
+        },
+      });
+      // The bootstrap floor is what stops a runner coming online without room to finish.
+      expect(runner?.selfHosted?.minimumBootstrapFreeDiskBytes).toBeGreaterThanOrEqual(42_949_672_960);
+      if (gpu) {
+        // Capability floors the local RTX 4060 Ti (8.9, ~8.19 GB) clears, and the hosted T4 did too.
+        expect(runner).toMatchObject({ minimumComputeCapability: '7.5' });
+        expect(runner?.minimumGpuMemoryBytes).toBeLessThanOrEqual(8_585_740_288);
+        expect(runner).not.toHaveProperty('expectedGpuModel');
+      }
+    }
+  });
+
+  it('rejects a self-hosted Linux or Windows job outside the exact checked runner context', () => {
+    for (const id of ['linux-x64-cuda-selfhosted', 'windows-x64-selfhosted']) {
+      const runner = catalog.runnerProfiles.find((candidate) => candidate.id === id);
+      const prefix = runner?.selfHosted?.runnerNamePrefix ?? '';
+      expect(() => validateRunnerExecutionContext(runner, {
+        GITHUB_ACTIONS: 'true',
+        RUNNER_ENVIRONMENT: 'self-hosted',
+        RUNNER_NAME: `${prefix}1721600000-1234`,
+      })).not.toThrow();
+      expect(() => validateRunnerExecutionContext(runner, {
+        GITHUB_ACTIONS: 'true',
+        RUNNER_ENVIRONMENT: 'github-hosted',
+        RUNNER_NAME: `${prefix}1721600000-1234`,
+      })).toThrow(/must execute on a self-hosted runner/);
+      expect(() => validateRunnerExecutionContext(runner, {
+        GITHUB_ACTIONS: 'true',
+        RUNNER_ENVIRONMENT: 'self-hosted',
+        RUNNER_NAME: 'unreviewed-runner',
+      })).toThrow(/does not match prefix/);
+    }
+  });
+
+  it('shares the proven Linux product lifecycle dependencies across validation and release', () => {
+    const validation = readFileSync(
+      new URL('../../.github/workflows/_runtime-box-validate.yml', import.meta.url),
+      'utf8',
+    );
+    const release = readFileSync(
+      new URL('../../.github/workflows/runtime-box-release.yml', import.meta.url),
+      'utf8',
+    );
+    const foundation = readFileSync(
+      new URL('../../.github/workflows/runtime-box-foundation.yml', import.meta.url),
+      'utf8',
+    );
+    const dependencyScript = readFileSync(
+      new URL('../../scripts/install-runtime-box-linux-product-deps.sh', import.meta.url),
+      'utf8',
+    );
+    const windowsPixiInstaller = readFileSync(
+      new URL('../../scripts/install-pixi-windows.ps1', import.meta.url),
+      'utf8',
+    );
+    const sharedCommand = 'bash scripts/install-runtime-box-linux-product-deps.sh';
+
+    expect(validation).toContain(sharedCommand);
+    expect(validation).toContain('id: build');
+    expect(validation).toContain('verify "${{ steps.build.outputs.release_path }}"');
+    expect(validation).toContain('--release "${{ steps.build.outputs.release_path || \'__not_built__\' }}"');
+    expect(validation).toContain('scripts/install-pixi-windows.ps1');
+    expect(validation).toContain('02c3e1bb4712199f62124deb1b1e9a5ddae32c413d21fda1586e198cd6f9cf2a');
+    expect(validation.indexOf(sharedCommand)).toBeLessThan(
+      validation.indexOf('Install pinned Rust 1.95.0'),
+    );
+    expect(release).toContain(sharedCommand);
+    expect(foundation).toContain(sharedCommand);
+    expect(dependencyScript).toContain('libwebkit2gtk-4.1-dev');
+    expect(dependencyScript).toContain('libayatana-appindicator3-dev');
+    expect(dependencyScript).toContain('xvfb');
+    expect(windowsPixiInstaller).toContain('pixi-x86_64-pc-windows-msvc.exe');
+    expect(windowsPixiInstaller).toContain('Get-FileHash');
+    expect(windowsPixiInstaller).toContain('curl.exe --fail --location --retry 3');
+    expect(windowsPixiInstaller).toContain('conda-pack==0.9.2');
+  });
+
+  // The frontend build packages the single-cell showcase with the CLI's own builder. Release run
+  // 40621392871 published OpenMM and then stopped at the product test binary on a missing `jszip`,
+  // because that workflow, unlike CI and the desktop release, never installed the CLI package.
+  it('installs the CLI package before every product test binary build', () => {
+    const directory = new URL('../../.github/workflows/', import.meta.url);
+    const building = readdirSync(directory)
+      .map((name) => ({ name, text: readFileSync(new URL(name, directory), 'utf8') }))
+      .filter(({ text }) => text.includes('npm run test:tauri:prepare'));
+    expect(building.map(({ name }) => name).sort()).toEqual([
+      'runtime-box-release.yml',
+      'runtime-box-windows-product-smoke.yml',
+      'runtime-box-wsl2-product-lifecycle.yml',
+    ]);
+    for (const { name, text } of building) {
+      const install = text.indexOf('npm ci --prefix packages/liatir-cli');
+      expect(install, name).toBeGreaterThanOrEqual(0);
+      expect(install, name).toBeLessThan(text.indexOf('npm run test:tauri:prepare'));
+    }
+  });
+
+  it('selects Git Bash before a Windows composite action in the WSL2 proof', () => {
+    const workflow = readFileSync(
+      new URL('../../.github/workflows/runtime-box-wsl2-product-lifecycle.yml', import.meta.url),
+      'utf8',
+    );
+    const gitBash = workflow.indexOf('Select Git Bash for Windows composite actions');
+    const rust = workflow.indexOf('Install pinned Rust 1.95.0');
+
+    expect(gitBash).toBeGreaterThanOrEqual(0);
+    expect(gitBash).toBeLessThan(rust);
+    expect(workflow).toContain("$gitBash = 'C:\\Program Files\\Git\\bin'");
+    expect(workflow).toContain('$gitBash | Out-File -FilePath $env:GITHUB_PATH');
+  });
+
+  it('keeps foundation validation manual and entirely self-hosted', () => {
+    const ciDispatcher = readFileSync(
+      new URL('../../scripts/runtime-box-ci.mjs', import.meta.url),
+      'utf8',
+    );
+    const stableCli = readFileSync(
+      new URL('../../scripts/runtime-box.mjs', import.meta.url),
+      'utf8',
+    );
+    expect(ciDispatcher).toContain(
+      "const args = ['run', 'runtime-box', '--', 'build', resolved.target.recipeId];",
+    );
+    expect(stableCli).toContain(
+      "import { dispatchRuntimeBox } from './runtime-box/scrollcase-adapter.mjs';",
+    );
+
+    const foundationWorkflow = readFileSync(
+      new URL('../../.github/workflows/runtime-box-foundation.yml', import.meta.url),
+      'utf8',
+    );
+    expect(foundationWorkflow).toContain('workflow_dispatch:');
+    expect(foundationWorkflow).not.toContain('pull_request:');
+    expect(foundationWorkflow).not.toContain('push:');
+    expect(foundationWorkflow).not.toContain('schedule:');
+    expect(foundationWorkflow).toContain("'liatir-linux-selfhosted'");
+    expect(foundationWorkflow).toContain("'liatir-windows-selfhosted'");
+    expect(foundationWorkflow).not.toContain('ubuntu-');
+    expect(foundationWorkflow).not.toContain('macos-');
+    expect(foundationWorkflow.indexOf('npm run ts:compile --prefix src-tauri'))
+      .toBeLessThan(foundationWorkflow.indexOf('npm run runtime-box:test:foundation'));
+  });
+});

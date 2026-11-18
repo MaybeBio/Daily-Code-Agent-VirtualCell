@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "BCRFoundation"
+version = "1.0.0"
+authors = [
+    {name = "Haotian Zhuang", email = "haotian.zhuang@duke.edu"}
+]
+description = "A multimodal foundation model for B cell receptor and transcriptome analysis"
+readme = "README.md"
+requires-python = ">=3.11.15"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "torch>=2.11.0",
+    "numpy>=2.4.4",
+    "scipy>=1.17.1",
+    "pandas>=2.3.3",
+    "scanpy>=1.11.5",
+    "scikit-learn>=1.8.0",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+    "tqdm>=4.67.3",
+    "anndata>=0.12.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.2.0",
+    "jupyter>=1.0.0",
+    "black>=21.0",
+]
+docs = [
+    "sphinx==9.0.4",
+    "furo==2025.12.19",
+    "myst-parser==5.2.0",
+    "sphinx-copybutton==0.5.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/haotian-zhuang/BCRFoundation"
+Repository = "https://github.com/haotian-zhuang/BCRFoundation"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["BCRFoundation*"]
+exclude = ["tests*"]

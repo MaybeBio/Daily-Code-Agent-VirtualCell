@@ -1,0 +1,63 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+from backend.sdk import (
+    APIKeyCredentials,
+    Block,
+    BlockCategory,
+    BlockCostType,
+    BlockOutput,
+    BlockSchemaInput,
+    BlockSchemaOutput,
+    CredentialsMetaInput,
+    ProviderBuilder,
+    SchemaField,
+)
+
+from ._api import llm_api_call
+
+wolfram = (
+    ProviderBuilder("wolfram")
+    .with_api_key("WOLFRAM_APP_ID", "Wolfram Alpha App ID")
+    .with_base_cost(1, BlockCostType.RUN)
+    .build()
+)
+
+
+class AskWolframBlock(Block):
+    """
+    Ask Wolfram Alpha a question.
+    """
+
+    class Input(BlockSchemaInput):
+        credentials: CredentialsMetaInput = wolfram.credentials_field(
+            description="Wolfram Alpha API credentials"
+        )
+        question: str = SchemaField(description="The question to ask")
+
+    class Output(BlockSchemaOutput):
+        answer: str = SchemaField(description="The answer to the question")
+
+    def __init__(self):
+        super().__init__(
+            id="b7710ce4-68ef-4e82-9a2f-f0b874ef9c7d",
+            description="Ask Wolfram Alpha a question",
+            categories={BlockCategory.SEARCH},
+            input_schema=self.Input,
+            output_schema=self.Output,
+        )
+
+    async def run(
+        self, input_data: Input, *, credentials: APIKeyCredentials, **kwargs
+    ) -> BlockOutput:
+        answer = await llm_api_call(credentials, input_data.question)
+        yield "answer", answer
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

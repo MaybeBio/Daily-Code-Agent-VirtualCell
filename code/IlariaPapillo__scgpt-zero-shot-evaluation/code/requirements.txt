@@ -1,0 +1,12 @@
+# plus scGPT-spatial itself: https://github.com/bowang-lab/scGPT-spatial
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+seaborn
+tqdm
+torch
+anndata
+scanpy
+scib

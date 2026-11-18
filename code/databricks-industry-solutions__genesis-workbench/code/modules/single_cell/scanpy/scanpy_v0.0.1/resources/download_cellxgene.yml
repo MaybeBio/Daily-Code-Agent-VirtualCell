@@ -1,0 +1,29 @@
+resources:
+  jobs:
+    download_cellxgene_gwb:
+      name: download_cellxgene_gwb
+      tags:
+        application: genesis_workbench
+        module: single_cell
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: census_version
+          default: "2025-11-08"
+
+      tasks:
+        - task_key: download_cellxgene
+          max_retries: 0
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/download_cellxgene.py
+            source: WORKSPACE
+          timeout_seconds: 14400
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'

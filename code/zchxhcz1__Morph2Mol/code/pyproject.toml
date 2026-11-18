@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morph2mol"
+version = "0.3.0"
+description = "Morph2Mol: A Foundation Model for Predicting Single-Cell Spatial Transcriptome from Histology Images"
+requires-python = ">=3.10"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["morph2mol*", "voice*", "predict*", "train*"]
+
+[tool.setuptools.package-data]
+"morph2mol.scgpt_backend" = ["LICENSE", "NOTICE.md"]

@@ -1,0 +1,143 @@
+# Universal Biomedical Skills & Agents (Biomedical OS - 2026)
+
+![Status](https://img.shields.io/badge/Status-Active-green)
+![Architecture](https://img.shields.io/badge/Architecture-Biomedical%20OS-blueviolet)
+![Domain](https://img.shields.io/badge/Domain-Biotech%20%7C%20Clinical%20%7C%20Genomics-purple)
+![Tech](https://img.shields.io/badge/Tech-MCP%20%7C%20DeepSeek%20%7C%20Gemini-orange)
+
+> **⚠️ IMPORTANT DISCLAIMER & COPYRIGHT NOTICE**
+> 
+> This repository, its architecture, agent designs, and specific implementations are the intellectual property of **MD BABU MIA, PhD**.
+> 
+> While open-source components are licensed under MIT, the unique curation, "Biomedical OS" architecture, and agentic workflows are proprietary to the author. 
+> 
+> **If you fork, clone, or copy this repository for public use, you MUST:**
+> 1.  Retain this copyright notice.
+> 2.  Explicitly credit **MD BABU MIA, PhD** as the original author.
+> 3.  Link back to the original repository.
+> 
+> *Plagiarism or uncredited redistribution is strictly prohibited.*
+
+---
+
+## 🚀 Overview
+
+This repository acts as a **Biomedical Operating System (BioOS)**, orchestrating a comprehensive library of **skills, agents, and mathematical foundations** for modern (2026) Artificial Intelligence. 
+
+Unlike standard codebases, this project transforms static scripts into **Agentic Workflows**—where autonomous systems plan, execute, use tools, and correct themselves to solve complex scientific problems. It is designed to support high-impact research, clinical decision support, and automated lab operations.
+
+## 👤 Author & Maintainer
+
+**MD BABU MIA, PhD**  
+*Assistant Professor of Hematology & Medical Oncology, Machine Learning -AI | Mount Sinai*  
+Mount Sinai Tisch Cancer Institute
+Icahn School of Medicine at Mount Sinai
+Mount Sinai Hospital
+One Gustave L. Levy Place
+New York, NY 10029
+Desk phone:(212) 241-2764 (x42764)
+Mobile phone:(332) 256-3038
+Email: md.babu.mia@mssm.edu
+Specializing in Hemato-Oncology,and Machine Learning-LLM-AI.
+ 
+
+---
+
+## 🌟 Major Updates (February 2026)
+
+We have significantly expanded the **Skills** directory to align with the 2026 roadmap, introducing the `SKILL.md` metadata standard and deploying high-performance agents across key domains.
+
+### 🧬 Genomics & Bioinformatics
+*   **BioMaster:** `Skills/Genomics/Multi_Agent_Workflows/BioMaster` - A master orchestrator for RNA-seq, ChIP-seq, and Hi-C pipelines.
+*   **CellAgent:** `Skills/Genomics/Single_Cell/CellAgent` - Autonomous single-cell annotation and quality control.
+*   **CompBioAgent:** `Skills/Genomics/Single_Cell/CompBioAgent` - Interactive scRNA-seq explorer and visualization tool.
+*   **STAgent:** `Skills/Genomics/Spatial_Transcriptomics/STAgent` - Spatial transcriptomics analysis for Visium/Xenium data.
+
+### 🏥 Clinical & Operations
+*   **ChatEHR:** `Skills/Clinical/EHR/ChatEHR` - Clinical assistant for summarizing patient records and answering queries.
+*   **TrialGPT:** `Skills/Clinical/Trial_Matching/TrialGPT` - Intelligent patient-to-trial matching and ranking.
+*   **RadGPT:** `Skills/Clinical/Radiology/RadGPT` - Radiology report summarizer and patient-friendly explainer.
+*   **Autonomous Oncology Agent:** Precision oncology treatment planning using multimodal data (H&E + Genomics).
+
+### 🧪 Drug Discovery & Chemistry
+*   **MAGE:** `Skills/Drug_Discovery/Antibody_Design/MAGE` - Generative antibody design using protein language models.
+*   **CheMatAgent:** `Skills/Drug_Discovery/CheMatAgent` - Computational chemistry agent for molecule design and property prediction.
+*   **Medea Agent:** `Skills/Drug_Discovery/Medea/SKILL.md` - Executes transparent, multi-step omics analyses and therapeutic discovery.
+*   **Biomni:** `Skills/Research_Tools/Biomni` - General-purpose biomedical research agent with access to 150+ tools.
+
+### 🔍 Knowledge & Research
+*   **KRAGEN:** `Skills/Research_Tools/Knowledge_Graphs/KRAGEN` - Knowledge Graph-Enhanced RAG for complex reasoning.
+*   **LEADS:** `Skills/Research_Tools/Literature_Mining/LEADS` - Automated systematic review and meta-analysis agent.
+*   **BioMCP:** `Skills/MCP_Servers/BioMCP` - Model Context Protocol server for connecting LLMs to PubMed, ClinicalTrials.gov, and more.
+*   **MCPmed Server:** `Skills/MCP_Servers/MCPmed/SKILL.md` - Adapts the Model Context Protocol to bioinformatics backends (GEO, STRING).
+
+## April 2026 LLM + Agentic AI Refresh
+
+We completed a focused curation pass on the repo's LLM and agentic AI surface, with the goal of turning scattered references into first-class, operational skills.
+
+- Added new first-party skills for `OpenAI_Codex_Agents`, `Google_ADK_Agents`, `PydanticAI_Agents`, `Agentic_Evals_Observability`, `MCP_Operations_2026`, `Mistral_Platform_Operations_2026`, `DeepSeek_API_Operations_2026`, and `XAI_Grok_Operations_2026`.
+- Rewrote `Automated_Web_Research` and `DeepResearch_Swarm` to be evidence-first, source-aware, and operationally realistic.
+- Added missing category indexes for `Skills/AI_Providers/` and `Skills/MCP_Servers/`, and replaced the stale `Skills/Agentic_AI/README.md` with an accurate curation guide.
+- Added `docs/strategy/LLM_AGENTIC_AI_CURATION_2026.md` as the source-of-truth playbook for official references, literature watchlists, and refresh discipline.
+
+## 🧠 Biomedical Model Operations Refresh (June 2026)
+
+*   **Evo 2:** `Skills/Genomics/evo2-genome-model` - Long-context genomic scoring, embeddings, and DNA generation.
+*   **AlphaGenome:** `Skills/Genomics/alphagenome-variant-effects` - Tissue-aware regulatory variant effect prediction.
+*   **MedGemma 1.5:** `Skills/Clinical/medgemma-health-ai` - Medical text and imaging workflows with clinical validation controls.
+*   **BioEmu:** `Skills/Structural_Biology/bioemu-protein-ensembles` - Protein monomer conformational ensemble generation and QC.
+*   **Boltz-2:** `Skills/Drug_Discovery/boltz2-biomolecular-interactions` - Biomolecular complex and binding-affinity prediction.
+*   **TxGemma:** `Skills/Drug_Discovery/txgemma-therapeutics` - Therapeutic prediction and conversational drug-discovery workflows.
+*   **Protenix-v2:** `Skills/Structural_Biology/protenix-structure-prediction` - Open biomolecular co-folding with MSA, templates, constraints, and sampling.
+*   **MedSAM2:** `Skills/Clinical/Medical_Imaging/medsam2-3d-segmentation` - Promptable volumetric and medical-video segmentation.
+*   **OpenCRISPR:** `Skills/Genomics/opencrispr-gene-editors` - Controlled evaluation of released AI-designed gene editors.
+*   **MONAI:** `Skills/Clinical/Medical_Imaging/monai-medical-imaging` - Reproducible healthcare imaging pipelines and bundles.
+*   **TranscriptFormer:** `Skills/Genomics/Single_Cell/transcriptformer-cell-embeddings` - Cross-species cell and contextual gene embeddings.
+
+## 📂 Directory Structure
+
+The repository is organized into domain-specific modules:
+
+```text
+Skills/
+├── Agentic_AI/           # Orchestrators, Swarms, Planning Agents
+├── Clinical/             # EHR, Radiology, Oncology, Trials
+├── Drug_Discovery/       # Antibody Design, Small Molecules, Chemistry
+├── Genomics/             # Single Cell, Spatial, CRISPR, Variant Interpretation
+├── MCP_Servers/          # BioMCP and other protocol servers
+├── Research_Tools/       # Biomni, Literature Mining, Knowledge Graphs
+├── Pharma/               # Regulatory Affairs, Pharmacovigilance
+└── Software_Engineering/ # Best Practices (React, Python, Pandas)
+```
+
+## 📜 Standardized Skill Format
+
+All skills now adhere to the **SKILL.md** standard, making them discoverable and executable by the BioKernel. Each skill definition includes:
+*   **Description:** Concise summary of capabilities.
+*   **Keywords:** Core terms for indexing.
+*   **Measurable Outcome:** SMART goals (e.g., "Rank 5 trials in <3 mins").
+*   **Allowed Tools:** Security sandboxing for agent execution.
+
+## 🛠️ Usage Examples
+
+**1. Match a Patient to a Clinical Trial (TrialGPT):**
+```bash
+python3 Skills/Clinical/Trial_Matching/TrialGPT/run_matching.py --patient_profile ./patient.json
+```
+
+**2. Design an Antibody (MAGE):**
+```bash
+python3 Skills/Drug_Discovery/Antibody_Design/MAGE/generate.py --antigen "spike_protein" --count 5
+```
+
+**3. Analyze Spatial Transcriptomics (STAgent):**
+```bash
+python3 Skills/Genomics/Spatial_Transcriptomics/STAgent/main.py --data ./visium_data.h5ad --task "cluster_domains"
+```
+
+## 📄 License
+
+**Copyright (c) 2026 MD BABU MIA, PhD.**  
+All rights reserved.
+
+This project is licensed under the MIT License for open-source components, but the unique architectural design and agentic workflows are the intellectual property of the author. **Attribution is mandatory.**

@@ -1,0 +1,1250 @@
+# Overview
+
+
+
+**scGPT** is a foundation model for single-cell multi-omics built with generative AI. It leverages a Transformer-based architecture to learn meaningful representations of single-cell gene expression data, enabling downstream tasks such as cell type annotation, multi-batch integration, perturbation prediction, gene regulatory network inference, and reference mapping — all from a single pretrained model. The project is published as a pip-installable Python package (v0.2.5) with pretrained checkpoints trained on up to 33 million cells.
+
+Sources: [README.md](README.md#L1-L7), [scgpt/__init__.py](scgpt/__init__.py#L1-L30)
+
+## What scGPT Does
+
+Single-cell RNA sequencing (scRNA-seq) produces high-dimensional expression matrices where each row is a cell and each column is a gene. scGPT reformulates this data into a **sequence modeling problem**: each cell becomes a "sentence" whose tokens are genes and whose token values are expression levels. A Transformer encoder then learns to reconstruct masked expression values — analogous to masked language modeling in NLP — producing rich cell-level and gene-level embeddings that transfer across tasks and tissues.
+
+The core insight is that **genes in a cell interact in context-dependent ways**, and a self-attention mechanism can capture these interactions without hand-crafted feature engineering. After pretraining on tens of millions of cells, scGPT can be fine-tuned with minimal labeled data for task-specific applications.
+
+Sources: [scgpt/model/model.py](scgpt/model/model.py#L25-L95), [scgpt/model/model.py](scgpt/model/model.py#L290-L370)
+
+## Architecture at a Glance
+
+The diagram below traces the data flow from raw expression counts through tokenization, encoding, the Transformer backbone, and finally to task-specific decoder heads. Understanding this pipeline is the key to working with scGPT effectively.
+
+> **Prerequisite**: This diagram uses Mermaid flowchart syntax. Each node represents a distinct module in the codebase; arrows indicate the primary data-flow direction during a forward pass.
+
+```mermaid
+flowchart TB
+    subgraph Input["Input Layer"]
+        A["Raw AnnData<br/>(cells × genes)"] --> B["Preprocessor<br/>filter · normalize · log1p · bin"]
+        B --> C["GeneVocab<br/>gene name → token id"]
+        B --> D["ContinuousValueEncoder<br/>expression → embedding"]
+    end
+
+    subgraph Backbone["Transformer Backbone"]
+        E["GeneEncoder<br/>token id → gene embedding"]
+        F["Embedding Fusion<br/>gene_emb + value_emb<br/>or gene_emb × value_emb"]
+        G["Domain-Specific BatchNorm<br/>(optional)"]
+        H["Transformer Encoder<br/>PyTorch or Flash-Attention"]
+        E --> F
+        D --> F
+        F --> G
+        G --> H
+    end
+
+    subgraph Heads["Task-Specific Decoder Heads"]
+        I["ExprDecoder<br/>reconstruct expression<br/>(MLM pretraining)"]
+        J["ClsDecoder<br/>cell type classification"]
+        K["MVCDecoder<br/>masked value prediction<br/>from cell embedding"]
+        L["AdversarialDiscriminator<br/>batch correction (DAB)"]
+        M["Cell Embedding<br/>cls · avg-pool · w-pool"]
+        H --> I
+        H --> J
+        H --> K
+        H --> L
+        H --> M
+    end
+
+    C --> E
+    A --> C
+
+    style Input fill:#e8f4f8,stroke:#2196F3
+    style Backbone fill:#fff3e0,stroke:#FF9800
+    style Heads fill:#e8f5e9,stroke:#4CAF50
+```
+
+Sources: [scgpt/model/model.py](scgpt/model/model.py#L25-L180), [scgpt/preprocess.py](scgpt/preprocess.py#L11-L100), [scgpt/tokenizer/gene_tokenizer.py](scgpt/tokenizer/gene_tokenizer.py#L21-L85)
+
+## Core Components
+
+The table below maps each major subsystem to its source module, responsibility, and the key class or function you will interact with most often.
+
+| Subsystem | Source Module | Key Class / Function | Responsibility |
+|---|---|---|---|
+| **Preprocessing** | `scgpt.preprocess` | `Preprocessor` | Filter, normalize, log1p, select HVGs, bin expression values |
+| **Tokenization** | `scgpt.tokenizer` | `GeneVocab` | Map gene names ↔ integer token IDs; load/save vocab files |
+| **Data Collation** | `scgpt.data_collator` | `DataCollator` | Pad, bin, and apply MLM masking per batch |
+| **Model** | `scgpt.model` | `TransformerModel` | Full encoder–decoder with configurable heads |
+| **Multi-omics Model** | `scgpt.model` | `MultiOmicTransformerModel` | Extended model with modality-specific encoders |
+| **Generation Model** | `scgpt.model` | `TransformerGenerator` | Perturbation-aware model with perturbation token encoder |
+| **Loss Functions** | `scgpt.loss` | `masked_mse_loss`, `criterion_neg_log_bernoulli` | Masked reconstruction and zero-inflation losses |
+| **Training** | `scgpt.trainer` | `train`, `evaluate`, `prepare_data` | Training loops, data prep, SCIB metric evaluation |
+| **Cell Embedding** | `scgpt.tasks.cell_emb` | `embed_data`, `get_batch_cell_embeddings` | Batch inference for cell-level embeddings |
+| **GRN Inference** | `scgpt.tasks.grn` | `GeneEmbedding` | Gene similarity, metagene discovery from gene embeddings |
+| **Data Bank** | `scgpt.scbank` | `DataBank`, `DataTable` | Large-scale dataset storage and flexible access |
+
+Sources: [scgpt/__init__.py](scgpt/__init__.py#L18-L30), [scgpt/data_collator.py](scgpt/data_collator.py#L7-L50), [scgpt/loss.py](scgpt/loss.py#L1-L37), [scgpt/tasks/__init__.py](scgpt/tasks/__init__.py#L1-L3)
+
+## How a Cell Becomes a Sequence
+
+Understanding the tokenization pipeline is critical because it bridges the biological data format (AnnData) and the model's expected input (padded, binned token sequences). The `Preprocessor` transforms raw counts through a configurable pipeline — filtering low-count genes/cells, normalizing to a fixed total, applying log1p, selecting highly variable genes, and finally **binning** non-zero expression values into discrete bins using quantile-based binning. The `GeneVocab` then maps each gene name to a unique integer token. The `DataCollator` assembles per-cell sequences at training time: it prepends a `<cls>` token, pads to `max_length`, applies random masking (MLM), and bins values on-the-fly.
+
+> [!TIP]
+> The first bin in the binning scheme is always reserved for zero expression. Non-zero values are binned using quantile boundaries, so each gene's expression distribution is adaptively discretized. This design preserves the sparsity structure of scRNA-seq data.
+
+Sources: [scgpt/preprocess.py](scgpt/preprocess.py#L139-L200), [scgpt/tokenizer/gene_tokenizer.py](scgpt/tokenizer/gene_tokenizer.py#L21-L85), [scgpt/data_collator.py](scgpt/data_collator.py#L100-L170)
+
+## Model Design Decisions
+
+The `TransformerModel` exposes several configuration knobs that control how expression data is encoded and decoded. The most important are compared below.
+
+| Parameter | Options | Default | Effect |
+|---|---|---|---|
+| `input_emb_style` | `continuous`, `category`, `scaling` | `continuous` | How gene and value embeddings combine. `continuous` = addition; `scaling` = element-wise multiplication; `category` = learned bin embeddings |
+| `cell_emb_style` | `cls`, `avg-pool`, `w-pool` | `cls` | How to extract a cell-level vector from transformer output. `cls` uses the `<cls>` token position; `w-pool` uses expression-weighted average |
+| `do_mvc` | `True` / `False` | `False` | Enable Masked Value Prediction for Cell embedding (MVC) decoder — reconstructs masked gene expressions from the cell embedding alone |
+| `do_dab` | `True` / `False` | `False` | Enable Domain Adversarial Batch correction — a gradient-reversal discriminator that encourages batch-invariant embeddings |
+| `explicit_zero_prob` | `True` / `False` | `False` | Model explicit zero-inflation by predicting a Bernoulli probability for each gene being zero |
+| `use_fast_transformer` | `True` / `False` | `False` | Use Flash-Attention backend for faster and memory-efficient attention |
+| `domain_spec_batchnorm` | `True`, `"dsbn"`, `"batchnorm"`, `False` | `False` | Apply domain-specific batch normalization per batch label |
+
+> [!TIP]
+> The `continuous` + `cls` combination is the default and most battle-tested configuration. Switch to `scaling` if you want the model to treat expression values as multiplicative scaling factors on gene embeddings — this can improve perturbation prediction tasks where expression fold-changes matter.
+
+Sources: [scgpt/model/model.py](scgpt/model/model.py#L25-L95), [scgpt/model/model.py](scgpt/model/model.py#L180-L260)
+
+## Pretraining Objectives
+
+scGPT is pretrained with a combination of self-supervised objectives that teach the model different facets of single-cell biology. During a forward pass, multiple objectives can be active simultaneously via boolean flags (`CLS`, `CCE`, `MVC`, `ECS`).
+
+| Objective | Flag | What It Teaches | Mechanism |
+|---|---|---|---|
+| **Masked Gene Expression (MLM)** | always active | Reconstruct masked expression values | Randomly mask ~15% of gene tokens; decode via `ExprDecoder` |
+| **Cell Type Classification (CLS)** | `CLS=True` | Discriminative cell-type awareness | `ClsDecoder` maps cell embedding → cell type logits |
+| **Contrastive Cell Embedding (CCE)** | `CCE=True` | Robust cell-level representations | Two forward passes with dropout; cosine similarity contrastive loss |
+| **Masked Value for Cell (MVC)** | `MVC=True` | Cell embedding sufficiency | `MVCDecoder` reconstructs masked gene expressions from cell embedding alone using inner-product or concat-query architecture |
+| **Elastic Cell Similarity (ECS)** | `ECS=True` | Within-cell gene coherence | Penalizes low similarity among embeddings of genes from the same cell |
+
+Sources: [scgpt/model/model.py](scgpt/model/model.py#L290-L400), [scgpt/loss.py](scgpt/loss.py#L1-L37)
+
+## Project Structure
+
+The repository is organized so that the `scgpt/` package is the installable core, `tutorials/` provides end-to-end notebook walkthroughs, and `data/` contains scripts for building large-scale pretraining corpora.
+
+```
+scGPT/
+├── scgpt/                          # 📦 Installable Python package
+│   ├── model/
+│   │   ├── model.py                # TransformerModel, encoders, decoders
+│   │   ├── multiomic_model.py      # Multi-omic extension
+│   │   ├── generation_model.py     # Perturbation generation model
+│   │   ├── dsbn.py                 # Domain-specific batch normalization
+│   │   ├── grad_reverse.py         # Gradient reversal for adversarial training
+│   │   └── flash_attn_compat.py    # Flash-Attention compatibility layer
+│   ├── tokenizer/
+│   │   ├── gene_tokenizer.py       # GeneVocab class
+│   │   ├── vocab_compat.py         # Cross-version Vocab compatibility
+│   │   └── default_*.json          # Built-in vocabulary files
+│   ├── tasks/
+│   │   ├── cell_emb.py             # Cell embedding extraction
+│   │   └── grn.py                  # Gene regulatory network inference
+│   ├── scbank/                     # Large-scale data management
+│   ├── preprocess.py               # Preprocessor pipeline
+│   ├── data_collator.py            # Batch collation + MLM masking
+│   ├── data_sampler.py             # SubsetsBatchSampler
+│   ├── loss.py                     # Loss functions
+│   ├── trainer.py                  # Training & evaluation loops
+│   └── utils/                      # Utilities, pretrained model loading
+│
+├── tutorials/                      # 📓 Hands-on notebooks
+│   ├── Tutorial_Annotation.ipynb
+│   ├── Tutorial_Integration.ipynb
+│   ├── Tutorial_Perturbation.ipynb
+│   ├── Tutorial_GRN.ipynb
+│   ├── Tutorial_Multiomics.ipynb
+│   ├── Tutorial_Reference_Mapping.ipynb
+│   └── zero-shot/                 # Zero-shot application notebooks
+│
+├── examples/                       # 🔧 Script-based fine-tuning example
+│   └── finetune_integration.py
+├── tests/                          # ✅ Unit tests
+├── data/                           # 📊 Pretraining data build scripts
+└── docs/                           # 📖 Sphinx documentation source
+```
+
+Sources: [scgpt/model/__init__.py](scgpt/model/__init__.py#L1-L12), [scgpt/tokenizer/__init__.py](scgpt/tokenizer/__init__.py#L1-L2), [scgpt/scbank/__init__.py](scgpt/scbank/__init__.py#L1-L20)
+
+## Supported Downstream Tasks
+
+scGPT's pretrained representations are designed to transfer across a wide range of single-cell analyses. The table summarizes each task, its tutorial entry point, and the model components involved.
+
+| Task | Tutorial | Key Model Component | Description |
+|---|---|---|---|
+| **Cell Type Annotation** | `Tutorial_Annotation.ipynb` | `ClsDecoder` | Classify cell types in new datasets using fine-tuned classifier head |
+| **Multi-Batch Integration** | `Tutorial_Integration.ipynb` | `ExprDecoder` + DAB | Remove batch effects while preserving biological variation |
+| **Perturbation Prediction** | `Tutorial_Perturbation.ipynb` | `TransformerGenerator` | Predict post-perturbation expression from control cells |
+| **Gene Regulatory Network** | `Tutorial_GRN.ipynb` / `Tutorial_Attention_GRN.ipynb` | `GeneEmbedding` / Attention weights | Infer gene–gene interactions from embeddings or attention maps |
+| **Reference Mapping** | `Tutorial_Reference_Mapping.ipynb` | `embed_data` + FAISS | Map new cells to a reference atlas using cell embedding similarity |
+| **Multi-omics Integration** | `Tutorial_Multiomics.ipynb` | `MultiOmicTransformerModel` | Jointly encode RNA + ATAC or other modality pairs |
+| **Zero-Shot Applications** | `tutorials/zero-shot/` | `embed_data` | Use continually pretrained checkpoints without any fine-tuning |
+
+Sources: [scgpt/tasks/cell_emb.py](scgpt/tasks/cell_emb.py#L20-L80), [scgpt/tasks/grn.py](scgpt/tasks/grn.py#L14-L60), [scgpt/model/generation_model.py](scgpt/model/generation_model.py#L30-L80), [README.md](README.md#L40-L60)
+
+## Pretrained Model Zoo
+
+scGPT ships with several pretrained checkpoints. The **whole-human** model, trained on 33 million normal human cells, is the recommended default for most applications. Organ-specific models (brain, blood, heart, lung, kidney) can outperform the general model when your fine-tuning data shares a similar tissue context. A separately **continual pretrained** checkpoint is optimized for zero-shot cell embedding tasks.
+
+| Model | Training Data | Best For |
+|---|---|---|
+| `whole-human` (recommended) | 33M normal human cells | General-purpose fine-tuning |
+| `continual pretrained` | Further pretraining for embeddings | Zero-shot cell embedding |
+| `brain` | 13.2M brain cells | Neuroscience applications |
+| `blood` | 10.3M blood & bone marrow cells | Hematology |
+| `heart` | 1.8M heart cells | Cardiology |
+| `lung` | 2.1M lung cells | Pulmonary research |
+| `kidney` | 814K kidney cells | Nephrology |
+| `pan-cancer` | 5.7M cancer cells | Oncology |
+
+Sources: [README.md](README.md#L57-L72)
+
+## Where to Go Next
+
+Now that you have a mental map of scGPT's architecture and capabilities, here is the recommended reading path through the documentation:
+
+1. **[Quick Start](2-quick-start)** — Install scGPT, load a pretrained model, and generate your first cell embeddings in under 10 minutes.
+2. **[Pretrained Model Zoo](3-pretrained-model-zoo)** — Explore checkpoint details, download links, and guidance on choosing the right model for your task.
+3. **Tutorials** (listed above) — Pick the notebook that matches your downstream application and run it end-to-end.
+4. **[Latest Updates](4-latest-updates)** — Stay current with new features, checkpoint releases, and HuggingFace integration progress.
+
+
+# Quick Start
+
+
+
+Get scGPT running in minutes. This page walks you through installation, a minimal working example, and the essential API surface you need to start fine-tuning a single-cell foundation model on your own data. By the end, you will have loaded a pretrained model, preprocessed an AnnData object, tokenized gene expression, and extracted cell embeddings — the core loop that underpins every scGPT workflow.
+
+## How scGPT Works: The Big Picture
+
+scGPT models each cell as a **sequence of gene–value token pairs** and processes them through a Transformer encoder. The architecture mirrors NLP's "token + embedding" paradigm, but here genes are tokens and binned expression values are their features. Understanding this data flow is the single most important mental model for working with scGPT.
+
+```mermaid
+flowchart LR
+    A["Raw AnnData<br/>(cells × genes)"] --> B["Preprocessor<br/>normalize → log1p → HVG → bin"]
+    B --> C["Tokenizer<br/>gene_ids + binned_values"]
+    C --> D["TransformerModel<br/>GeneEncoder + ValueEncoder<br/>→ Transformer → Decoder"]
+    D --> E["Outputs<br/>cell embeddings /<br/>class predictions /<br/>gene predictions"]
+    style A fill:#e8f4fd,stroke:#2196F3
+    style B fill:#fff3e0,stroke:#FF9800
+    style C fill:#e8f5e9,stroke:#4CAF50
+    style D fill:#f3e5f5,stroke:#9C27B0
+    style E fill:#fce4ec,stroke:#E91E63
+```
+
+The **Preprocessor** transforms raw counts into binned discrete values. The **Tokenizer** maps gene names to vocabulary indices and pairs them with those binned values. The **TransformerModel** encodes this sequence and can output cell embeddings, cell-type classifications, or reconstructed gene expressions depending on which decoder heads are enabled. Every downstream task — integration, annotation, perturbation prediction, GRN inference — is a variation on this same pipeline.
+
+Sources: [scgpt/preprocess.py](/scgpt/preprocess.py#L24-L100), [scgpt/model/model.py](/scgpt/model/model.py#L21-L153), [scgpt/tokenizer/gene_tokenizer.py](/scgpt/tokenizer/gene_tokenizer.py#L293-L400)
+
+## Installation
+
+scGPT requires **Python ≥ 3.7.12** and **PyTorch ≥ 1.13**. Install the core package from PyPI:
+
+```bash
+pip install scgpt
+```
+
+For GPU-accelerated attention (strongly recommended for training), add the optional flash-attn dependency:
+
+```bash
+pip install scgpt "flash-attn<1.0.5"
+```
+
+> [!TIP]
+> If `flash-attn` fails to install, it is usually a CUDA version mismatch. scGPT will gracefully fall back to PyTorch's native attention — you can set `use_fast_transformer=False` when constructing the model. See the [flash-attn repo](https://github.com/HazyResearch/flash-attention) for compatible CUDA versions.
+
+Optionally, install [wandb](https://wandb.ai/) for experiment tracking:
+
+```bash
+pip install wandb
+```
+
+| Dependency | Minimum Version | Purpose |
+|:---|:---|:---|
+| `torch` | ≥ 1.13.0 | Core deep learning framework |
+| `scanpy` | ≥ 1.9.1 | Single-cell data I/O and preprocessing |
+| `scvi-tools` | ≥ 0.16.0 | Benchmark datasets and evaluation |
+| `pandas` | ≥ 1.3.5 | Data manipulation |
+| `datasets` | ≥ 2.20.0 | HuggingFace data loading |
+| `flash-attn` | ≥ 2.8.0 (optional) | Fast GPU attention kernel |
+
+Sources: [pyproject.toml](/pyproject.toml#L1-L62), [README.md](/README.md#L28-L45)
+
+## Step-by-Step: Your First scGPT Pipeline
+
+The following minimal example demonstrates the complete workflow from raw data to cell embeddings. Each step maps directly to the architecture diagram above.
+
+```mermaid
+flowchart TD
+    S1["1. Load Data"] --> S2["2. Build Vocabulary"]
+    S2 --> S3["3. Preprocess & Bin"]
+    S3 --> S4["4. Tokenize"]
+    S4 --> S5["5. Load Pretrained Model"]
+    S5 --> S6["6. Get Cell Embeddings"]
+    style S1 fill:#e3f2fd,stroke:#1565C0
+    style S2 fill:#e3f2fd,stroke:#1565C0
+    style S3 fill:#e8f5e9,stroke:#2E7D32
+    style S4 fill:#e8f5e9,stroke:#2E7D32
+    style S5 fill:#fff3e0,stroke:#E65100
+    style S6 fill:#fff3e0,stroke:#E65100
+```
+
+### Step 1 — Load Your Data
+
+scGPT consumes [AnnData](https://anndata.readthedocs.io/) objects, the standard container in the single-cell ecosystem. Gene names must be stored in `adata.var` with a known column name.
+
+```python
+import scanpy as sc
+
+adata = sc.read("your_data.h5ad")  # or any scanpy loader
+adata.var["gene_name"] = adata.var.index.tolist()  # ensure gene names column exists
+```
+
+### Step 2 — Build or Load the Gene Vocabulary
+
+The **GeneVocab** maps each gene symbol to a unique integer ID. When loading a pretrained model, you **must** use the vocabulary that was saved alongside the checkpoint to ensure gene–ID alignment.
+
+```python
+from scgpt.tokenizer.gene_tokenizer import GeneVocab
+from pathlib import Path
+
+# Load the vocabulary from a pretrained checkpoint folder
+vocab = GeneVocab.from_file(Path("save/scGPT_human/vocab.json"))
+
+# Add special tokens required for processing
+special_tokens = ["<pad>", "<cls>", "<eoc>"]
+for s in special_tokens:
+    if s not in vocab:
+        vocab.append_token(s)
+vocab.set_default_index(vocab["<pad>"])
+```
+
+Cross-check your data against the vocabulary to retain only genes the model knows:
+
+```python
+import numpy as np
+
+adata.var["id_in_vocab"] = [
+    1 if gene in vocab else -1 for gene in adata.var["gene_name"]
+]
+adata = adata[:, adata.var["id_in_vocab"] >= 0]
+print(f"Matched {np.sum(adata.var['id_in_vocab'] >= 0)} genes in vocabulary")
+```
+
+Sources: [scgpt/tokenizer/gene_tokenizer.py](/scgpt/tokenizer/gene_tokenizer.py#L113-L160), [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb)
+
+### Step 3 — Preprocess and Bin Expression Values
+
+The **Preprocessor** orchestrates a configurable pipeline: filtering → normalization → log1p → HVG selection → binning. Binning converts continuous expression into discrete bins (the first bin is reserved for zeros), which is the format scGPT expects as input.
+
+```python
+from scgpt.preprocess import Preprocessor
+
+preprocessor = Preprocessor(
+    use_key="X",                    # use raw counts from adata.X
+    filter_gene_by_counts=3,        # remove low-count genes
+    normalize_total=1e4,            # depth normalization to 10,000
+    log1p=True,                     # log1p transform
+    subset_hvg=1200,                # keep top 1200 highly variable genes
+    hvg_flavor="seurat_v3",        # HVG selection method
+    binning=51,                     # bin into 51 discrete values
+)
+preprocessor(adata, batch_key="str_batch")
+```
+
+The preprocessor stores results in `adata.layers` — binned values go to `adata.layers["X_binned"]` by default.
+
+| Preprocessor Parameter | Default | Purpose |
+|:---|:---|:---|
+| `filter_gene_by_counts` | `False` | Minimum total counts to keep a gene |
+| `filter_cell_by_counts` | `False` | Minimum total counts to keep a cell |
+| `normalize_total` | `1e4` | Target sum for depth normalization |
+| `log1p` | `False` | Apply log(1+x) transform |
+| `subset_hvg` | `False` | Number of HVGs to retain |
+| `binning` | `None` | Number of discrete bins for quantile binning |
+
+Sources: [scgpt/preprocess.py](/scgpt/preprocess.py#L24-L100), [scgpt/preprocess.py](/scgpt/preprocess.py#L101-L230)
+
+### Step 4 — Tokenize the Data
+
+Tokenization pairs each gene's vocabulary ID with its binned expression value, producing the `(gene_ids, values)` tensor pairs that the Transformer consumes.
+
+```python
+from scgpt.tokenizer import tokenize_and_pad_batch, random_mask_value
+from scipy.sparse import issparse
+
+pad_token = "<pad>"
+pad_value = -2
+mask_value = -1
+max_seq_len = 1201  # n_hvg + 1 (for <cls> token)
+
+input_layer_key = "X_binned"
+all_counts = (
+    adata.layers[input_layer_key].toarray()
+    if issparse(adata.layers[input_layer_key])
+    else adata.layers[input_layer_key]
+)
+genes = adata.var["gene_name"].tolist()
+gene_ids = np.array(vocab(genes), dtype=int)
+
+tokenized = tokenize_and_pad_batch(
+    all_counts,
+    gene_ids,
+    max_len=max_seq_len,
+    vocab=vocab,
+    pad_token=pad_token,
+    pad_value=pad_value,
+    append_cls=True,          # prepend <cls> token
+    include_zero_gene=True,   # include zero-expression genes
+)
+# tokenized["genes"]  → Tensor of gene IDs, shape (n_cells, max_seq_len)
+# tokenized["values"] → Tensor of binned values, shape (n_cells, max_seq_len)
+```
+
+For training, apply random masking to create the masked-language-model objective:
+
+```python
+masked_values = random_mask_value(
+    tokenized["values"],
+    mask_ratio=0.4,
+    mask_value=mask_value,
+    pad_value=pad_value,
+)
+```
+
+Sources: [scgpt/tokenizer/gene_tokenizer.py](/scgpt/tokenizer/gene_tokenizer.py#L293-L400), [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb)
+
+### Step 5 — Load a Pretrained Model
+
+The **TransformerModel** is the central scGPT architecture. When fine-tuning, load the pretrained weights and model config from a checkpoint directory containing `best_model.pt` and `args.json`.
+
+```python
+import json
+import torch
+from scgpt.model import TransformerModel
+from scgpt.utils import load_pretrained
+
+model_dir = Path("save/scGPT_human")
+
+# Read model architecture from the checkpoint's saved config
+with open(model_dir / "args.json", "r") as f:
+    model_configs = json.load(f)
+
+model = TransformerModel(
+    ntoken=len(vocab),
+    d_model=model_configs["embsize"],
+    nhead=model_configs["nheads"],
+    d_hid=model_configs["d_hid"],
+    nlayers=model_configs["nlayers"],
+    nlayers_cls=model_configs["n_layers_cls"],
+    n_cls=1,                             # adjust for your number of cell types
+    vocab=vocab,
+    dropout=0.2,
+    pad_token="<pad>",
+    pad_value=-2,
+    do_mvc=False,
+    do_dab=True,                         # enable domain adversarial for batch correction
+    use_batch_labels=True,
+    num_batch_labels=num_batch_types,
+    input_emb_style="continuous",
+    n_input_bins=51,
+    cell_emb_style="cls",
+    use_fast_transformer=True,
+)
+
+# Load pretrained weights (non-strict: skips mismatched or new heads)
+load_pretrained(model, torch.load(model_dir / "best_model.pt"), strict=False)
+model.eval()
+```
+
+Sources: [scgpt/model/model.py](/scgpt/model/model.py#L21-L153), [scgpt/utils/util.py](/scgpt/utils/util.py#L238-L310)
+
+### Step 6 — Extract Cell Embeddings
+
+With the model loaded and data tokenized, extracting cell embeddings is a single forward pass. The `<cls>` token's output representation serves as the cell-level embedding by default.
+
+```python
+with torch.no_grad():
+    output = model(
+        src=tokenized["genes"],
+        values=tokenized["values"],
+        src_key_padding_mask=tokenized["genes"] == vocab["<pad>"],
+    )
+    cell_embeddings = output["cell_emb"]  # shape: (n_cells, d_model)
+```
+
+These embeddings can then be used for UMAP visualization, clustering, cell-type classification, or any downstream analysis.
+
+> [!TIP]
+> The `cell_emb_style` parameter controls how cell embeddings are extracted from the Transformer output: `"cls"` uses the `<cls>` token position, `"avg-pool"` averages across all gene positions, and `"w-pool"` applies a weighted sum. The pretrained models use `"cls"` — stick with it unless you have a specific reason to change.
+
+Sources: [scgpt/model/model.py](/scgpt/model/model.py#L192-L210), [scgpt/model/model.py](/scgpt/model/model.py#L294-L350)
+
+## Essential API Reference
+
+Below is a quick-reference table of the most frequently used scGPT classes and functions, organized by pipeline stage.
+
+| Stage | Import | Description |
+|:---|:---|:---|
+| **Preprocessing** | `scgpt.preprocess.Preprocessor` | Configurable pipeline: filter → normalize → log1p → HVG → bin |
+| **Vocabulary** | `scgpt.tokenizer.gene_tokenizer.GeneVocab` | Gene symbol ↔ integer ID mapping |
+| **Tokenization** | `scgpt.tokenizer.tokenize_and_pad_batch` | Convert binned expression to (gene_ids, values) tensors |
+| **Masking** | `scgpt.tokenizer.random_mask_value` | Randomly mask values for MLM training objective |
+| **Model** | `scgpt.model.TransformerModel` | Core Transformer with gene/value encoders and task decoders |
+| **Loading** | `scgpt.utils.load_pretrained` | Load checkpoint weights with flash-attn / PyTorch backend compatibility |
+| **Training** | `scgpt.trainer.train` | Training loop with wandb logging |
+| **Seeding** | `scgpt.utils.set_seed` | Set reproducible random seeds across numpy and torch |
+
+Sources: [scgpt/__init__.py](/scgpt/__init__.py#L1-L30), [scgpt/model/__init__.py](/scgpt/model/__init__.py#L1-L12), [scgpt/tokenizer/__init__.py](/scgpt/tokenizer/__init__.py#L1-L2)
+
+## What's Next?
+
+You now have the foundational pipeline running. Here's where to go based on what you want to accomplish:
+
+| Goal | Recommended Path |
+|:---|:---|
+| Explore available pretrained checkpoints and choose the right one | [Pretrained Model Zoo](3-pretrained-model-zoo) |
+| Understand scGPT's design philosophy and architecture at a deeper level | [Overview](1-overview) |
+| Full end-to-end tutorials (integration, annotation, GRN, perturbation) | See the `tutorials/` directory for Jupyter notebooks |
+| Fine-tune scGPT for batch integration via CLI | [examples/finetune_integration.py](/examples/finetune_integration.py) |
+
+
+# Pretrained Model Zoo
+
+
+
+scGPT provides a collection of pretrained checkpoints that serve as starting points for a wide range of single-cell analysis tasks. Each checkpoint encodes knowledge learned from millions of cells during self-supervised pretraining, and can be either used directly for **zero-shot** inference or further **fine-tuned** on your downstream dataset. This page catalogues every available checkpoint, explains what each one contains, and walks you through the mechanics of loading and selecting the right model for your work.
+
+## Available Checkpoints
+
+The table below lists all officially released scGPT checkpoints. The **whole-human** model is the general-purpose default—start there unless your downstream data aligns closely with one of the organ-specific or specialised distributions.
+
+| Model | Training Data | Description | Recommended Use | Download |
+|:------|:-------------|:------------|:----------------|:---------|
+| **whole-human** ★ | 33M normal human cells | Pretrained on the largest and most diverse normal human cell corpus | Default for all tasks; fine-tuning & zero-shot | [Google Drive](https://drive.google.com/drive/folders/1oWh_-ZRdhtoGQ2Fw24HP41FgLoomVo-y) |
+| **continual pretrained** | whole-human + Tabula Sapiens labels | Further supervised with cell-type labels during a continual pretraining stage | Zero-shot cell embedding, integration, reference mapping | [Google Drive](https://drive.google.com/drive/folders/1_GROJTzXiAV8HB4imruOTk6PEGuNOcgB) |
+| **brain** | 13.2M brain cells | Organ-specific pretraining | Brain-focused datasets | [Google Drive](https://drive.google.com/drive/folders/1vf1ijfQSk7rGdDGpBntR5bi5g6gNt-Gx) |
+| **blood** | 10.3M blood & bone marrow cells | Organ-specific pretraining | Hematopoietic / immune datasets | [Google Drive](https://drive.google.com/drive/folders/1kkug5C7NjvXIwQGGaGoqXTk_Lb_pDrBU) |
+| **heart** | 1.8M heart cells | Organ-specific pretraining | Cardiac datasets | [Google Drive](https://drive.google.com/drive/folders/1GcgXrd7apn6y4Ze_iSCncskX3UsWPY2r) |
+| **lung** | 2.1M lung cells | Organ-specific pretraining | Pulmonary datasets | [Google Drive](https://drive.google.com/drive/folders/16A1DJ30PT6bodt4bWLa4hpS7gbWZQFBG) |
+| **kidney** | 814K kidney cells | Organ-specific pretraining | Renal datasets | [Google Drive](https://drive.google.com/drive/folders/1S-1AR65DF120kNFpEbWCvRHPhpkGK3kK) |
+| **pan-cancer** | 5.7M cancer cells (various types) | Pretrained on diverse cancer cell populations | Tumour / cancer-focused datasets | [Google Drive](https://drive.google.com/drive/folders/13QzLHilYUd0v3HTwa_9n4G4yEF-hdkqa) |
+
+> [!TIP]
+> When your fine-tuning dataset shares similar cell-type context with an organ-specific model's training data, that organ-specific checkpoint often converges faster and achieves better performance than the general whole-human model.
+
+Sources: [README.md](/README.md#L56-L72), [tutorials/zero-shot/README.md](/tutorials/zero-shot/README.md#L1-L29)
+
+## Checkpoint Structure
+
+Every downloaded checkpoint folder contains three files that scGPT expects in a fixed layout. Understanding this structure is essential for both loading models correctly and debugging loading failures.
+
+```
+scGPT_human/              ← checkpoint folder (name may vary)
+├── args.json             ← model architecture hyperparameters
+├── best_model.pt         ← model state_dict (PyTorch checkpoint)
+└── vocab.json            ← gene token → index mapping (≈60K genes)
+```
+
+| File | Format | Purpose |
+|:-----|:-------|:--------|
+| `args.json` | JSON dict | Stores architecture dimensions (`embsize`, `nheads`, `d_hid`, `nlayers`, `n_layers_cls`) that override any manually-specified model config during loading |
+| `best_model.pt` | PyTorch `state_dict` | All learned weights—gene embeddings, transformer layers, decoders |
+| `vocab.json` | JSON `{token: index}` | Maps gene symbol strings to integer token IDs; the whole-human vocabulary contains ~60,697 entries |
+
+Sources: [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb#L322-L350), [scgpt/tokenizer/gene_tokenizer.py](/scgpt/tokenizer/gene_tokenizer.py#L106-L127)
+
+## How to Choose a Model
+
+The decision flow below helps you pick the right checkpoint for your scenario. The key differentiator is whether you need **zero-shot** embeddings (no training at all) or are willing to **fine-tune** on your target dataset.
+
+```mermaid
+flowchart TD
+    A[Start: Choose a Checkpoint] --> B{Do you need zero-shot inference?}
+    B -- Yes --> C{Is cell embedding the primary goal?}
+    C -- Yes --> D[Use continual pretrained model]
+    C -- No --> E[Use whole-human model]
+    B -- No --> F{Does your data match an organ-specific domain?}
+    F -- Yes --> G[Use the organ-specific checkpoint]
+    F -- No --> H[Use whole-human model]
+    D --> I[Download & load checkpoint]
+    E --> I
+    G --> I
+    H --> I
+    I --> J{Zero-shot or fine-tune?}
+    J -- Zero-shot --> K[Call embed_data directly]
+    J -- Fine-tune --> L[Load with load_pretrained, then train]
+```
+
+### Zero-shot vs. Fine-tuning at a Glance
+
+| Aspect | Zero-shot | Fine-tuning |
+|:-------|:----------|:------------|
+| Training required | None | 10–30 epochs on your data |
+| Speed | Seconds to minutes | Minutes to hours (GPU) |
+| When to prefer | Quick exploration; limited compute; large pretraining overlap | Small domain shift; best accuracy needed; novel cell types |
+| Recommended model | Continual pretrained (embedding tasks) or whole-human | Organ-specific if available, else whole-human |
+| Output | Cell embeddings stored in `adata.obsm["X_scGPT"]` | Full model with task-specific decoders |
+
+Sources: [tutorials/zero-shot/Tutorial_ZeroShot_Integration.ipynb](/tutorials/zero-shot/Tutorial_ZeroShot_Integration.ipynb#L1-L36), [tutorials/zero-shot/README.md](/tutorials/zero-shot/README.md#L11-L18)
+
+## Loading a Pretrained Model
+
+### Step 1 — Download and Extract
+
+Download your chosen checkpoint folder from the Google Drive link in the table above, and place it in a local directory (e.g., `save/scGPT_human/`).
+
+### Step 2 — Load Vocabulary and Architecture Config
+
+The vocabulary and model dimensions are loaded from the checkpoint's own files, ensuring exact compatibility:
+
+```python
+from pathlib import Path
+from scgpt.tokenizer.gene_tokenizer import GeneVocab
+import json
+
+model_dir = Path("save/scGPT_human")
+vocab_file = model_dir / "vocab.json"
+model_config_file = model_dir / "args.json"
+model_file = model_dir / "best_model.pt"
+
+# Load vocabulary
+vocab = GeneVocab.from_file(vocab_file)
+# Ensure special tokens are present
+special_tokens = ["<pad>", "<cls>", "<eoc>"]
+for s in special_tokens:
+    if s not in vocab:
+        vocab.append_token(s)
+
+# Load architecture config (overrides manual hyperparameters)
+with open(model_config_file, "r") as f:
+    model_configs = json.load(f)
+```
+
+Sources: [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb#L322-L357), [scgpt/tokenizer/gene_tokenizer.py](/scgpt/tokenizer/gene_tokenizer.py#L106-L127)
+
+### Step 3 — Instantiate the Model and Load Weights
+
+Create a `TransformerModel` with the architecture parameters from `args.json`, then call `load_pretrained` to inject the saved weights. The `load_pretrained` utility automatically handles **parameter renaming** between flash-attention and standard PyTorch backends, so you can load the same checkpoint on CPU, GPU, or flash-attention hardware:
+
+```python
+import torch
+from scgpt.model import TransformerModel
+from scgpt.utils import load_pretrained
+
+ntokens = len(vocab)
+model = TransformerModel(
+    ntokens,
+    model_configs["embsize"],       # embedding dimension
+    model_configs["nheads"],        # number of attention heads
+    model_configs["d_hid"],         # feed-forward hidden dimension
+    model_configs["nlayers"],       # number of transformer layers
+    vocab=vocab,
+    dropout=0.2,
+    pad_token="<pad>",
+    pad_value=0,
+    do_mvc=True,                    # enable MVC decoder for integration
+    do_dab=True,                    # enable adversarial batch correction
+    use_batch_labels=True,
+    num_batch_labels=num_batch_types,  # from your dataset
+    domain_spec_batchnorm=True,
+    n_input_bins=51,
+    ecs_threshold=0.8,
+    explicit_zero_prob=True,
+    use_fast_transformer=True,      # flash-attn if available
+    pre_norm=False,
+)
+
+# Load pretrained weights (handles flash-attn ↔ PyTorch key remapping)
+load_pretrained(model, torch.load(model_file), verbose=False)
+model.to(device)
+```
+
+Sources: [scgpt/utils/util.py](/scgpt/utils/util.py#L290-L360), [scgpt/model/model.py](/scgpt/model/model.py#L12-L99), [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb#L672-L697)
+
+### How `load_pretrained` Works Internally
+
+The `load_pretrained` function performs three critical operations automatically:
+
+1. **Backend-aware key renaming** — When flash-attention is not used, attention weight keys like `self_attn.Wqkv.` are renamed to `self_attn.in_proj_` (the standard PyTorch naming). When flash-attention *is* used, the reverse or version-specific renaming rules are applied. This means the same `best_model.pt` file works on any backend.
+
+2. **Prefix filtering** (optional) — If you pass a `prefix` list, only parameters whose keys start with one of those prefixes are loaded. This is useful for partial transfer (e.g., loading only the encoder).
+
+3. **Shape-safe partial loading** — In non-strict mode (the default), parameters whose shapes do not match the current model are silently skipped. This prevents crashes when the downstream task uses a different number of class labels or batch labels than the pretrained model.
+
+```mermaid
+flowchart LR
+    A[best_model.pt] --> B{Detect backend}
+    B -- Flash-attn --> C[Apply flash-attn rename rules]
+    B -- PyTorch std --> D[Apply PyTorch rename rules]
+    C --> E[Filter by prefix?]
+    D --> E
+    E -- Yes --> F[Keep matching keys only]
+    E -- No --> G[Keep all keys]
+    F --> H{Strict mode?}
+    G --> H
+    H -- Yes --> I[Exact match load]
+    H -- No --> J[Shape-safe partial load]
+    I --> K[Model ready]
+    J --> K
+```
+
+Sources: [scgpt/utils/util.py](/scgpt/utils/util.py#L290-L360), [scgpt/model/flash_attn_compat.py](/scgpt/model/flash_attn_compat.py)
+
+## Zero-shot Embedding
+
+For zero-shot applications, you can skip manual model construction and use the high-level `embed_data` function, which handles preprocessing, tokenization, and batched encoding in a single call:
+
+```python
+import scgpt as scg
+
+# Zero-shot embedding — no training required
+embed_adata = scg.tasks.embed_data(
+    adata,
+    model_dir,
+    gene_col="gene_name",
+    batch_key="sample",
+)
+# Embeddings are stored in embed_adata.obsm["X_scGPT"]
+```
+
+The continual pretrained checkpoint is specifically optimised for zero-shot cell embedding tasks—it inherits the whole-human weights and was further supervised with cell-type labels from Tabula Sapiens, which improves the biological structure of the embedding space.
+
+> [!TIP]
+> Zero-shot inference is extremely fast (seconds to minutes) and is a great first step. If the zero-shot results already meet your needs, fine-tuning may be unnecessary.
+
+Sources: [scgpt/tasks/cell_emb.py](/scgpt/tasks/cell_emb.py), [tutorials/zero-shot/Tutorial_ZeroShot_Integration.ipynb](/tutorials/zero-shot/Tutorial_ZeroShot_Integration.ipynb#L100-L200), [tutorials/zero-shot/Tutorial_ZeroShot_Integration_Continual_Pretraining.ipynb](/tutorials/zero-shot/Tutorial_ZeroShot_Integration_Continual_Pretraining.ipynb#L1-L45)
+
+## Vocabulary and Gene Compatibility
+
+Each checkpoint ships with its own `vocab.json` that maps gene symbols to integer token IDs. The whole-human vocabulary covers **60,697 genes**, while organ-specific models may use slightly smaller vocabularies tailored to their tissue. When loading a pretrained model, you **must** use the vocabulary from the same checkpoint folder—mismatched vocabularies will produce incorrect token mappings.
+
+### Cross-checking Genes with Your Dataset
+
+After loading the vocabulary, you should verify how many of your dataset's genes are covered. Genes not found in the vocabulary will be filtered out before fine-tuning:
+
+```python
+adata.var["id_in_vocab"] = [
+    1 if gene in vocab else -1 for gene in adata.var["gene_name"]
+]
+gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
+print(f"Match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
+      f"in vocabulary of size {len(vocab)}.")
+# Keep only genes that exist in the vocabulary
+adata = adata[:, adata.var["id_in_vocab"] >= 0]
+```
+
+A typical PBMC 10K dataset retains approximately 97% of its genes (~3,256 out of 3,346) against the whole-human vocabulary. If your retention rate is significantly lower, verify that your gene naming convention (e.g., Ensembl IDs vs. gene symbols) matches the vocabulary format.
+
+Sources: [tutorials/Tutorial_Integration.ipynb](/tutorials/Tutorial_Integration.ipynb#L322-L340), [scgpt/tokenizer/default_gene_vocab.json](/scgpt/tokenizer/default_gene_vocab.json#L1-L30)
+
+## Model Architecture at a Glance
+
+All checkpoints share the same `TransformerModel` architecture—the differences lie only in the training data and the learned weights. The architecture is configured by the parameters stored in each checkpoint's `args.json`:
+
+| Parameter | Description | Typical Value (whole-human) |
+|:----------|:------------|:---------------------------|
+| `embsize` | Gene & value embedding dimension | 128–512 |
+| `nheads` | Number of multi-head attention heads | 4–8 |
+| `d_hid` | Feed-forward hidden dimension | 128–512 |
+| `nlayers` | Number of transformer encoder layers | 4–12 |
+| `n_layers_cls` | Number of layers in the classification decoder | 3 |
+
+```mermaid
+flowchart TB
+    subgraph Input
+        GE[GeneEncoder] --> TE[Token Embedding]
+        VE[ValueEncoder] --> VE2[Value Embedding]
+    end
+    TE --> SUM["⊕ Combine"]
+    SUM --> DSBN["Domain-Specific BatchNorm"]
+    DSBN --> TX["Transformer Encoder × nlayers"]
+    TX --> EXPR["ExprDecoder — gene expression reconstruction"]
+    TX --> CLS["ClsDecoder — cell type classification"]
+    TX --> MVC["MVCDecoder — masked value prediction for cell emb"]
+    TX --> DAB["AdversarialDiscriminator — batch correction"]
+    TX --> CCE["Contrastive Cell Embedding"]
+    TX --> ECS["Elastic Cell Similarity"]
+```
+
+Sources: [scgpt/model/model.py](/scgpt/model/model.py#L12-L99), [scgpt/model/__init__.py](/scgpt/model/__init__.py#L1-L12)
+
+## Known Limitations
+
+The pretrained models are trained with purely self-supervised objectives (gene expression reconstruction), which means they may **not fully mitigate type II technical batch effects**—distribution shifts driven by sequencing procedures rather than biology. If your downstream task is highly sensitive to batch correction, consider enabling the DAB (Domain Adversarial Batch correction) and DSBN (Domain-Specific Batch Normalisation) objectives during fine-tuning, or evaluate whether the continual pretrained model's supervised cell-type knowledge offers better zero-shot separation.
+
+Sources: [tutorials/zero-shot/README.md](/tutorials/zero-shot/README.md#L22-L29)
+
+## Next Steps
+
+Now that you understand the model zoo and how to load checkpoints, you are ready to apply scGPT to your own data:
+
+- **[Quick Start](2-quick-start)** — End-to-end walkthrough from installation to your first embedding
+- **[Overview](1-overview)** — Broader context on scGPT's architecture and design philosophy
+
+# Latest Updates
+
+
+
+scGPT -- the generative pretrained transformer for single-cell multi-omics from Bo Wang Lab at the University of Toronto -- has been quietly but steadily evolving. Since its [publication in Nature Methods](https://doi.org/10.1038/s41592-024-02201-0) in February 2024, the project has pushed through dependency quagmires, modernized its GPU stack, and begun embracing AI-assisted development workflows. Here is a structured walkthrough of everything that has changed, what it means for users, and what is still unresolved.
+
+---
+
+## A Timeline of Recent Activity
+
+```mermaid
+timeline
+    title scGPT Recent Development Timeline
+    section 2024
+        Jun : Perturbation tutorial notebook update
+        Aug : scipy .A deprecation fix (PR #234)
+    section 2025
+        Mar 30 : v0.2.2 released — relaxed Python dependency
+        Mar 31 : v0.2.4 released — scipy .toarray() migration, Colab fixes
+        Aug 30 : Claude AI GitHub Actions workflows merged
+        Sep 17 : preprocess.py annotation error fix
+        Nov 12 : Colab autoreload fix
+    section 2026
+        Apr 27 : CUDA 12.8 + FlashAttention 2.x support (PR #351)
+        Apr 27 : Claude issue labeling & suggestions workflows merged
+        Jun 02 : torchtext deprecation issue opened (#352)
+```
+
+---
+
+## The Big One: CUDA 12.8 and FlashAttention 2.x Support
+
+The most consequential recent change is [PR #351](https://github.com/bowang-lab/scGPT/commit/cebd6fae655b9c585a4807daa3ac31bb764f06b4), authored by lidanwu and merged on April 27, 2026. This is a structural overhaul of scGPT's attention backend, and it addresses what has been perhaps the single most painful installation problem since the project's inception.
+
+### The Problem It Solves
+
+For over two years, scGPT pinned `flash-attn<1.0.5`, which required CUDA 11.7. This was a constant source of frustration -- see the sprawling [Issue #10](https://github.com/bowang-lab/scGPT/issues/10) on the repo, the cross-filed [flash-attn#1014](https://github.com/Dao-AILab/flash-attention/issues/1014), and the recurring "pip install doesn't work" complaints. The old FlashAttention 1.x API was incompatible with newer CUDA toolkits, and users on modern GPU clusters (A100/H100 with CUDA 12.x) were essentially locked out of the fast attention path.
+
+### What Changed
+
+| Component | Before | After |
+|---|---|---|
+| FlashAttention | 1.x only (`flash-attn<1.0.5`) | FA2-backed `FlashMHA` with FA1 backward compat |
+| CUDA requirement | 11.7 (hard pinned) | 12.8 primary, 11.7 backward compat |
+| `GeneVocab` init | Used `torchtext.vocab` | Clean internal handling |
+| Build system | Mixed | Switched to `setuptools` |
+| Checkpoint loading | Single backend | Auto-detect FA backend, rename ckpt keys |
+
+The PR is careful about **backward compatibility**: older FA1 checkpoints can still be loaded, with a renaming rule that detects mismatched attention backends and adapts on the fly. The mask logic in tests was also aligned, and edge cases in `GeneVocab` initialization were fixed. This is exactly the kind of infra work that is unglamorous but essential -- it unblocks an entire generation of hardware.
+
+---
+
+## Version Bumps: v0.2.2 and v0.2.4
+
+Two PyPI releases landed in quick succession on March 30-31, 2025:
+
+| Version | Date | Key Changes |
+|---|---|---|
+| [0.2.2](https://pypi.org/project/scgpt/) | Mar 30, 2025 | Relaxed Python dependency constraint |
+| [0.2.4](https://pypi.org/project/scgpt/) | Mar 31, 2025 | Replaced `sparse.A` with `.toarray()`, pinned default torch for Colab |
+
+The scipy migration deserves specific attention. The `.A` attribute on sparse matrices was [deprecated in SciPy 1.12](https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.sparse.csr_matrix.A.html), and its removal broke scGPT's preprocessing pipeline. This was first flagged by community contributor Wei Li in [PR #234](https://github.com/bowang-lab/scGPT/commit/63208ba7243f6eb8b1065d7c906c92941be9b398) back in August 2024, but the fix did not propagate to a PyPI release until March 2025 -- an eight-month gap that left users encountering `AttributeError: 'csr_matrix' object has no attribute 'A'` ([Issue #254](https://github.com/bowang-lab/scGPT/issues/254)).
+
+The Colab-specific fixes -- adding default torch version pins and removing `autoreload` magic -- were small but significant quality-of-life improvements. The [Colab install issue](https://github.com/bowang-lab/scGPT/issues/288) had been open since February 2025 with dependency conflicts around `llvmlite` versions.
+
+---
+
+## AI-Assisted Development: Claude GitHub Actions
+
+In a move that is increasingly common across open-source projects, scGPT has integrated Claude AI into its GitHub workflows. [Two workflows were merged](https://github.com/bowang-lab/scGPT/commit/37da072fad0c1f32991ce45f4586dde3e17fbcc5) on August 30, 2025:
+
+- **auto-issue-labeling.yml**: Automatically categorizes new issues by component, type, and priority
+- **auto-issue-suggestions.yml**: Generates context-aware helpful comments on new issues using Claude AI
+
+This was initiated by maintainer Haotian Cui in response to [Issue #325](https://github.com/bowang-lab/scGPT/issues/325), which explicitly requested Claude-powered issue triage. Additionally, a **Claude Code Review** workflow and a **Claude PR Assistant** workflow were added in the same batch.
+
+The practical impact: new issues now get labeled faster, and users receive an initial AI-generated response that can point them to relevant documentation or common solutions. For a project where maintainer response time has been a recurring complaint, this is a pragmatic if imperfect solution.
+
+---
+
+## Ecosystem Expansion: scGPT-spatial
+
+While not part of the main scGPT repository, the Bo Wang Lab released [scGPT-spatial](https://github.com/bowang-lab/scGPT-spatial) in February 2025 as a separate project. It continually pretrains the scGPT backbone on **30 million spatial transcriptomic profiles** (the SpatialHuman30M corpus), introducing:
+
+- A novel **Mixture of Experts (MoE) decoder** for protocol-aware decoding
+- **Spatially-aware sampling** and a **neighborhood-based reconstruction objective**
+- Support for Visium, Visium HD, Xenium, and MERFISH platforms
+
+The [preprint](https://www.biorxiv.org/content/10.1101/2025.02.05.636714v1) has already accumulated 45 citations per [Semantic Scholar](https://www.semanticscholar.org/paper/scGPT-spatial%3A-Continual-Pretraining-of-Single-Cell-Wang-Cui/8468eae54f0cb47f9e40c0c406a76d27cb1b4ef3), signaling strong community interest in extending the scGPT paradigm to spatial data.
+
+---
+
+## Platform Adoption: CZI Virtual Cells
+
+scGPT was selected as one of the inaugural models on the [Chan Zuckerberg Initiative's Virtual Cells Platform](https://virtualcellmodels.cziscience.com/model/scgpt), with a [dedicated quickstart guide](https://virtualcellmodels.cziscience.com/quickstart/scgpt-quickstart) hosted by CZI. The platform provides a standardized model card, quickstart notebook, and integration with the CZ CELLxGENE Census data. This gives scGPT a visibility and accessibility boost that goes beyond the typical GitHub README.
+
+The model is also available on [Hugging Face](https://huggingface.co/tdc/scGPT) via the Therapeutics Data Commons (TDC) interface, which wraps the weights for programmatic access through the `tdc` library.
+
+---
+
+## What Is Still Unresolved
+
+Despite the recent progress, several structural issues remain open and actively discussed:
+
+### The torchtext Time Bomb
+
+[Issue #352](https://github.com/bowang-lab/scGPT/issues/352), opened June 2, 2026, reports that `torchtext.vocab` no longer exposes the `vocab` attribute -- because **torchtext is officially deprecated**. The PyTorch team [archived the repository](https://github.com/pytorch/text/issues/2250) in September 2025, and version 0.18.0 was the final release. scGPT's `GeneVocab` class depends on `torchtext.vocab.Vocab`, which means every new PyTorch installation will eventually break this import path. This is arguably the most urgent technical debt in the codebase right now.
+
+### Dependency Hell Persists
+
+Even with v0.2.4, installing scGPT remains non-trivial. [Issue #333](https://github.com/bowang-lab/scGPT/issues/333) reports `SparseDataset` import errors with recent `anndata` versions. [Issue #330](https://github.com/bowang-lab/scGPT/issues/330) documents how `pip install scgpt` forces a torch upgrade that breaks CUDA compatibility. These are not edge cases -- they represent a fundamental tension between scGPT's pinned transitive dependencies (scvi-tools, torchtext, flash-attn) and the rapid evolution of the scientific Python ecosystem.
+
+### Perturbation Pipeline Gaps
+
+Multiple open issues ([#165](https://github.com/bowang-lab/scGPT/issues/165), [#298](https://github.com/bowang-lab/scGPT/issues/298), [#338](https://github.com/bowang-lab/scGPT/issues/338)) highlight confusion and potential bugs in the perturbation prediction workflow. Issue #338 specifically asks where the iterative gene selection code described in the paper lives -- and whether the attention mask logic matches the published description. The disconnect between the paper's iterative confidence-based selection and the current implementation has not been publicly addressed.
+
+---
+
+## Summary
+
+| Area | Status | Trajectory |
+|---|---|---|
+| GPU/CUDA support | **Improved** -- FA2 + CUDA 12.8 merged | Moving toward modern hardware |
+| PyPI releases | **Active** -- v0.2.4 released Mar 2025 | Infra modernization, but slow cadence |
+| AI-assisted dev | **Adopted** -- Claude Actions live | Faster issue triage, but not a substitute for code reviews |
+| Ecosystem | **Growing** -- scGPT-spatial + CZI platform | The model family is expanding |
+| torchtext dependency | **Critical debt** -- deprecated upstream | Needs a Vocab migration path, soon |
+| Install experience | **Still painful** -- dependency conflicts persist | FA2 helps, but scvi/anndata pins remain a bottleneck |
+| Perturbation docs | **Unclear** -- gap between paper and code | Awaiting maintainer response |
+
+The project is clearly in a "paying down technical debt" phase rather than a "shipping new features" phase. The CUDA 12.8 support is the most meaningful improvement, but the torchtext deprecation and persistent dependency conflicts suggest that scGPT still needs a more aggressive modernization of its packaging and dependency strategy to remain accessible to the average computational biologist.
+
+# Issues and Feedbacks
+
+
+
+scGPT has garnered significant attention since its publication in *Nature Methods* (2024), and with that attention comes a steady stream of user-reported issues, feature requests, and critical feedback. This page consolidates the most prominent themes from the project's GitHub issues, external benchmarks, and community discussions — giving developers a clear picture of where scGPT shines, where it stumbles, and what the community is asking for next.
+
+---
+
+## The Dependency Installation Gauntlet
+
+If there is a single, defining pain point reported by scGPT users, it is **installation**. The issue tracker is littered with dependency conflict reports, and the root cause is structural: scGPT sits at the intersection of PyTorch, flash-attention, scipy, anndata, scvi-tools, and torchtext — a stack where version compatibility is anything but trivial.
+
+### The `flash-attn` Problem
+
+The original installation instruction (`pip install scgpt "flash-attn<1.0.5"`) pinned flash-attention to versions that only support CUDA 11.7. This caused cascading failures on modern GPU environments. The problem was severe enough that it spawned its own issue on the [flash-attention repository](https://github.com/Dao-AILab/flash-attention/issues/1014), where multiple users reported that flash-attn 1.0.4 simply cannot build on newer CUDA/toolchain combinations. One commenter concluded:
+
+> "It's better to just install flash attn with `--no-build-isolation` as a Docker command when building the image."
+
+The April 2026 merge of [PR #351](https://github.com/bowang-lab/scGPT/commit/cebd6fae655b9c585a4807daa3ac31bb764f06b4) finally addressed this by adding **CUDA 12.8 and FlashAttention 2.x compatibility** with backward compatibility to CUDA 11.7 with FA1. This is a welcome and long-overdue fix.
+
+### The `llvmlite` and `orbax` Conflicts
+
+Multiple users reported that `pip install scgpt` fails with `ResolutionImpossible` errors caused by `llvmlite<0.39.0 and >=0.38.0` constraints. See [Issue #284](https://github.com/bowang-lab/scGPT/issues/284), [Issue #288](https://github.com/bowang-lab/scGPT/issues/288), and [Issue #289](https://github.com/bowang-lab/scGPT/issues/289). The same pattern repeated on Google Colab, where the default Python environment made it impossible to satisfy the constraint tree. The version bumps to 0.2.2 and 0.2.4 (March–April 2025) relaxed some of these pins, but users on older versions remain stuck.
+
+### The `anndata` / `scvi-tools` Trap
+
+[Issue #333](https://github.com/bowang-lab/scGPT/issues/333) reports `ImportError: cannot import name 'SparseDataset' from 'anndata._core.sparse_dataset'` after a default `pip install scgpt`. This traces back to anndata 0.12.2 and scvi-tools 0.20.3 being incompatible — a known problem in the [scvi-tools issue tracker](https://github.com/scverse/scvi-tools/issues/2953). [Issue #260](https://github.com/bowang-lab/scGPT/issues/260) documents an even deeper rabbit hole where scvi-tools 0.16.4 requires `pytorch-lightning<1.6`, which in turn depends on `torchtext.legacy`, a module removed in newer torchtext — creating an **impossible dependency graph** across scvi-tools, pytorch-lightning, and torchtext.
+
+### The `scipy.sparse.A` Deprecation
+
+A more targeted but recurring issue: `scipy.sparse.csr_matrix.A` was deprecated in scipy 1.12.0. This broke the `preprocess.py` pipeline. It was first reported in [Issue #254](https://github.com/bowang-lab/scGPT/issues/254) and partially fixed by community PR [Issue #234](https://github.com/bowang-lab/scGPT/commit/63208ba7243f6eb8b1065d7c906c92941be9b398), then properly addressed in [commit 534c023](https://github.com/bowang-lab/scGPT/commit/534c023ff027b9fad2a72fe8132045bb61999274) by switching to `.toarray()`.
+
+### The `torchtext` Deprecation
+
+The newest entry in this saga is [Issue #352](https://github.com/bowang-lab/scGPT/issues/352): `AttributeError: module 'torchtext.vocab' has no attribute 'vocab'`. Torchtext was officially deprecated by PyTorch (last version 0.18.0), and its API has been steadily breaking in newer PyTorch releases. scGPT's `GeneVocab` class inherits from `torchtext.vocab.Vocab`, which means the project is **building its core vocabulary abstraction on a deprecated library**. The recent FA2 PR refactored `GeneVocab.__init__`, but the torchtext dependency itself has not been removed. This is a ticking time bomb.
+
+### The Pickle Problem on CPU
+
+[Issue #282](https://github.com/bowang-lab/scGPT/issues/282) reports `AttributeError: Can't pickle local object 'get_batch_cell_embeddings.<locals>.Dataset'` when running the zero-shot reference mapping tutorial on CPU. The root cause is a locally-defined `Dataset` class inside `get_batch_cell_embeddings`, which Python's `multiprocessing` cannot serialize. This is a classic Python gotcha — the fix would be to hoist the class to module scope, but the issue remains open.
+
+The following timeline summarizes the major installation-related milestones:
+
+```mermaid
+timeline
+    title scGPT Dependency & Installation Timeline
+    2023-09 : flash-attn made optional dependency
+    2024-08 : Community PR fixes scipy .A deprecation
+    2025-01 : llvmlite/orbax conflicts reported on Colab
+    2025-02 : pip install scgpt broken on Colab (multiple issues)
+    2025-03 : v0.2.2 — relaxed Python dependency, .toarray() fix
+    2025-03 : v0.2.4 — default torch versions for Colab notebooks
+    2025-09 : anndata SparseDataset import error reported
+    2026-04 : CUDA 12.8 + FlashAttention 2.x support merged (PR #351)
+    2026-06 : torchtext deprecation causes AttributeError (Issue #352)
+```
+
+**Takeaway:** If you are setting up scGPT today, **pin your dependencies aggressively** or use the latest `main` branch (post-PR #351). Do not rely on the PyPI release alone — it lags behind the fixes on `main`. The project would benefit enormously from a lockfile, a `conda-forge` recipe, or a Docker image that captures a known-good environment.
+
+---
+
+## The Perturbation Prediction Question Mark
+
+Perturbation prediction is one of scGPT's most touted capabilities, but also one of its most questioned. The GitHub issues and external benchmarks tell a surprisingly critical story.
+
+### Code vs. Paper Gap
+
+[Issue #338](https://github.com/bowang-lab/scGPT/issues/338) raises a fundamental question: the paper describes an iterative, confidence-based attention masking mechanism where "scGPT selects the top 1/K genes from the unknown set with the highest prediction confidence to be included as known genes in the next iteration." Yet the user could not find **any iterative code in the repository**. They ask:
+
+> "How is the order of prediction specified in the current implementation: is it determined by attention scores, prediction confidence, or something else? Where is the relevant iterative code?"
+
+This issue has been open since October 2025 without a definitive answer from the maintainers. It echoes a broader frustration: the gap between the paper's descriptions and the actual codebase is wider than users expect.
+
+### The `pert_pad_id` Design Question
+
+[Issue #266](https://github.com/bowang-lab/scGPT/issues/266) (closed) points out that in `generation_model.py`, `pert_pad_id` is set to 0 and used as `padding_idx` for `pert_encoder`. Since `pert_flags` only takes values 0 and 1, setting `padding_idx=0` means **the embedding for non-perturbed genes is always zeroed out**. The user asks whether this is deliberate — effectively, only perturbed genes contribute through `pert_encoder`. This is either a clever design or a subtle bug, and the issue was closed without a clear explanation.
+
+### The `max_seq_len` Problem
+
+[Issue #298](https://github.com/bowang-lab/scGPT/issues/298) raises a more alarming concern: when `max_seq_len` is much smaller than the input gene count, `pert_flag` sampling may produce an **all-zero vector**, meaning the model receives no perturbation signal at all — yet it still predicts post-perturbation expression. The user asks:
+
+> "Without providing the model with perturbation flags, what does the model learn?"
+
+This is a legitimate architectural concern. If perturbation flags are frequently dropped due to sequence truncation, the model may be relying on shortcuts that don't generalize.
+
+### External Benchmark: Foundation Models Underperform
+
+The community concerns are not limited to GitHub. A 2025 paper in *BMC Genomics* by Csendes et al., ["Benchmarking foundation cell models for post-perturbation RNA-seq prediction"](https://pubmed.ncbi.nlm.nih.gov/40269681/), found that:
+
+> "Even the simplest baseline model — taking the mean of training examples — outperformed scGPT and scFoundation."
+
+Furthermore, "basic machine learning models that incorporate biologically meaningful features outperformed scGPT by a large margin." The paper also notes that standard Perturb-Seq benchmark datasets exhibit low perturbation-specific variance, making them suboptimal for evaluation.
+
+Similarly, a [Genome Biology paper by Kedzierska et al. (2025)](https://pubmed.ncbi.nlm.nih.gov/40251685/) ("Zero-shot evaluation reveals limitations of single-cell foundation models") evaluated scGPT in zero-shot settings and concluded:
+
+> "Both Geneformer and scGPT exhibit limited reliability in zero-shot settings and often underperform compared to simpler methods."
+
+A [Reddit thread on r/bioinformatics](https://www.reddit.com/r/bioinformatics/comments/1k3cmpd/what_do_you_think_about_foundation_models_and) summarized the sentiment:
+
+> "scGPT is probably better known in the field... [but] I could barely find actual biology papers among the citations."
+
+### Missing Tutorials for Custom Data
+
+[Issue #165](https://github.com/bowang-lab/scGPT/issues/165) asks how to apply perturbation prediction to non-Perturb-seq data (e.g., 10X tissue datasets). The existing tutorial only covers Adamson/Norman datasets, which are specially formatted. [Issue #271](https://github.com/bowang-lab/scGPT/issues/271) (closed) reports that using `PertData.new_data_process()` fails because `pert_flags` is missing from the processed output. These gaps make it extremely difficult for biologists to apply scGPT to their own perturbation data.
+
+```mermaid
+flowchart TD
+    A["User wants perturbation prediction"] --> B{Using standard Perturb-seq data?}
+    B -->|Yes| C["Tutorial works with caveats"]
+    B -->|No| D["No clear path forward"]
+    C --> E{max_seq_len >> gene count?}
+    E -->|Yes| F["pert_flag may be all zeros"]
+    E -->|No| G["Prediction may work"]
+    F --> H["Model learns without perturbation signal"]
+    D --> I["PertData.new_data_process lacks pert_flags"]
+    I --> J["Dead end without manual workaround"]
+    G --> K["Benchmarked against mean baseline..."]
+    K --> L["...and often loses"]
+```
+
+---
+
+## Preprocessing & Data Pipeline Concerns
+
+### The Binning Randomization Problem
+
+[Issue #319](https://github.com/bowang-lab/scGPT/issues/319) is perhaps the most technically detailed and concerning open issue. The user discovered that the custom `_digitize` function in the binning preprocessing step introduces **randomization** when bin edges contain repeated values (common with quantile-based binning on sparse data):
+
+```python
+rands = np.random.rand(len(x))
+digits = rands * (right_digits - left_digits) + left_digits
+```
+
+This means the same input value can be assigned to different bins across runs, which in sparse single-cell data can "disproportionately affect the resulting feature vector." The user raises three sharp questions:
+
+1. What is the motivation for randomization instead of deterministic `np.digitize`?
+2. Has an ablation study been done with randomization disabled?
+3. **How is this handled during inference?** If randomization is applied at inference, predictions are unstable. If disabled, the input distribution differs from training.
+
+The user provides a concrete example where the same raw values produce different bin assignments on different runs — a reproducibility red flag. **This issue has been open since August 2025 with no maintainer response.**
+
+### Vocabulary Coverage Gaps
+
+[Issue #346](https://github.com/bowang-lab/scGPT/issues/346) (closed) highlights that when fine-tuning the scGPT_Human model on data annotated with a recent GENCODE version (GRCh38 v44), **36.54% of genes are missing from the vocabulary** — mostly lncRNAs and novel transcripts with Ensembl IDs. The user asks whether to fine-tune as-is or train from scratch. This is a structural limitation of any fixed-vocabulary model: as gene annotations evolve, the vocabulary becomes stale.
+
+### Missing Mouse Model
+
+[Issue #347](https://github.com/bowang-lab/scGPT/issues/347) requests resources for training a custom mouse model. Despite the model zoo offering organ-specific human checkpoints, **no mouse model exists**, and there are no guidelines for pretraining on non-human data. This is a significant gap for a substantial portion of the single-cell community.
+
+### Dataset Reproducibility
+
+[Issue #262](https://github.com/bowang-lab/scGPT/issues/262) asks whether the cell type classification datasets (Multiple Sclerosis, Myeloid, hPancreas) are raw counts or already normalized — the documentation does not specify. [Issue #299](https://github.com/bowang-lab/scGPT/issues/299) (closed) asks for the pan-cancer dataset used in Supplementary Figure 2, noting that the 5.7 million cells from cellxgene don't match the figure's cancer types. [Issue #302](https://github.com/bowang-lab/scGPT/issues/302) (closed) asks for clarification on which datasets are used in the perturbation tutorial and how to combine multiple perturbation datasets for fine-tuning.
+
+---
+
+## Fine-Tuning & Model Usage Friction
+
+| Issue | Theme | Status |
+|-------|-------|--------|
+| [#349](https://github.com/bowang-lab/scGPT/issues/349) | How to fine-tune with generative pretraining pipeline on custom data | Open |
+| [#346](https://github.com/bowang-lab/scGPT/issues/346) | Fine-tuning with 36% missing genes from vocabulary | Closed |
+| [#330](https://github.com/bowang-lab/scGPT/issues/330) | `pip install scgpt` upgrades torch, breaking CUDA compatibility | Open |
+| [#282](https://github.com/bowang-lab/scGPT/issues/282) | Pickle error on CPU inference | Open |
+| [#268](https://github.com/bowang-lab/scGPT/issues/268) | Vocabulary/tokenization confusion during embedding generation | Closed |
+
+A common thread across these issues is that **the tutorials and documentation cover happy paths but don't address the messy reality of custom datasets**. Users who deviate from the provided notebooks quickly encounter undocumented edge cases — missing `pert_flags`, vocabulary mismatches, tokenization errors, and pickle failures. The maintainers have been responsive to some issues (the scipy fix, the Colab fixes), but many technical questions — especially around the core model architecture — remain unanswered for months.
+
+---
+
+## Community Sentiment: Hype vs. Reality
+
+The external feedback on scGPT reflects a broader tension in the single-cell foundation model space. The model was published in a top-tier journal, cited hundreds of times, and listed on the [CZI Virtual Cells Platform](https://virtualcellmodels.cziscience.com/model/scgpt). Yet independent evaluations consistently find that **simpler methods often match or exceed its performance**.
+
+A 2025 *Nature Biotechnology* piece by Xie et al., ["Overcoming barriers to the wide adoption of single-cell large language models in biomedical research"](https://pubmed.ncbi.nlm.nih.gov/41131148), explicitly identifies the adoption gap: despite impressive benchmark numbers in the original paper, real-world biologists are not integrating these tools into their workflows. The reasons cited include dependency complexity, lack of interpretability, and the fact that task-specific methods (scVI, Harmony, CellTypist) remain easier to use and often perform just as well.
+
+The CZI model card itself acknowledges key limitations:
+
+> "The model's performance may degrade when analyzing cell types, tissues, or species not well represented in the training data."
+
+> "Specific groups or conditions (e.g., rare diseases or minority populations) may be underrepresented in the dataset, impacting generalizability."
+
+---
+
+## Summary: What the Issues Tell Us
+
+| Category | Core Problem | Severity | Progress |
+|----------|-------------|----------|----------|
+| **Installation** | Cascading dependency conflicts (flash-attn, llvmlite, torchtext, scipy, anndata) | High | Partially addressed (FA2, v0.2.4); torchtext time bomb remains |
+| **Perturbation** | Code-paper gap; pert_flag may be zeroed out; outperformed by baselines | High | No substantive response |
+| **Preprocessing** | Randomized binning breaks reproducibility | Medium-High | No response |
+| **Vocabulary** | Gene annotations evolve; 36%+ genes may be missing; no mouse model | Medium | No mouse model planned |
+| **Documentation** | Tutorials only cover happy paths; dataset provenance unclear | Medium | Minor updates |
+| **Reproducibility** | External benchmarks show simpler methods often win | Structural | Acknowledged in CZI model card |
+
+The honest assessment is this: **scGPT is a pioneering contribution that demonstrated the feasibility of foundation models for single-cell biology, but its software engineering has not kept pace with its scientific ambition.** The dependency graph is fragile, the perturbation module has unresolved architectural questions, the binning pipeline has a reproducibility flaw, and the documentation assumes you're running the provided notebooks verbatim. The recent CUDA 12.8 / FlashAttention 2.x PR and the automated issue-labeling workflows are positive signals, but the project needs sustained investment in robustness and transparency — not just new features — to earn the trust of working biologists.
+
+If you're considering scGPT for a production pipeline, start with the **latest `main` branch**, pin every dependency, validate against simpler baselines (scVI, Harmony), and be prepared to debug the preprocessing pipeline yourself. The model is a powerful idea; the software is still catching up.
+
+# About Contributors
+
+
+
+scGPT is not a solo act -- it's the product of a tightly-knit research group at the intersection of machine learning and computational biology, augmented by a growing open-source community. Understanding *who* built this project and *where they come from* tells you a lot about the decisions baked into the codebase: the emphasis on generative pretraining, the FlashAttention dependency headaches, the academic pacing of releases. Let's pull back the curtain.
+
+## The Lab: Bo Wang Group at University of Toronto
+
+The [bowang-lab](https://github.com/bowang-lab) organization on GitHub is home to scGPT and several related projects. The lab is led by **[Bo Wang](https://medbio.utoronto.ca/faculty/wang)**, who holds a remarkable cluster of titles: Assistant Professor in the Department of Medical Biophysics at the University of Toronto, Chief AI Scientist at University Health Network (UHN), Tier 2 Canada Research Chair in Artificial Intelligence for Medicine, and Canada CIFAR AI Chair at the [Vector Institute](https://vectorinstitute.ai). His PhD is from Stanford's Department of Computer Science, and he has held research positions at Illumina and Genentech -- a background that sits squarely at the boundary of deep ML and genomics, which explains scGPT's dual personality as both a rigorous Nature Methods paper and a somewhat fragile pip install.
+
+As [UHN Research noted](https://www.uhnresearch.ca/news/4-24-2024/generative-ai-for-cellular-insights) when the paper was published:
+
+> "To address this, we wanted to develop a foundation model to employ machine learning to decode and predict single-cell behaviours from sequencing data." -- Bo Wang
+
+Bo Wang is also on the advisory board of Vevo Therapeutics. This industry connection is worth noting -- it partially explains the lab's push toward practical tooling (reference mapping apps, cloud deployments on Superbio.ai) alongside the academic publications.
+
+## The Co-First Authors
+
+### Haotian Cui -- The Architect
+
+If scGPT has a single architect, it's **[Haotian Cui](https://subercui.github.io)**. He completed his **Ph.D. in Computer Science** at the University of Toronto (2019-2024) under Bo Wang's supervision, and scGPT was his doctoral centerpiece. On GitHub, he operates under the handle **@subercui**, and the commit history makes it clear: he is by far the most active contributor to the repository.
+
+His [personal website](https://subercui.github.io) describes his focus as:
+
+> "I am a researcher specializing in **machine learning, genomics, and drug discovery**. My work focuses on developing **large-scale self-supervised models** to enable biological insights and therapeutic discoveries."
+
+Looking at the commit log, Haotian has shouldered the unglamorous work that keeps a research repo alive: [bumping versions](https://github.com/bowang-lab/scGPT/commit/dd6bc1ce4b9ce287b4b36f0acd03e7b0b449170f) (0.2.2, then 0.2.4), [fixing scipy deprecations](https://github.com/bowang-lab/scGPT/commit/534c023ff027b9fad2a72fe8132045bb61999274) (`.A` to `.toarray()`), [relaxing Python dependencies](https://github.com/bowang-lab/scGPT/commit/b9b452a134ff70ceacee8f16758b77bb2e3b08bc), [setting up Claude GitHub Actions workflows](https://github.com/bowang-lab/scGPT/commit/5867896291f10b280176931f349ac0eafc075d26), and [fixing Colab compatibility](https://github.com/bowang-lab/scGPT/commit/05a7c94270277ea08fa48b4f815513a191a32ce9). This is the kind of maintenance grind that rarely earns citations but determines whether a project survives contact with real users.
+
+Beyond scGPT, Haotian's publication record is strikingly broad for a PhD student:
+
+| Project | Venue | Description |
+|---------|-------|-------------|
+| **scGPT** | Nature Methods, 2024 | Foundation model for single-cell multi-omics |
+| **scGPT-spatial** | bioRxiv, 2025 | Continual pretraining for spatial transcriptomics |
+| **LUMI-lab** | bioRxiv, 2025 | Foundation model-driven autonomous lab for mRNA therapeutics |
+| **MethylGPT** | bioRxiv, 2024 | Foundation model for the DNA methylome |
+| **DeepVelo** | Genome Biology, 2024 | Deep learning extends RNA velocity |
+| **AGILE platform** | Nature Communications, 2024 | Deep learning for LNP development for mRNA delivery |
+| **Towards Multimodal Foundation Models** | Nature, 2025 (forthcoming) | Perspective on multimodal foundation models in molecular cell biology |
+
+That last one -- a *Nature* perspective co-authored with researchers from EMBL, ETH Zurich, and UCSF -- signals that Haotian has moved from "building a specific model" to "shaping how the field thinks about foundation models in biology." That's a trajectory worth watching.
+
+### Chloe (Xueqi) Wang -- The Generalist Who Went Spatial
+
+**Chloe Wang** is the other co-first author, a doctoral candidate at TGHRI (Toronto General Hospital Research Institute). In the [UHN Research feature](https://www.uhnresearch.ca/news/4-24-2024/generative-ai-for-cellular-insights), she stated:
+
+> "The release of scGPT models and workflows will be able to accelerate research in cellular biology and beyond, offering a standardized approach for analyzing single-cell omics." -- Chloe Wang
+
+While Haotian drove the core architecture, Chloe has taken the baton on the most significant extension of scGPT: **[scGPT-spatial](https://www.biorxiv.org/content/10.1101/2025.02.05.636714v1)**, a continual pretraining approach that adapts the original scRNA-seq foundation model to spatial transcriptomics. The preprint, co-first-authored by Chloe and Haotian, introduces a 30-million-cell spatial transcriptomics dataset (SpatialHuman30M), a novel Mixture-of-Experts (MoE) decoder, and spatially-aware training objectives. This is not an incremental extension -- it's a fundamental architectural rethink that addresses the spatial blindness of the original scGPT. Bo Wang himself [tweeted](https://x.com/BoWang87/status/1762153505324687461) that Haotian and Chloe are "really the emerging superstars in AI and biology."
+
+## The Core Co-Authors
+
+### Hassaan Maan -- From Single-Cell to Histopathology
+
+**[Hassaan Maan](https://hmaan.ca)** is a fifth-year PhD candidate in the Department of Medical Biophysics at the University of Toronto, co-supervised by Bo Wang, Kieran Campbell, and Michael D. Taylor. He's also a [Vector Institute](https://vectorinstitute.ai) affiliate and a two-time Microsoft Research intern (Immunomics team), where he worked on T-cell receptor repertoire analysis and HLA-interaction modeling.
+
+His personal website describes research spanning "representation learning for single-cell sequencing, spatial transcriptomics, and histopathology data, for tasks such as integration, predictive modeling, and dynamic modeling." Notably, he also developed a COVID-19 genome analysis tool during his internship at the Vector Institute's AI Engineering Team -- a reminder that many of these researchers pivoted between pandemic response and foundation model work during 2020-2022.
+
+Beyond scGPT, Hassaan co-authored **DeepVelo** (Genome Biology, 2024) with Haotian, extending RNA velocity estimation to multi-lineage systems using deep learning.
+
+### Kuan Pang and Fengning Luo
+
+**Kuan Pang** and **Fengning Luo** are both affiliated with the Department of Computer Science at the University of Toronto and the Vector Institute. They appear as co-authors on the original Nature Methods paper but maintain a lower public profile. Based on the paper's acknowledgements and the lab's publication patterns, they contributed to the data curation, model training infrastructure, and benchmarking that underpins the 33-million-cell pretraining run -- the kind of work that is invisible in a commit log but determines whether a paper clears peer review.
+
+### Nan Duan -- The Industry Bridge
+
+**Nan Duan**, listed as a co-author on the Nature Methods paper, is an employee of Microsoft Research. According to the [publication's competing interests statement](https://pubmed.ncbi.nlm.nih.gov/38409223), he "holds equity in the company." His presence on the author list reflects a broader pattern in Bo Wang's lab of maintaining industry collaborations, which also shows up in Haotian's [CodeExp paper at EMNLP 2022](https://subercui.github.io) (co-authored with researchers from Microsoft). The Microsoft connection likely influenced scGPT's use of certain NLP-inspired architectural choices, though the codebase itself has no Microsoft licensing.
+
+## The Community Contributors
+
+Beyond the core lab, scGPT has attracted a handful of external contributors who have quietly improved the project's usability. The commit history tells this story clearly:
+
+```mermaid
+timeline
+    title Community Contributions Timeline
+    2024-08 : Wei Li (davidliwei) fixes deprecated scipy .A attribute
+    2025-03 : Haotian Cui adopts scipy fix repo-wide (.toarray())
+    2025-03 : Version bump to 0.2.2, then 0.2.4
+    2025-08 : Claude[bot] adds auto-issue-labeling workflows
+    2025-09 : Xiao Z fixes annotation error in preprocess.py
+    2025-11 : Haotian Cui fixes Colab autoreload issue
+    2026-04 : Lidanwu adds CUDA 12.8 & FlashAttention 2.x compatibility
+```
+
+### Wei Li -- The Dependency Fixer
+
+**Wei Li** ([@davidliwei](https://github.com/bowang-lab/scGPT/commit/74603ca5d8a2adf2a7420936c73784a1fef01597)) submitted a focused [pull request](https://github.com/bowang-lab/scGPT/commit/63208ba7243f6eb8b1065d7c906c92941be9b398) in August 2024 fixing the deprecated `csr_matrix.A` attribute from newer versions of scipy. As he noted in the commit message:
+
+> "The csr_matrix.A has been depreciated in newer scipy. See https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.sparse.csr_matrix.A.html"
+
+This was exactly the issue that was flooding the issue tracker -- see [Issue #254: `layer_data.A` in `preprocess.py`](https://github.com/bowang-lab/scGPT/issues/254). The fix sat in a PR for months before Haotian merged it and propagated the change across the entire codebase in [March 2025](https://github.com/bowang-lab/scGPT/commit/534c023ff027b9fad2a72fe8132045bb61999274). That lag between community fix and upstream adoption is a familiar pattern in academic-maintained projects.
+
+### Lidanwu -- The FlashAttention 2.x Upgrader
+
+**Lidanwu** authored the most technically substantial recent community contribution: [PR #351](https://github.com/bowang-lab/scGPT/commit/cebd6fae655b9c585a4807daa3ac31bb764f06b4), which adds **CUDA 12.8 and FlashAttention 2.x compatibility** while maintaining backward compatibility with CUDA 11.7 and FlashAttention 1.x. This is a non-trivial engineering feat. The PR touches FlashMHA internals, vocabulary handling, mask logic, and checkpoint loading -- effectively a modernization pass that the core team hadn't gotten to. The 17-commit PR with messages like "FA2-backed FlashMHA," "fix FA1 test," and "ckpt rename rule for mismatched FA backend" suggests this was a careful, iterative effort, not a weekend hack.
+
+This contribution directly addresses what has been scGPT's most persistent installation pain point. The original dependency pin of `flash-attn<1.0.5` (from [May 2023](https://github.com/bowang-lab/scGPT)) locked users into a CUDA version that was already obsolete by 2024, spawning a trail of installation issues ([#288](https://github.com/bowang-lab/scGPT/issues/288), [#289](https://github.com/bowang-lab/scGPT/issues/289), [#284](https://github.com/bowang-lab/scGPT/issues/284), [#330](https://github.com/bowang-lab/scGPT/issues/330)).
+
+### Xiao Z and learning1112
+
+**Xiao Z** fixed [an annotation error in `preprocess.py`](https://github.com/bowang-lab/scGPT/commit/f35fbecdea002d072e03e9c3bbf01bbb3c0cf3ce) in September 2025, and **learning1112** submitted a separate [preprocess.py update](https://github.com/bowang-lab/scGPT/commit/fc038391970ce7e2c9b189e32bdc098a82306318). These are small, surgical fixes from users who encountered problems in the wild and chose to fix them upstream rather than fork. The pattern of both targeting `preprocess.py` is telling -- that file is the first thing users touch, and it's where version incompatibilities surface earliest.
+
+### Claude[bot] -- The Automated Contributor
+
+A curious entry in the commit log is **claude[bot]**, which authored two commits in [August 2025](https://github.com/bowang-lab/scGPT/commit/88ac3f7bd75c4be347f2ed076eb7cbbc1edab196) adding auto issue labeling and suggestion workflows. These were co-authored by Haotian Cui, who opened [Issue #325](https://github.com/bowang-lab/scGPT/issues/325) requesting Claude-based automation for issue triage. The result: every new issue now gets automatically categorized with component, type, and priority labels. It's a pragmatic move for a repo with 350+ issues and limited maintainer bandwidth, though it remains to be seen whether AI-generated suggestions actually reduce the response time on substantive technical questions.
+
+## The Broader Ecosystem
+
+The contributors above don't operate in a vacuum. scGPT is embedded in a broader ecosystem of related projects from the same lab:
+
+| Project | Relation | Status |
+|---------|----------|--------|
+| [scGPT-spatial](https://www.biorxiv.org/content/10.1101/2025.02.05.636714v1) | Continual pretraining extension | Preprint, 2025 |
+| [LUMI-lab](https://subercui.github.io) | Autonomous lab for mRNA therapeutics | Preprint (under review at Cell), 2025 |
+| [MethylGPT](https://subercui.github.io) | Foundation model for DNA methylome | Preprint, 2024 |
+| [DeepVelo](https://subercui.github.io) | Deep learning RNA velocity | Published, Genome Biology, 2024 |
+| [AGILE platform](https://subercui.github.io) | LNP development for mRNA delivery | Published, Nature Communications, 2024 |
+| [CZI Virtual Cells Platform](https://virtualcellmodels.cziscience.com/model/scgpt) | Model card & deployment | Live, hosted by CZI |
+
+The [Chan Zuckerberg Initiative's Virtual Cells Platform](https://virtualcellmodels.cziscience.com/model/scgpt) listing is particularly notable: it means scGPT has been vetted and hosted by one of the largest funders of single-cell biology infrastructure, with a formal model card documenting its 53 million parameters, 512 embedding size, and 12 transformer blocks. The CZI listing also includes explicit documentation of biases, risks, and out-of-scope use cases -- the kind of responsible AI framing that academic repos rarely provide on their own.
+
+## The Maintainer Gap
+
+Here's the honest assessment: scGPT's contributor landscape reveals a structural weakness common to academic open-source projects. **The bus factor is approximately 1.5**. Haotian Cui handles virtually all day-to-day maintenance -- merging PRs, fixing Colab notebooks, bumping versions, setting up CI. Bo Wang provides strategic direction. Everyone else has moved on to next projects (scGPT-spatial, LUMI-lab, MethylGPT).
+
+This explains the chronic latency on issue responses. The [scipy `.A` deprecation](https://github.com/bowang-lab/scGPT/issues/254) was reported in September 2024, fixed by a community PR in August 2024, but not propagated across the codebase until March 2025. The [torchtext deprecation](https://github.com/bowang-lab/scGPT/issues/352) (Issue #352, opened June 2026) still sits open. The [FlashAttention 2.x compatibility](https://github.com/bowang-lab/scGPT/commit/cebd6fae655b9c585a4807daa3ac31bb764f06b4) was a community contribution, not an internal effort.
+
+The scGPT team has built something genuinely important -- one of the first and most cited foundation models for single-cell biology, published in a top venue, adopted by thousands. But the gap between "impactful research artifact" and "well-maintained open-source tool" remains wide. The community contributors (Wei Li, Lidanwu, Xiao Z) are doing the work that keeps scGPT installable on modern hardware. Whether that's sustainable depends on whether the lab invests in dedicated engineering support, or continues to rely on PhD students squeezing maintenance between paper deadlines.
+
+---
+
+*All contributor information sourced from public profiles, GitHub commit history, the [scGPT Nature Methods paper](https://pubmed.ncbi.nlm.nih.gov/38409223), [UHN Research](https://www.uhnresearch.ca/news/4-24-2024/generative-ai-for-cellular-insights), the [bioRxiv preprint](https://www.biorxiv.org/content/10.1101/2023.04.30.538439v2), the [scGPT-spatial preprint](https://www.biorxiv.org/content/10.1101/2025.02.05.636714v1), [CZI Virtual Cells Platform](https://virtualcellmodels.cziscience.com/model/scgpt), and individual personal websites.*

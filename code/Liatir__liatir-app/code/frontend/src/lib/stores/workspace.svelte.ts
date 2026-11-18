@@ -1,0 +1,250 @@
+import { liatir } from '$lib/api';
+import { appStorage } from './app-storage';
+import type { WorkspaceMeta, WorkspacesFile, WorkspaceEnvVar, WorkspaceEnvFile } from '$lib/types/workspace';
+import { tick } from 'svelte';
+
+const WORKSPACES_FILE = 'workspaces.json';
+const ACTIVE_FILE = 'active-workspace.json';
+
+export const SANDBOX_WORKSPACE_ID = '__test__';
+const SANDBOX_WORKSPACE_NAME = 'Sandbox';
+export type SandboxResetLevel = 'demo-files' | 'runs' | 'full';
+export type WorkspaceResetScope = 'runs' | 'all' | 'workspace-switch';
+
+function workspaceEnvPath(id: string) {
+  return `workspaces/${id}/env.json`;
+}
+
+let resetFn: ((scope: WorkspaceResetScope) => void) | null = null;
+let demoInitFn: (() => Promise<void>) | null = null;
+let activateFn: (() => Promise<void>) | null = null;
+
+export function setResetFn(fn: (scope: WorkspaceResetScope) => void) {
+  resetFn = fn;
+}
+
+export function setDemoInitFn(fn: () => Promise<void>) {
+  demoInitFn = fn;
+}
+
+/** Inject workspace-scoped startup work without creating store dependency cycles. */
+export function setActivateFn(fn: () => Promise<void>) {
+  activateFn = fn;
+}
+
+let leaveGuard: (() => Promise<boolean>) | null = null;
+
+/** Ask before leaving a workspace whose leaving would cancel work (same injection pattern). */
+export function setLeaveGuard(fn: () => Promise<boolean>) {
+  leaveGuard = fn;
+}
+
+function createWorkspaceStore() {
+  let workspaces = $state<WorkspaceMeta[]>([]);
+  let activeId = $state<string | null>(null);
+  let previousActiveId = $state<string | null>(null);
+  let envVars = $state<WorkspaceEnvVar[]>([]);
+  let initialized = $state(false);
+  let initStarted = false; // non-reactive guard against concurrent init() calls
+
+  async function persistWorkspaces() {
+    const data: WorkspacesFile = { workspaces };
+    await appStorage.writeText(WORKSPACES_FILE, JSON.stringify(data, null, 2));
+  }
+
+  async function persistActiveId() {
+    await appStorage.writeText(ACTIVE_FILE, JSON.stringify({ id: activeId }));
+  }
+
+  async function persistEnvVars(id: string) {
+    const data: WorkspaceEnvFile = { variables: envVars };
+    await appStorage.writeText(workspaceEnvPath(id), JSON.stringify(data, null, 2));
+  }
+
+  async function loadEnvVars(id: string) {
+    try {
+      if (await appStorage.exists(workspaceEnvPath(id))) {
+        const raw = await appStorage.readText(workspaceEnvPath(id));
+        const parsed: WorkspaceEnvFile = JSON.parse(raw);
+        envVars = parsed.variables ?? [];
+      } else {
+        envVars = [];
+      }
+    } catch {
+      envVars = [];
+    }
+  }
+
+  return {
+    get workspaces() { return workspaces; },
+    get activeId() { return activeId; },
+    get previousActiveId() { return previousActiveId; },
+    get active() { return workspaces.find(w => w.id === activeId) ?? null; },
+    get envVars() { return envVars; },
+    get initialized() { return initialized; },
+    get isSandboxMode() { return activeId === SANDBOX_WORKSPACE_ID; },
+
+    getDataPrefix(): string {
+      return activeId ? `workspaces/${activeId}/` : '';
+    },
+
+    async init() {
+      if (initStarted) return;
+      initStarted = true;
+      try {
+        const api = liatir();
+        if (!api) { initialized = true; return; }
+
+        // Move any legacy app state out of the public data scope before reading.
+        await appStorage.migrate();
+
+        if (await appStorage.exists(WORKSPACES_FILE)) {
+          const raw = await appStorage.readText(WORKSPACES_FILE);
+          const parsed: WorkspacesFile = JSON.parse(raw);
+          if (!Array.isArray(parsed.workspaces)) {
+            throw new Error('Workspace index is invalid: expected a workspaces array');
+          }
+          workspaces = parsed.workspaces;
+        }
+
+        // Auto-create Sandbox workspace if missing
+        if (!workspaces.some(w => w.id === SANDBOX_WORKSPACE_ID)) {
+          const testWs: WorkspaceMeta = {
+            id: SANDBOX_WORKSPACE_ID,
+            name: SANDBOX_WORKSPACE_NAME,
+            createdAt: Date.now(),
+            lastOpenedAt: 0,
+          };
+          workspaces = [...workspaces, testWs];
+          await persistWorkspaces();
+        }
+
+        if (await appStorage.exists(ACTIVE_FILE)) {
+          const raw = await appStorage.readText(ACTIVE_FILE);
+          const parsed = JSON.parse(raw) as { id?: string | null };
+          const savedId = parsed.id ?? null;
+          if (savedId && workspaces.some(w => w.id === savedId)) {
+            activeId = savedId;
+            await loadEnvVars(savedId);
+          }
+        }
+
+        initialized = true;
+      } catch (error) {
+        // Keep persisted data untouched and let the startup recovery screen
+        // offer a real retry. Leaving this latch set would turn a transient
+        // disk/permission failure into a permanent spinner.
+        initialized = false;
+        initStarted = false;
+        throw error;
+      }
+    },
+
+    async create(name: string): Promise<WorkspaceMeta> {
+      const w: WorkspaceMeta = {
+        id: crypto.randomUUID(),
+        name: name.trim() || 'Workspace',
+        createdAt: Date.now(),
+        lastOpenedAt: Date.now(),
+      };
+      workspaces = [w, ...workspaces];
+      await persistWorkspaces();
+      return w;
+    },
+
+    /** Returns false when the user chose to stay in the current workspace. */
+    async switchTo(id: string): Promise<boolean> {
+      if (id !== activeId && leaveGuard && !(await leaveGuard())) return false;
+      resetFn?.('workspace-switch');
+      previousActiveId = activeId;
+      activeId = id;
+      await persistActiveId();
+      await loadEnvVars(id);
+      workspaces = workspaces.map(w =>
+        w.id === id ? { ...w, lastOpenedAt: Date.now() } : w
+      );
+      await persistWorkspaces();
+      if (id === SANDBOX_WORKSPACE_ID) {
+        await demoInitFn?.();
+      }
+      await activateFn?.();
+      await tick();
+      return true;
+    },
+
+    async toggleFavorite(id: string) {
+      if (id === SANDBOX_WORKSPACE_ID) return;
+      workspaces = workspaces.map(w =>
+        w.id === id ? { ...w, favorite: !w.favorite } : w
+      );
+      await persistWorkspaces();
+    },
+
+    async rename(id: string, name: string) {
+      if (id === SANDBOX_WORKSPACE_ID) return;
+      workspaces = workspaces.map(w =>
+        w.id === id ? { ...w, name: name.trim() || w.name } : w
+      );
+      await persistWorkspaces();
+    },
+
+    async delete(id: string) {
+      if (id === SANDBOX_WORKSPACE_ID) return;
+      workspaces = workspaces.filter(w => w.id !== id);
+      await persistWorkspaces();
+      if (activeId === id) {
+        activeId = null;
+        await persistActiveId();
+        envVars = [];
+      }
+      // Remove both the isolated app config and the public Results dir.
+      try { await appStorage.remove(`workspaces/${id}`, true); } catch { /* best effort */ }
+      const api = liatir();
+      if (api) {
+        try { await api.desktop.fs.data.remove(`workspaces/${id}`, true); } catch { /* best effort */ }
+      }
+    },
+
+    async resetSandboxMode(level: SandboxResetLevel = 'full') {
+      const api = liatir();
+
+      if (level === 'demo-files') {
+        await demoInitFn?.();
+        return;
+      }
+
+      if (level === 'runs') {
+        resetFn?.('runs');
+        try { await appStorage.remove(`workspaces/${SANDBOX_WORKSPACE_ID}/analysis-runs`, true); } catch { /* ok */ }
+        // The run directories hold what the index only points at, so resetting one without the
+        // other would leave the sandbox with orphan runs on disk.
+        try { await appStorage.remove(`workspaces/${SANDBOX_WORKSPACE_ID}/runs`, true); } catch { /* ok */ }
+        try { await appStorage.remove(`workspaces/${SANDBOX_WORKSPACE_ID}/execution-runs`, true); } catch { /* ok */ }
+        if (api) {
+          try { await api.desktop.fs.data.remove(`workspaces/${SANDBOX_WORKSPACE_ID}/Results`, true); } catch { /* ok */ }
+          try { await api.invoke('lia_jobs_clear_done', { workspaceId: SANDBOX_WORKSPACE_ID }); } catch { /* ok */ }
+        }
+        return;
+      }
+
+      resetFn?.('all');
+      try { await appStorage.remove(`workspaces/${SANDBOX_WORKSPACE_ID}`, true); } catch { /* ok */ }
+      if (api) {
+        try { await api.desktop.fs.data.remove(`workspaces/${SANDBOX_WORKSPACE_ID}`, true); } catch { /* ok */ }
+      }
+      envVars = [];
+      await demoInitFn?.();
+    },
+
+    async updateEnvVars(vars: WorkspaceEnvVar[]) {
+      envVars = vars;
+      if (activeId) await persistEnvVars(activeId);
+    },
+  };
+}
+
+export const workspaceStore = createWorkspaceStore();
+
+export function getDataPrefix(): string {
+  return workspaceStore.getDataPrefix();
+}

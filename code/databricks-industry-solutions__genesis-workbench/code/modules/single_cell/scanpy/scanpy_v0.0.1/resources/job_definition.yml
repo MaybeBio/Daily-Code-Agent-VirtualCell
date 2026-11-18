@@ -1,0 +1,180 @@
+resources:
+  jobs:
+    scanpy:
+      name: run_scanpy_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        # File-size probe + branching ladder. These six tasks are tiny — they
+        # only read `dbutils.fs.ls(path)[0].size` or compare a number — so
+        # they stay on serverless. Only the analyze_single_h5ad run needs a
+        # real cluster (scanpy peak memory is ~10-15× the on-disk h5ad size
+        # after densification + intermediates).
+        - task_key: check_file_size
+          max_retries: 0
+          disable_auto_optimization: true
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/check_file_size.py
+            base_parameters:
+              data_path: ""
+            source: WORKSPACE
+
+        - task_key: check_small
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: check_file_size
+          condition_task:
+            op: GREATER_THAN
+            left: "{{tasks.check_file_size.values.file_size_gb}}"
+            right: "4"
+
+        - task_key: check_medium
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: check_small
+              outcome: "true"
+          condition_task:
+            op: GREATER_THAN
+            left: "{{tasks.check_file_size.values.file_size_gb}}"
+            right: "7"
+
+        - task_key: check_large
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: check_medium
+              outcome: "true"
+          condition_task:
+            op: GREATER_THAN
+            left: "{{tasks.check_file_size.values.file_size_gb}}"
+            right: "14"
+
+        # The four analyze paths. Each one runs the SAME notebook, but on a
+        # progressively larger memory-optimized node. Rough sizing:
+        #   ≤ 4 GiB  → r5.4xlarge   (128 GiB RAM)  — covers most CELLxGENE PBMC sets
+        #   4-7 GiB  → r5.8xlarge   (256 GiB RAM)
+        #   7-14 GiB → r5.12xlarge  (384 GiB RAM)
+        #   > 14 GiB → r5.24xlarge  (768 GiB RAM)  — last resort; >14 GiB
+        #              jobs should probably switch to rapids-singlecell on GPU.
+        # All clusters auto-terminate (single-node + new_cluster, no
+        # autoscale → terminate-on-finish per Databricks default).
+        - task_key: run_lt_small
+          max_retries: 0
+          depends_on:
+            - task_key: check_small
+              outcome: "false"
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/analyze_single_h5ad.py
+            base_parameters:
+              data_path: ""
+              gene_name_column: ""
+              species: hsapiens
+            source: WORKSPACE
+
+        - task_key: run_lt_medium
+          max_retries: 0
+          depends_on:
+            - task_key: check_medium
+              outcome: "false"
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/analyze_single_h5ad.py
+            base_parameters:
+              data_path: ""
+              gene_name_column: ""
+              species: hsapiens
+            source: WORKSPACE
+
+        - task_key: run_lt_large
+          max_retries: 0
+          depends_on:
+            - task_key: check_large
+              outcome: "false"
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/analyze_single_h5ad.py
+            base_parameters:
+              data_path: ""
+              gene_name_column: ""
+              species: hsapiens
+            source: WORKSPACE
+
+        - task_key: run_gt_large
+          max_retries: 0
+          depends_on:
+            - task_key: check_large
+              outcome: "true"
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/analyze_single_h5ad.py
+            base_parameters:
+              data_path: ""
+              gene_name_column: ""
+              species: hsapiens
+            source: WORKSPACE
+
+        # Failure-finalize. Fires when ANY analyze task fails. Sets the
+        # pre-created MLflow run's `tags.job_status='failed'` so the
+        # Search Past Runs view in the app flips the row from 'started'
+        # (🟩⬜⬜) to 'failed' (🟥). Runs serverless — cheap, ~5 s.
+        - task_key: tag_failed
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: run_lt_small
+            - task_key: run_lt_medium
+            - task_key: run_lt_large
+            - task_key: run_gt_large
+          run_if: AT_LEAST_ONE_FAILED
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/tag_run_failed.py
+            source: WORKSPACE
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: user_email
+          default: ${var.current_user}
+        - name: data_path
+          default: dummy_data_path.h5ad
+        - name: mlflow_experiment
+          default: scanpy_genesis_workbench
+        - name: mlflow_run_name
+          default: scanpy_genesis_workbench
+        - name: mlflow_run_id
+          default: ""
+        - name: gene_name_column
+          default: gene_name
+        - name: min_genes
+          default: 200
+        - name: min_cells
+          default: 3
+        - name: pct_counts_mt
+          default: 5
+        - name: n_genes_by_counts
+          default: 2500
+        - name: target_sum
+          default: 10000
+        - name: n_top_genes
+          default: 2000
+        - name: n_pcs
+          default: 50
+        - name: cluster_resolution
+          default: 0.2
+
+      tags: ${var.common_resource_tags}

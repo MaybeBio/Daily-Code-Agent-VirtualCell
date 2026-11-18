@@ -1,0 +1,68 @@
+resources:
+  jobs:
+    initialize_core_job:
+      name: dbx_gwb_initialize_core
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: initialize_core_task
+          disable_auto_optimization: true
+          notebook_task:
+            notebook_path: ../../notebooks/initialize_core.py
+          max_retries: 0
+
+        - task_key: "setup_permissions"
+          max_retries: 0
+          disable_auto_optimization: true
+          description: "Set up app permissions for Genesis Workbench"
+          notebook_task:
+            notebook_path: "../../library/genesis_workbench/src/genesis_workbench/privilege_management/setup_permissions_notebook.py"
+            base_parameters:
+              catalog_name: "${var.core_catalog_name}"
+              schema_name: "${var.core_schema_name}"
+              initial_admin_user: "${var.admin_user}"
+              default_admin_group: "${var.default_admin_group}"
+              environment: "${bundle.target}"
+          #environment_key: Default
+          timeout_seconds: 600 
+
+        # - task_key: create_non_dab_resources
+        #   notebook_task:
+        #     notebook_path: ../../notebooks/create_non_dab_resources.py
+        #   depends_on:
+        #     - task_key: create_table_task
+
+      environments:
+        - environment_key: Default
+          spec:
+            client: '4'
+            dependencies:
+              - ../../library/genesis_workbench/dist/*.whl
+              - databricks-sdk==0.50.0
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          #default: ${resources.schemas.core_workbench.name}
+          default: ${var.core_schema_name}
+        - name: deploy_model_job_id
+          default: ${resources.jobs.deploy_model_job.id}
+        - name: start_all_endpoints_job_id
+          default: ${resources.jobs.start_all_endpoints_job.id}
+        - name: run_ai_canvas_workflow_job_id
+          default: ${resources.jobs.run_ai_canvas_workflow_job.id}
+        - name: databricks_app_name
+          default: ${var.app_name}
+        - name: dev_user_prefix
+          default: ${var.dev_user_prefix}       
+        - name: admin_usage_dashboard_id
+          default: ${resources.dashboards.genesis_workbench.id}       
+                
+        # - name: application_secret_scope
+        #   default: ${resources.secret_scopes.dbx_gwb_secret_scope.name}
+
+      tags: ${var.common_resource_tags}

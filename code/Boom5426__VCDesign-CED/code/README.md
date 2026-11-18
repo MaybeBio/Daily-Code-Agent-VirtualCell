@@ -1,0 +1,222 @@
+<a id="top"></a>
+
+<div align="center">
+
+<h1>VCDesign</h1>
+<h3>Finite-Budget Intervention Design for Virtual Cells</h3>
+
+<p>
+  <a href="https://boom5426.github.io/VCDesign-CED/"><img alt="Project website" src="https://img.shields.io/badge/project-website-082D39?logo=githubpages&logoColor=white"></a>
+  <img alt="Single-cell" src="https://img.shields.io/badge/scope-single--cell-7B61FF?logo=cell&logoColor=white">
+  <img alt="Intervention design" src="https://img.shields.io/badge/task-intervention%20design-008C95?logo=target&logoColor=white">
+  <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/pyproject.toml"><img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white"></a>
+  <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/paper/VCDesign.pdf"><img alt="Paper PDF" src="https://img.shields.io/badge/paper-PDF-B31B1B?logo=adobeacrobatreader&logoColor=white"></a>
+  <a href="https://huggingface.co/datasets/Boom5426/VCDesign"><img alt="Hugging Face dataset" src="https://img.shields.io/badge/data-Hugging%20Face-FFD21E?logo=huggingface&logoColor=black"></a>
+</p>
+
+<p><strong>Rank the experiments worth running, not just the intervention identity.</strong></p>
+
+<p><strong>English</strong> · <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/README_zh-CN.md">简体中文</a></p>
+
+<p>
+  <a href="https://boom5426.github.io/VCDesign-CED/">🌐 Project website</a> ·
+  <a href="#quick-start">🚀 Quick start</a> ·
+  <a href="#how-it-works">🧭 How it works</a> ·
+  <a href="https://huggingface.co/datasets/Boom5426/VCDesign">🤗 Data</a> ·
+  <a href="#reproduce">🧪 Reproduce</a> ·
+  <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/paper/VCDesign.pdf">📄 Paper</a>
+</p>
+
+</div>
+
+**VCDesign** formulates cellular intervention design as finite-budget ranking over a variable candidate set. A solver ranks feasible interventions for a source-to-target transition; evaluation scores the executable top-$B$ prefix using independently measured held-out outcomes. In this CRISPRi benchmark, utility measures the direction of the transcriptomic response. **VCDesign-CED** combines direct candidate scoring with effects inferred from historical perturbation measurements and biological knowledge when a candidate's own response is absent from the CED effect atlas.
+
+<p align="center">
+  <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/paper/VCDesign.pdf"><img src="https://github.com/Boom5426/VCDesign-CED/raw/HEAD/assets/vcdesign_overview.png" alt="VCDesign framework: finite-budget candidate ranking, outcome-based evaluation, and Candidate Effect Distillation for response-unseen deployment" width="960"></a>
+  <br>
+  <sub>VCDesign framework and VCDesign-CED reference realization · Figure 1 · <a href="https://github.com/Boom5426/VCDesign-CED/blob/HEAD/paper/VCDesign.pdf">Read the paper ↗</a></sub>
+</p>
+
+<a id="how-it-works"></a>
+
+## ✨ From prediction to design
+
+<table>
+  <tr>
+    <td valign="top" width="33%">
+      <b>🎯 Rank a candidate set</b><br><br>
+      Score a variable set of feasible interventions for a requested source-to-target transition and select the top-B prefix.
+    </td>
+    <td valign="top" width="33%">
+      <b>🧪 Evaluate decisions by outcomes</b><br><br>
+      Exclude the query identity and grade selected candidates using independently measured held-out outcomes.
+    </td>
+    <td valign="top" width="33%">
+      <b>🧬 Transfer to unmeasured candidates</b><br><br>
+      Distill historical responses into an effect predictor using STRING and MAP-KG candidate knowledge.
+    </td>
+  </tr>
+</table>
+
+### Choose the information regime
+
+| Candidate information at decision time | Recommended route |
+| :--- | :--- |
+| Measured candidate responses are available | Direct response-profile retrieval |
+| Candidate responses are unavailable | VCDesign-CED predicted-effect scoring |
+
+Both routes use the same downstream decision interface: a candidate pool, an experimental budget, and outcome-based evaluation.
+
+### What the manuscript establishes
+
+- In three held-out cellular contexts, masking candidate responses from the CED atlas gives a pooled paired BU@20 gain of `+0.0492` over the same base scorer and, among 20 selections, `1.11` more top-5% candidates on average.
+- When candidate responses have been measured in other contexts, direct profile retrieval scores higher than VCDesign-CED (pooled BU@20 `0.675` versus `0.508`).
+- Response masking applies to the CED atlas, not to all prior supervision: the fixed base scorer was trained on 68% of masked candidate identities. The manuscript also reports a base-scorer-unseen subset and a locked K562 identity test.
+
+These are retrospective results for transcriptomic directional prioritization, not prospective evidence of improved biological endpoints. The unit-direction held-context configuration was selected on the same evaluation pools and fixed before external baselines were run; the K562 configuration was fixed before its locked split was scored.
+
+<a id="quick-start"></a>
+
+## 🚀 Quick start
+
+**Python 3.11 is required.** The bundled demo is synthetic and does not download biological data.
+
+```bash
+git clone https://github.com/Boom5426/VCDesign-CED.git
+cd VCDesign-CED
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[model,data,dev]"
+python examples/ced_demo.py
+python -m pytest -q
+```
+
+> [!NOTE]
+> The demo checks response-basis construction, ridge effect prediction, missing-knowledge handling, and score fusion. Its scores are a software smoke test, not a biological result.
+
+<details>
+<summary><b>Install the exact tested CPU environment</b></summary>
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-cpu.txt
+python -m pip install -e . --no-deps
+```
+
+For GPU training, install the PyTorch 2.4 build appropriate for the local CUDA system, then install the remaining dependencies from `requirements.txt`.
+
+</details>
+
+## 🧠 Candidate Effect Distillation
+
+CED learns a deliberately simple transfer map:
+
+```text
+historical perturbation responses ──► response basis
+                                      ▲
+STRING + MAP-KG candidate features ──► ridge effect predictor
+                                      │
+unmeasured candidate knowledge ──────► predicted effect ──► target alignment
+```
+
+The deployment candidate's measured response is never an input. Candidates missing all supported knowledge modalities receive the frozen all-missing score defined by the protocol.
+
+### Corrections made after external review
+
+Two defects in the submitted implementation were reported by a reviewer and are corrected here.
+
+- **Ridge penalty selection.** The submitted selection cut cross-validation folds over row indices and fitted one response basis over every row before the folds were cut. A gene with rows in several training contexts could therefore sit on both sides of a fold, and held-out responses shaped the basis their own prediction was reconstructed in. `src/gene_open_inverse/revision_v1/grouped_fit.py` cuts folds over gene identities and refits the basis inside each fold, and `four_context_v1.predictors.fit` uses it by default. `selection="frozen"` reproduces the submitted selection. On every pool checked, the three held-out contexts of the main analysis with their masking folds and the K562 pool of the vocabulary-size curve, the selected penalty is unchanged, so those numbers stand. The held-out cosine recorded during selection changes because it is measured on gene folds, and each selection record names the selection that produced it. The K562 Candidate Effect Distillation entry point keeps the submitted selection; its pool has one row per gene, so its folds are already gene folds, but its basis is fitted before the folds are cut. `revision_v1/test_grouped_fit.py` shows the submitted folds splitting 173 gene identities on a synthetic pool where the corrected folds split none.
+- **Fusion normalization.** The two branches are standardized per query row over every column they are given, which in the published runs is the whole scored pool rather than the evaluated subset of it. The code always did this; the submitted manuscript equation described it imprecisely, and the revision states it as implemented. `four_context_v1.evaluate.fuse` now says which pool it standardizes over. The PDF in `paper/` is the earlier build.
+
+The fusion normalization is also available as an option. `four_context_v1.evaluate.fuse(base, effect, standardize_over=mask)` standardizes both branches over the columns selected by a boolean mask or an index array only, and returns 0.0 elsewhere, so those columns must not be graded. `python -m gene_open_inverse.open_vocab_generalization_v1.poolsize --packs PACKS --output OUT --standardize subset` does the same inside every subsample of the vocabulary-size curve. The defaults, `standardize_over=None` and `--standardize pool`, are the computation described above and reproduce the published numbers. Tests 61 to 63 in `four_context_v1/test_protocol.py` cover the option.
+
+The protocol checks in `revision_v1`, `external_baselines_v1` and `open_vocab_generalization_v1` now fail their test under pytest when they do not hold; before, only their standalone runners reported a failure. `requirements-cpu.txt` installs the CPU build of PyTorch.
+
+`release/VCDesign_ICLR2027_code/` is the code as submitted and is left unchanged, so the two versions can be compared.
+
+## 🌍 Evaluation contexts
+
+| Context | Perturbation setting | Role |
+| :--- | :--- | :--- |
+| **K562** | CRISPRi Perturb-seq | Primary genome-scale setting |
+| **RPE1** | CRISPRi Perturb-seq | Cross-context evaluation |
+| **HepG2** | CRISPRi Perturb-seq | External cellular context |
+| **Jurkat** | CRISPRi Perturb-seq | External cellular context |
+
+Exact source versions, variants, and citations are listed in [DATA_SOURCES.md](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/DATA_SOURCES.md).
+
+## 🤗 Data & frozen artifacts
+
+The processed feature matrices, four-context packs, comparator scores, selected checkpoint, run records, and SHA-256 manifest are hosted in the companion dataset:
+
+<p align="center">
+  <a href="https://huggingface.co/datasets/Boom5426/VCDesign"><img alt="Open Boom5426/VCDesign on Hugging Face" src="https://img.shields.io/badge/Open_dataset-Boom5426%2FVCDesign-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black&labelColor=332D00"></a>
+</p>
+
+| Released artifact | Contents |
+| :--- | :--- |
+| `inputs/` | Frozen response, STRING, MAP-KG, candidate-knowledge, and comparator arrays |
+| `checkpoints/` | Selected epoch-8 reference checkpoint |
+| `records/` | Training, selection, evaluation, external-baseline, and verification records |
+| `DATA_MANIFEST.json` | Byte sizes and SHA-256 digests for release verification |
+
+<a id="reproduce"></a>
+
+## 🔁 Reproduce
+
+Download the frozen processed inputs, checkpoints, and run records into the repository root, then verify every released byte:
+
+```bash
+python -m pip install "huggingface_hub>=0.35"
+hf download Boom5426/VCDesign --repo-type dataset --local-dir . \
+  --include 'inputs/**' 'checkpoints/**' 'records/**' 'DATA_MANIFEST.json'
+python tools/verify_processed_data.py --root .
+```
+
+Train the primary base scorer with an explicit, new output directory:
+
+```bash
+python -m gene_open_inverse.final_clean_model_v1.train \
+  --config configs/paper_run_v1.json \
+  --output outputs/final_clean_train \
+  --device cuda
+```
+
+The training command refuses to overwrite an existing output directory. The frozen reference checkpoint is `checkpoints/final_clean_epoch_008.pt`; its SHA-256 is recorded in both the run configuration and processed-data manifest.
+
+| Goal | Entry point |
+| :--- | :--- |
+| Try CED without external data | [`examples/ced_demo.py`](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/examples/ced_demo.py) |
+| Verify the processed release | [`tools/verify_processed_data.py`](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/tools/verify_processed_data.py) |
+| Inspect the frozen run contract | [`configs/paper_run_v1.json`](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/configs/paper_run_v1.json) |
+| Run the complete command sequence | [REPRODUCE.md](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/REPRODUCE.md) |
+| Understand the source tree | [PROJECT_STRUCTURE.md](https://github.com/Boom5426/VCDesign-CED/blob/HEAD/PROJECT_STRUCTURE.md) |
+
+## 🗂️ Repository map
+
+```text
+src/gene_open_inverse/
+├── candidate_effect_distillation_v1/  CED basis, predictor, fusion, evaluation
+├── final_clean_model_v1/              base scorer, selection, locked evaluation
+├── four_context_v1/                   K562/RPE1/HepG2/Jurkat data contracts
+├── external_baselines_v1/             comparator adapters and reporting
+├── open_vocab_generalization_v1/      masking and open-vocabulary analyses
+├── revision_v1/                       corrections made after external review
+└── model/                             knowledge features and model components
+
+configs/                               portable paper-run configuration
+examples/                              synthetic end-to-end demonstration
+tools/                                 integrity and release utilities
+paper/                                 manuscript PDF
+```
+
+> [!IMPORTANT]
+> GitHub contains the source, configuration, synthetic demo, and manuscript. Large processed inputs and frozen artifacts live in the companion Hugging Face release; raw H5AD matrices remain with their original public repositories.
+
+---
+
+<p align="center">
+  <b>From predicting responses to prioritizing experiments.</b><br>
+  <sub><a href="#top">Back to top ↑</a></sub>
+</p>

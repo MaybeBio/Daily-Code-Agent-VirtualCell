@@ -1,0 +1,127 @@
+resources:
+  jobs:
+    gwas_analysis:
+      name: gwas_glow_analysis
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: prepare_phenotype
+          max_retries: 0
+          job_cluster_key: gwas_spark_cluster
+          notebook_task:
+            notebook_path: ../notebooks/03_prepare_phenotype.py
+            source: WORKSPACE
+
+        - task_key: run_gwas
+          max_retries: 0
+          depends_on:
+            - task_key: prepare_phenotype
+          job_cluster_key: gwas_spark_cluster
+          libraries:
+            - jar: /Volumes/${var.core_catalog_name}/${var.core_schema_name}/libraries/glow-spark3-assembly-2.0.4-SNAPSHOT.jar
+          notebook_task:
+            notebook_path: ../notebooks/04_gwas_analysis.py
+            source: WORKSPACE
+
+        - task_key: save_results
+          max_retries: 0
+          depends_on:
+            - task_key: run_gwas
+          job_cluster_key: gwas_spark_cluster
+          notebook_task:
+            notebook_path: ../notebooks/05_save_results.py
+            source: WORKSPACE
+
+        - task_key: mark_success
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: save_results
+          run_if: ALL_SUCCESS
+          notebook_task:
+            notebook_path: ../notebooks/update_mlflow_status.py
+            source: WORKSPACE
+            base_parameters:
+              mlflow_run_id: "{{job.parameters.mlflow_run_id}}"
+              job_status: "gwas_complete"
+          environment_key: default
+
+        - task_key: mark_failure
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: save_results
+          run_if: AT_LEAST_ONE_FAILED
+          notebook_task:
+            notebook_path: ../notebooks/update_mlflow_status.py
+            source: WORKSPACE
+            base_parameters:
+              mlflow_run_id: "{{job.parameters.mlflow_run_id}}"
+              job_status: "failed"
+          environment_key: default
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: vcf_path
+          default: ""
+        - name: phenotype_path
+          default: ""
+        - name: phenotype_column
+          default: phenotype
+        - name: contigs
+          default: "6"
+        - name: hwe_cutoff
+          default: "0.01"
+        - name: pvalue_threshold
+          default: "0.01"
+        - name: mlflow_run_id
+          default: ""
+        - name: user_email
+          default: ${var.current_user}
+
+      job_clusters:
+        - job_cluster_key: gwas_spark_cluster
+          new_cluster:
+            cluster_name: ""
+            spark_version: 16.4.x-scala2.12
+            spark_conf:
+              # A num_workers:0 cluster MUST be declared single-node (local scheduler), or it comes
+              # up with zero executors and never provisions any — so every Spark action hangs
+              # forever waiting for executors (this was the prepare_phenotype hang). These three
+              # settings (local master + singleNode profile + ResourceClass tag) are what the
+              # original working config had; the serverless-era refactor dropped them.
+              spark.master: "local[*, 4]"
+              spark.databricks.cluster.profile: singleNode
+              spark.sql.codegen.wholeStage: "false"
+            node_type_id: ${var.cpu_node_type}
+            driver_node_type_id: ${var.cpu_node_type}
+            custom_tags:
+              ResourceClass: SingleNode
+              work_type: gwas_analysis
+            enable_elastic_disk: true
+            data_security_mode: SINGLE_USER
+            runtime_engine: STANDARD
+            # Single-node (as this pipeline ran originally). Glow's normalize_variants uses htsjdk,
+            # which opens the FASTA with random-access java.nio — blocked ("Operation not permitted")
+            # against the UC Volumes FUSE from sandboxed Spark executors. Running single-node keeps
+            # normalize in the driver JVM, and 04_gwas_analysis stages the reference to the node's
+            # local disk (DBFS root is disabled here, so the old /dbfs staging is gone).
+            num_workers: 0
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+
+      tags: ${var.common_resource_tags}
+
+      queue:
+        enabled: true

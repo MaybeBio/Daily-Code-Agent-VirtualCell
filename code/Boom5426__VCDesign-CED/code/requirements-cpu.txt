@@ -1,0 +1,5 @@
+-r requirements.txt
+# CPU build of PyTorch. Without this index, pip on Linux installs the CUDA build and several
+# gigabytes of GPU libraries that the CPU verification never uses.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.4.1

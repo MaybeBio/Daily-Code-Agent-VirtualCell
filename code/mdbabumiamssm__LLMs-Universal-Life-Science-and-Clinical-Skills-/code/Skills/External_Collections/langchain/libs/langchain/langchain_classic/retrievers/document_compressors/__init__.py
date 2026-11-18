@@ -1,0 +1,58 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+import importlib
+from typing import Any
+
+from langchain_classic.retrievers.document_compressors.base import (
+    DocumentCompressorPipeline,
+)
+from langchain_classic.retrievers.document_compressors.chain_extract import (
+    LLMChainExtractor,
+)
+from langchain_classic.retrievers.document_compressors.chain_filter import (
+    LLMChainFilter,
+)
+from langchain_classic.retrievers.document_compressors.cohere_rerank import CohereRerank
+from langchain_classic.retrievers.document_compressors.cross_encoder_rerank import (
+    CrossEncoderReranker,
+)
+from langchain_classic.retrievers.document_compressors.embeddings_filter import (
+    EmbeddingsFilter,
+)
+from langchain_classic.retrievers.document_compressors.listwise_rerank import (
+    LLMListwiseRerank,
+)
+
+_module_lookup = {
+    "FlashrankRerank": "langchain_community.document_compressors.flashrank_rerank",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _module_lookup:
+        module = importlib.import_module(_module_lookup[name])
+        return getattr(module, name)
+    msg = f"module {__name__} has no attribute {name}"
+    raise AttributeError(msg)
+
+
+__all__ = [
+    "CohereRerank",
+    "CrossEncoderReranker",
+    "DocumentCompressorPipeline",
+    "EmbeddingsFilter",
+    "FlashrankRerank",
+    "LLMChainExtractor",
+    "LLMChainFilter",
+    "LLMListwiseRerank",
+]
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

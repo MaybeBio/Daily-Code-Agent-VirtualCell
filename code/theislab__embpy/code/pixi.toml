@@ -1,0 +1,675 @@
+# ---------------------------------------------------------------------------
+# Pixi manifest for embpy (https://pixi.sh)
+#
+# Why pixi?
+#   * Fully reproducible environments via pixi.lock (no more "works on my
+#     machine" torch / CUDA / rdkit mismatches).
+#   * Mixes conda-forge and PyPI in one resolver pass -- binary heavyweights
+#     (pytorch, rdkit, pysam, pyarrow) come from conda-forge as pre-built
+#     wheels, everything else from PyPI.
+#   * Cross-platform (linux-64, osx-arm64, osx-64, win-64).
+#
+# Install pixi:  curl -fsSL https://pixi.sh/install.sh | bash
+#
+# Usage:
+#   pixi install                   # resolve + install the default env (CPU)
+#   pixi shell                     # drop into the activated env
+#   pixi run verify                # smoke-test the install
+#   pixi install -e mps            # Apple Silicon env (PyTorch MPS backend)
+#   pixi run -e mps verify-mps     # smoke-test Mac GPU visibility
+#   pixi run -e gpu install        # install the CUDA 12.4 env
+#   pixi shell -e gpu              # activate the CUDA 12.4 env
+#   pixi run -e dev test           # run the test suite in the dev env
+#   pixi run -e docs build-docs    # build the Sphinx docs
+#   pixi install -e alphagenome    # AlphaGenome cloud API client (opt-in)
+#   pixi install -e scooby         # Scooby single-cell DNA model (opt-in, git install)
+# ---------------------------------------------------------------------------
+
+[workspace]
+name = "embpy"
+version = "0.0.1"
+description = "A package for biological embeddings in the perturbation experimental space"
+authors = ["Goncalo Rei Pinto <goncalo.pinto@helmholtz-munich.de>"]
+channels = ["conda-forge", "bioconda", "pytorch", "nvidia"]
+# Only linux-64 gets the CUDA env (no NVIDIA on macOS / Apple Silicon).
+# Apple Silicon uses PyTorch's MPS backend through the conda-forge build.
+platforms = ["linux-64", "osx-arm64"]
+
+# Activation env vars that apply to every `pixi run` / `pixi shell` call.
+# Setting PYTHONNOUSERSITE=1 stops Python from picking up stale packages in
+# ~/.local/lib/pythonX.Y/site-packages (old `pip install --user` leftovers),
+# which otherwise silently shadow the pixi env's numpy/pandas/anndata and
+# cause `_ARRAY_API not found` / `CXXABI_1.3.15 not found` errors.
+[activation.env]
+PYTHONNOUSERSITE = "1"
+
+# ---------------------------------------------------------------------------
+# Core dependencies -- these are available everywhere (CPU and GPU).
+# Binary-heavy packages (rdkit, pysam, pyarrow, pytorch) come from conda-forge
+# so users never hit "error: failed building wheel" issues.
+# ---------------------------------------------------------------------------
+[dependencies]
+python = ">=3.11,<3.14"
+pip = ">=24.0"
+
+# Scientific stack (all pre-built)
+numpy = ">=1.26,<3"
+pandas = ">=2.2"
+scipy = ">=1.11"
+scikit-learn = ">=1.3"
+matplotlib-base = "*"
+seaborn = "*"
+pyarrow = ">=15"
+
+# scverse
+anndata = "*"
+
+# Bioinformatics binaries that are painful via pip
+biopython = "*"
+rdkit = "*"
+pysam = ">=0.22"
+pyensembl = ">=2.3.13"
+
+# HuggingFace + transformers runtime
+huggingface_hub = ">=0.35,<1.0"
+transformers = ">=4.45,<5.0"
+# sentencepiece is required by T5Tokenizer (used by ProtT5 and many other HF
+# models). transformers does NOT pull it in automatically, so add it here.
+sentencepiece = ">=0.1.99"
+# protobuf is needed to load some slow -> fast tokenizer conversions.
+protobuf = ">=3.20"
+ipywidgets = "*"
+requests = "*"
+tqdm = "*"
+
+# ---------------------------------------------------------------------------
+# PyPI-only dependencies (no good conda-forge build available).
+# ---------------------------------------------------------------------------
+[pypi-dependencies]
+# Install the public embpy package editable from this repository.
+embpy = { path = ".", editable = true }
+# pure-Python / PyPI-only deps that embpy imports directly:
+broad-babel = ">=0.1"
+cirpy = "*"
+session-info = "*"
+torch-geometric = ">=2.5"
+
+# ---------------------------------------------------------------------------
+# Features -- toggle these on via `[environments]` below.
+# ---------------------------------------------------------------------------
+
+# CPU-only PyTorch (default). Pulled from conda-forge, which ships pytorch
+# builds for linux-64, osx-arm64, and osx-64. The `pytorch` conda channel
+# itself no longer publishes osx-64 builds of pytorch >= 2.5, so pinning
+# `channel = "pytorch"` here would break macOS installs.
+[feature.cpu.dependencies]
+pytorch = ">=2.5.1,<3.0"
+
+# Apple Silicon GPU support. This intentionally reuses the conda-forge
+# PyTorch build from [feature.cpu]: on osx-arm64 that build exposes
+# torch.backends.mps. The feature exists mostly to give users a discoverable
+# `pixi shell -e mps` / `pixi run -e mps ...` target instead of asking them
+# to remember that the "cpu" env can also see the Mac GPU.
+[feature.mps]
+platforms = ["osx-arm64"]
+
+# CUDA 12.4 PyTorch -- linux-64 only (macOS has no NVIDIA GPUs). The `pytorch`
+# channel is required here because conda-forge doesn't ship the CUDA runtime
+# metapackages (`pytorch-cuda`).
+[feature.gpu]
+platforms = ["linux-64"]
+
+[feature.gpu.dependencies]
+pytorch = { version = ">=2.5.1", channel = "pytorch" }
+pytorch-cuda = { version = "12.4.*", channel = "pytorch" }
+
+# ESM-3 (Evolutionary Scale Modeling). Kept as its own feature because
+# `esm>=3.2.0` hard-pins `transformers<4.48.2`, which conflicts with helical
+# (which needs `transformers>=4.53`). Mirror the transformers pin on the
+# conda side so the solver doesn't pick a newer version that esm can't use.
+[feature.esm3.dependencies]
+transformers = ">=4.45,<4.48.2"
+
+[feature.esm3.pypi-dependencies]
+esm = ">=3.2.0"
+
+# minimol (small-molecule fingerprints). Transitively pulls torch-sparse,
+# which has broken build metadata (missing torch as build dep). Kept opt-in
+# because not everyone needs it, and resolution is slow on macOS.
+[feature.minimol.pypi-dependencies]
+minimol = "*"
+
+# torch-sparse etc. have broken build metadata (don't declare torch as a
+# build dep). Disable build isolation so they inherit the env's torch.
+[feature.minimol.pypi-options]
+no-build-isolation = [
+  "torch-sparse",
+  "torch-scatter",
+  "torch-cluster",
+  "torch-spline-conv",
+  "pyg-lib",
+]
+
+# DNA/RNA sequence model wrappers. borzoi-pytorch pins transformers<4.51.0,
+# enformer-pytorch is permissive. Grouped into an opt-in feature so they don't
+# pin the whole environment's transformers version.
+[feature.seqmodels.dependencies]
+transformers = ">=4.45,<4.51"
+
+[feature.seqmodels.pypi-dependencies]
+borzoi-pytorch = ">=0.4.3"
+enformer-pytorch = ">=0.8.10"
+
+# AlphaGenome (Google DeepMind cloud API client). No local weights are
+# downloaded; inference runs against Google's servers and needs
+# ALPHAGENOME_API_KEY set in the environment. Pure-Python with no CUDA/build
+# requirements -- kept opt-in (rather than folded into default/gpu/dev) so
+# the main envs don't gain a hard dependency on an external API account.
+[feature.alphagenome.pypi-dependencies]
+alphagenome = ">=0.7"
+
+# Scooby (single-cell-resolution DNA sequence model, gagneurlab/scooby).
+# Installed from git because PyPI's `scooby` package name is already taken
+# by an unrelated project (a pyvista/VTK system-report utility) -- the real
+# package has to be pulled from the gagneurlab fork by URL, not by name. It
+# also pulls in a patched `peft` fork via git (scooby's own setup.py) plus
+# `borzoi-pytorch`/`enformer-pytorch`, which pin `transformers<4.51.0` --
+# mirrored on the conda side here like `seqmodels`.
+# Kept as its own standalone environment (see `[environments]` below) so the
+# git-based resolve doesn't slow down or destabilize the main envs.
+[feature.scooby.dependencies]
+transformers = ">=4.45,<4.51"
+
+[feature.scooby.pypi-dependencies]
+snapatac2-scooby = "*"
+scooby = { git = "https://github.com/gagneurlab/scooby.git" }
+
+# ---------------------------------------------------------------------------
+# Evo 2 (Arc Institute long-context DNA LM, StripedHyena 2 architecture via
+# Vortex). Linux-64 + CUDA 12 only.
+#
+# Hardware: needs an Ampere (SM 8.0) GPU or newer. On A100 / H100 the model
+# runs in BF16; FP8 inference requires Ada (SM 8.9) or Hopper (SM 9.0).
+#
+# Heavy native-CUDA transitive deps (flash-attn, mamba-ssm, transformer_engine,
+# vortex-ai) are pulled from PyPI; pre-built wheels exist for common
+# torch+CUDA combos but pip will fall back to building from source if no wheel
+# matches. We provide ninja / cmake / packaging on the conda side to make
+# that fallback succeed.
+#
+# Kept in its own feature because mamba-ssm / transformer_engine versions
+# usually conflict with the helical and esm3 stacks. The `evo2` environment
+# below combines this feature with the standard `gpu` + tutorial deps so
+# notebooks/02_gene_embeddings.ipynb can run section 2.7 (Evo2) end-to-end.
+#
+# Usage:
+#   pixi install -e evo2
+#   sbatch submission_scripts/jupyter_pixi_evo2.sbatch
+# ---------------------------------------------------------------------------
+[feature.evo2]
+platforms = ["linux-64"]
+
+[feature.evo2.system-requirements]
+cuda = "12"
+
+[feature.evo2.dependencies]
+python = ">=3.11,<3.13"
+# Build helpers in case PyPI falls back to compiling flash-attn / mamba-ssm
+# from source (no matching wheel for the resolved torch + CUDA combo).
+ninja = "*"
+cmake = ">=3.20"
+packaging = "*"
+
+[feature.evo2.pypi-dependencies]
+# Pulls vortex-ai, transformer_engine, flash-attn, mamba-ssm transitively.
+evo2 = ">=0.3"
+
+[feature.evo2.pypi-options]
+# These ship pre-built CUDA wheels but their build metadata declares torch
+# only as a runtime dep. If pip falls back to a sdist build, disabling build
+# isolation lets them find the env's pre-installed torch.
+no-build-isolation = ["flash-attn", "mamba-ssm", "transformer_engine"]
+
+# ---------------------------------------------------------------------------
+# Caduceus (Mamba-based long-context DNA LM). Linux-64 + CUDA only.
+#
+# Caduceus models on HF (`kuleshov-group/caduceus-{ph,ps}_seqlen-131k_*`)
+# use `trust_remote_code=True` modeling files that require the Mamba
+# selective-SSM kernels via the `mamba-ssm` PyPI package, which in turn
+# needs the matching `causal-conv1d` CUDA kernels. Both ship pre-built
+# wheels for common torch+CUDA combos; pip falls back to building from
+# source (with ninja/cmake/packaging) if no wheel matches.
+#
+# Kept in its OWN feature/environment because mamba-ssm + causal-conv1d
+# are heavy CUDA-built deps whose torch ABI requirements (and build time)
+# we do not want to inflict on every gpu user. Smaller blast radius than
+# `evo2` (no flash-attn, no transformer_engine, no vortex-ai) -- so we
+# keep them in separate envs even though both ship mamba-ssm.
+#
+# ---------------------------------------------------------------------------
+[feature.caduceus]
+platforms = ["linux-64"]
+
+[feature.caduceus.system-requirements]
+cuda = "12"
+
+[feature.caduceus.dependencies]
+# Match the build helpers Evo2 ships so pip can compile mamba-ssm /
+# causal-conv1d from source if a matching wheel is not available.
+ninja = "*"
+cmake = ">=3.20"
+packaging = "*"
+
+[feature.caduceus.pypi-dependencies]
+# Mamba selective-SSM kernels + the causal 1D convolution helper. Pin to
+# loose 2.x / 1.x ranges; both projects follow strict semver and we want
+# pip to be able to upgrade within the major series when new torch ABIs
+# land. Wheels are published for torch >= 2.1 + CUDA 11.8 / 12.x.
+mamba-ssm = ">=2.2,<3"
+causal-conv1d = ">=1.4,<2"
+
+[feature.caduceus.pypi-options]
+# Both projects declare torch only as a runtime dep in their wheel
+# metadata. If pip cannot find a wheel and falls back to a sdist build,
+# disabling build isolation lets the build pick up the env's torch.
+no-build-isolation = ["mamba-ssm", "causal-conv1d"]
+
+# Boltz-2 (structure-informed protein embeddings). Kept as its own feature +
+# environment because `boltz>=2` hard-pins `numpy<2.0`, which is incompatible
+# with the rest of the stack (modern pytorch / scanpy / anndata are on numpy
+# 2.x). Linux-64 only because boltz uses CUDA kernels via `cuequivariance`.
+[feature.boltz]
+platforms = ["linux-64"]
+
+# Mirror boltz's hard pins on the conda side so the conda solver doesn't pick
+# newer versions that the PyPI `boltz` package can't accept. Without these,
+# pixi will pick e.g. scikit-learn==1.8 and then fail the PyPI resolve.
+# Mirror boltz's hard pins on the conda side. Boltz is VERY strict about these
+# versions (see https://github.com/jwohlwend/boltz/blob/main/pyproject.toml).
+# Without these mirrors, the conda solver picks newer versions that the pypi
+# resolver then rejects.
+[feature.boltz.dependencies]
+# Python: boltz requires 3.10-3.12 (not 3.13 yet).
+python = ">=3.11,<3.13"
+numpy = ">=1.26,<2.0"
+scipy = "==1.13.1"
+scikit-learn = "==1.6.1"
+pandas = ">=2.2.2"
+biopython = "==1.84"
+numba = "==0.61.0"
+pyyaml = "==6.0.2"
+requests = "==2.32.3"
+rdkit = ">=2024.3.2"
+# wandb==0.18.7 (pinned transitively by boltz) requires protobuf<6. Our base
+# asks for protobuf>=3.20 (for sentencepiece/T5 tokenizer conversions), so we
+# just clamp the upper bound here to the last 5.x series.
+protobuf = ">=3.20,<6"
+pytorch = { version = ">=2.5.1", channel = "pytorch" }
+pytorch-cuda = { version = "12.4.*", channel = "pytorch" }
+
+[feature.boltz.pypi-dependencies]
+# `boltz[cuda]` pulls in the CUDA-enabled flash-attention / triton kernels.
+boltz = { version = ">=2.0", extras = ["cuda"] }
+
+# Single-cell foundation models (scGPT, Geneformer, UCE, Tahoe, ...).
+# helical 2.0.0 hard-pins `torch==2.7.0`, `scipy==1.13.1`, `pandas==2.2.2`,
+# `numpy>=2.1.3,<2.3`, and needs `transformers>=4.53`. We mirror those pins on
+# the conda side so the conda solver doesn't pick newer versions that PyPI
+# `helical` can't satisfy.
+#
+# IMPORTANT: pytorch is pulled from conda-forge here (NOT the `pytorch` channel)
+# because the `pytorch` channel does not ship pytorch==2.7. conda-forge's
+# pytorch 2.7.* builds include CUDA support on linux-64, so GPU still works.
+# Helical env is linux-64 only. helical has many brittle PyPI deps (loompy,
+# scib, mamba-ssm) that either don't build on macOS or have no conda-forge
+# packages for osx. Users on Mac should use the CPU default env without
+# helical.
+[feature.helical]
+platforms = ["linux-64"]
+
+# Only mirror the big-ticket hard pins on the conda side. Everything else
+# (accelerate, datasets, einops, loompy, scib, ...) is let through to PyPI so
+# pip's resolver can take helical's own constraints into account without
+# fighting the conda solver.
+[feature.helical.dependencies]
+pytorch = { version = "==2.7.0", channel = "conda-forge" }
+scipy = "==1.13.1"
+transformers = ">=4.53,<5"
+pandas = "==2.2.2"
+numpy = ">=2.1.3,<2.3"
+python = ">=3.11,<3.13"
+# Transitive deps of helical's `datasets==3.6.0` pin. conda's default solve
+# picks versions that violate what datasets==3.6.0 accepts, so we clamp them.
+dill = "<0.3.9"
+fsspec = "<=2025.3.0"
+# Graph-community detection packages pulled in transitively by helical
+# (via scanpy/scib). Their PyPI wheels would compile igraph's C core from
+# source, which needs CMake. Grab pre-built conda-forge binaries instead.
+louvain = "*"
+leidenalg = "*"
+python-igraph = "*"
+# CMake as a build-time fallback in case any other PyPI dep still needs
+# to compile from source.
+cmake = ">=3.20"
+# Tahoe-x1 vendors llm-foundry code that uses the `catalogue` package
+# (spaCy/Thinc-style layer registry) to register attention implementations
+# and norm layers. Not declared by helical's own pyproject.
+catalogue = ">=2.0"
+# Tahoe-x1 also imports `torchmetrics` at module load time (SFTPreMetrics,
+# etc. from the vendored llm-foundry). Not declared by helical either.
+# Conda-forge ships prebuilt wheels compatible with pytorch==2.7.
+torchmetrics = ">=1.0"
+
+[feature.helical.pypi-dependencies]
+helical = "==2.0.0"
+# scvi-tools is used by notebook 12 to produce a scVI VAE latent. It is
+# not a helical dependency, but users often want to compare scVI against
+# the foundation models in the same notebook. Pinned loosely so pip's
+# resolver can pick a version compatible with helical's transformers /
+# torch / numpy / pandas pins.
+scvi-tools = ">=1.2"
+
+# GPU add-on specifically for the helical env. We do NOT reuse the top-level
+# `gpu` feature because that pins pytorch to the `pytorch` channel, which
+# doesn't have pytorch==2.7. Here we just request the CUDA-enabled build of
+# pytorch 2.7 from conda-forge.
+[feature.helical-gpu]
+platforms = ["linux-64"]
+
+# Declare that the TARGET system will have CUDA 12 available, so the solver
+# picks the cuda* build variants of pytorch even when running on a non-GPU
+# build host.
+[feature.helical-gpu.system-requirements]
+cuda = "12"
+
+[feature.helical-gpu.dependencies]
+# Restrict conda-forge pytorch 2.7.0 to its CUDA-enabled build variant.
+pytorch = { version = "==2.7.0", channel = "conda-forge", build = "cuda*" }
+
+# ---------------------------------------------------------------------------
+# Arc Institute foundation models (STATE + Stack).
+# STATE and Stack are encoder-decoder single-cell foundation models whose
+# latent spaces are used as the substrate for flow-matching / cellflow
+# style perturbation pipelines (encode -> predict latent -> decode).
+#
+# They cannot share the `helical` environment because arc-state pins
+# scipy>=1.15, transformers>=4.52.3, numpy>=2.2.6 which are strictly
+# newer than helical's own pins (scipy==1.13.1, transformers<4.53).
+# So we isolate them in their own feature.
+#
+# Usage:
+#   pixi install -e arc-gpu
+#   pixi shell   -e arc-gpu
+# ---------------------------------------------------------------------------
+[feature.arc]
+platforms = ["linux-64"]
+
+[feature.arc.dependencies]
+python = ">=3.11,<3.13"
+# Mirror arc-state's conda-side heavy pins so the solver doesn't
+# unnecessarily compile torch / scipy from PyPI.
+pytorch = { version = ">=2.7.0,<2.8", channel = "conda-forge" }
+scipy = ">=1.15"
+numpy = ">=2.2.6,<2.3"
+scanpy = ">=1.11"
+scikit-learn = ">=1.6.1"
+pandas = ">=2.2.3"
+pyyaml = ">=6.0"
+h5py = ">=3.8"
+hydra-core = ">=1.3.2"
+omegaconf = ">=2.3"
+transformers = ">=4.52.3,<5"
+pytorch-lightning = ">=2.1"
+# Jupyter bits so users can run notebooks inside this env.
+jupyterlab = ">=4.0"
+ipykernel = "*"
+ipywidgets = "*"
+
+[feature.arc.pypi-dependencies]
+# STATE uses the SE-600M encoder + binary decoder head (see
+# state.emb.Inference.decode_from_adata).
+arc-state = ">=0.10"
+# Stack uses the StateICL encoder + in-context generation head (see
+# stack.cli.generation.generate).
+arc-stack = ">=0.1.3"
+# scvi-tools is needed for Stack's data pipeline (it imports scvi at
+# module load time).
+scvi-tools = ">=1.2"
+
+# GPU add-on for the arc env. Same pattern as helical-gpu: declare
+# the CUDA 12 virtual package and restrict pytorch to the cuda* build.
+[feature.arc-gpu]
+platforms = ["linux-64"]
+
+[feature.arc-gpu.system-requirements]
+cuda = "12"
+
+[feature.arc-gpu.dependencies]
+pytorch = { version = ">=2.7.0,<2.8", channel = "conda-forge", build = "cuda*" }
+
+# scanpy / pertpy / lamindb integration
+[feature.scanpy.dependencies]
+scanpy = ">=1.10"
+
+[feature.pertpy.pypi-dependencies]
+pertpy = "*"
+
+[feature.lamindb.pypi-dependencies]
+lamindb = "*"
+
+# Morphology (Cell Painting / image-based assays).
+# Pillow handles basic image I/O.
+[feature.morphology.dependencies]
+pillow = ">=10"
+
+# JUMP Cell Painting data access. Separate feature because jump-portrait has
+# strict s3fs/fsspec version requirements that conflict with newer fsspec.
+# Only included in envs that can actually use it (gpu, default, dev), not
+# helical or boltz.
+[feature.jump.dependencies]
+# jump-portrait pins s3fs<2025, and s3fs requires fsspec to match its version.
+# We must pin fsspec to 2024.x so the s3fs constraint can be satisfied.
+fsspec = ">=2024.6.0,<2025"
+pyarrow = ">=23.0.1"
+# s3fs -> aiobotocore requires wrapt<2.0.0
+wrapt = ">=1.10.10,<2.0.0"
+
+[feature.jump.pypi-dependencies]
+# jump-portrait 0.1.0+ requires pyarrow>=23.0.1 and works with numpy 2.x.
+jump-portrait = ">=0.1.0"
+
+# PPI GNN encoder
+[feature.ppi.dependencies]
+h5py = "*"
+
+# ArcInstitute cell-eval benchmark suite for perturbation prediction reports.
+# Kept as a feature so training/evaluation envs can require the real metric
+# suite while lighter embpy installs can still avoid the extra dependency set.
+[feature.cell_eval.dependencies]
+polars = "*"
+python-igraph = "*"
+scanpy = ">=1.10"
+
+[feature.cell_eval.pypi-dependencies]
+cell-eval = ">=0.7.2"
+
+# Jupyter (used by default/gpu/dev envs so notebooks work everywhere).
+[feature.jupyter.dependencies]
+jupyterlab = ">=4.0"
+ipykernel = "*"
+ipywidgets = "*"
+notebook = "*"
+
+# Docs / Dev: embpy is already installed as the workspace root (see the
+# top-level [pypi-dependencies] block). These per-feature blocks add the
+# corresponding extras on top of that base install.
+[feature.docs.pypi-dependencies]
+embpy = { path = ".", editable = true, extras = ["doc"] }
+
+[feature.dev.pypi-dependencies]
+embpy = { path = ".", editable = true, extras = ["dev", "test"] }
+
+# ---------------------------------------------------------------------------
+# Environments -- named combinations of features.
+# ---------------------------------------------------------------------------
+[environments]
+# Default CPU env for anyone who just wants to try embpy.
+default = { features = ["cpu", "morphology", "jump", "scanpy", "esm3", "seqmodels", "jupyter"], solve-group = "cpu" }
+
+# Apple Silicon env. Same package stack as `default`, but named for the
+# PyTorch MPS backend and exposing MPS-specific helper tasks.
+mps = { features = ["cpu", "mps", "morphology", "jump", "scanpy", "esm3", "seqmodels", "jupyter"] }
+
+# GPU env with CUDA 12.4 PyTorch and everything compatible with the modern
+# transformers/scipy stack. NOTE: helical is NOT here -- it hard-pins
+# transformers==4.49.0 and scipy==1.13.1 which conflicts with the rest of the
+# stack. Use the standalone `helical` environment below if you need it.
+gpu = { features = [
+  "gpu",
+  "morphology",
+  "jump",
+  "scanpy",
+  "pertpy",
+  "ppi",
+  "cell_eval",
+  "lamindb",
+  "esm3",
+  "seqmodels",
+  "jupyter",
+], solve-group = "gpu" }
+
+# Standalone env for helical (single-cell foundation models). helical hard-pins
+# several dependencies (transformers==4.49.0, scipy==1.13.1), so it cannot
+# share a solve-group with the main envs.
+# Usage: pixi install -e helical && pixi shell -e helical
+helical-gpu = { features = ["helical", "helical-gpu", "morphology", "jupyter"] }
+helical-cpu = { features = ["helical", "morphology", "jupyter"] }
+
+# Arc Institute STATE + Stack encoder-decoder models. These hard-pin
+# scipy>=1.15, transformers>=4.52.3, numpy>=2.2.6 and therefore cannot
+# share an env with helical (which pins scipy==1.13.1, transformers<4.53).
+# Usage: pixi install -e arc-gpu && pixi shell -e arc-gpu
+arc-gpu = { features = ["arc", "arc-gpu"] }
+arc-cpu = { features = ["arc"] }
+
+# World-model training env with both Arc STATE and STACK backbones
+# in one place. CURRENTLY DISABLED because Arc's pytorch >=2.7 pins conflict with the channels
+# wired into [feature.gpu] (pixi cannot find a pytorch build that
+# satisfies both at once). The workflow used to depend on it for the
+# `single_replogle_stack` experiments lives elsewhere now: pre-warm
+# the STACK cache once in `arc-gpu` (which has no Borzoi/seqmodels
+# but doesn't need it for the encode pass), then train in `gpu`
+# (which has Borzoi/seqmodels but reads STACK cells from the warmed
+# NPZ). Keep this block commented for the historical record; remove
+# entirely once the upstream pytorch pin is reconciled.
+#
+# gpu-state-stack = { features = [
+#   "gpu", "arc",
+#   "morphology", "jump", "scanpy", "pertpy", "ppi", "lamindb",
+#   "esm3", "seqmodels", "jupyter",
+# ] }
+
+# Opt-in env for MiniMol (molecule GNN). Separate because torch-sparse has
+# broken build metadata and the resolve is slow.
+minimol = { features = ["cpu", "morphology", "minimol", "jupyter"], solve-group = "minimol" }
+
+# Standalone env for Boltz-2 (structure-informed protein embeddings). boltz
+# hard-pins numpy<2.0 which conflicts with the main stack, so it gets its own
+# environment. Linux-64 + CUDA only. Usage:
+#   pixi install -e boltz && pixi shell -e boltz
+boltz = { features = ["boltz", "morphology", "jupyter"] }
+
+# Standalone env for Evo 2 (long-context DNA LM, A100/H100 required).
+# Combines the evo2 feature with the standard tutorial stack so
+# notebooks/02_gene_embeddings.ipynb runs end-to-end including Evo2.
+# Usage:
+#   pixi install -e evo2
+#   sbatch submission_scripts/jupyter_pixi_evo2.sbatch
+evo2 = { features = [
+  "gpu",
+  "evo2",
+  "seqmodels",
+  "morphology",
+  "scanpy",
+  "pertpy",
+  "jupyter",
+] }
+
+# Standalone env for Caduceus (Mamba-based DNA LMs). Mirrors the `gpu`
+# env with the `caduceus` feature for the mamba-ssm + causal-conv1d CUDA
+# kernels Caduceus needs at load time. No solve-group shared with `gpu`
+# because mamba-ssm pins a slightly tighter torch ABI than the seqmodels /
+# esm3 / helical stack would tolerate.
+caduceus = { features = [
+  "gpu",
+  "caduceus",
+  "seqmodels",
+  "morphology",
+  "scanpy",
+  "pertpy",
+  "jupyter",
+] }
+
+# Standalone env for AlphaGenome (cloud API client, no local weights). Kept
+# out of default/gpu/dev so those envs don't gain a hard dependency on an
+# external API account; CPU-only since there's no local inference. Usage:
+#   pixi install -e alphagenome && pixi shell -e alphagenome
+#   export ALPHAGENOME_API_KEY=...
+alphagenome = { features = ["cpu", "alphagenome", "morphology", "jupyter"], solve-group = "cpu" }
+
+# Standalone env for Scooby (single-cell-resolution DNA sequence model).
+# Kept separate from `default`/`gpu` because it installs from a git URL (see
+# `[feature.scooby]` above), which would slow down/destabilize the main
+# solve-groups. GPU only in practice -- Scooby shares Borzoi's trunk, which
+# needs a GPU for reasonable runtime. Usage:
+#   pixi install -e scooby && pixi shell -e scooby
+scooby = { features = ["gpu", "scooby", "morphology", "jupyter"] }
+
+# CPU env that also pulls the docs + dev extras. Useful for tutorial work.
+dev = { features = ["cpu", "morphology", "jump", "scanpy", "cell_eval", "esm3", "seqmodels", "jupyter", "dev", "docs"], solve-group = "cpu" }
+
+# Documentation build env.
+docs = { features = ["cpu", "morphology", "jump", "scanpy", "docs"], solve-group = "cpu" }
+
+# ---------------------------------------------------------------------------
+# Tasks -- shortcuts for common commands (`pixi run <name>`).
+# ---------------------------------------------------------------------------
+[tasks]
+# Quick smoke test that the install actually works.
+verify = "python -c \"from embpy.embedder import BioEmbedder; e = BioEmbedder(device='cpu'); print(f'embpy ok -- device={e.device}, models={len(e.list_available_models())}')\""
+# Jupyter kernel that uses THIS pixi env (so notebooks pick up the pinned deps).
+install-kernel = "python -m ipykernel install --user --name embpy --display-name 'Python (embpy)'"
+# Launch jupyter-lab bound to this env. Override port/host with args:
+#   pixi run jupyter --port 8899 --ip 0.0.0.0
+jupyter = "jupyter lab --no-browser --ip 0.0.0.0"
+# Quick interactive shell for working in the package. It drops you into
+# the activated default env with PYTHONNOUSERSITE=1 already set.
+embpy-shell = { cmd = "bash -c 'cd src/embpy && exec bash -i'", description = "Interactive bash, cwd=src/embpy/" }
+
+[feature.gpu.tasks]
+# GPU smoke test (assumes CUDA is visible: run on a GPU node or with CUDA_VISIBLE_DEVICES set).
+verify-gpu = "python -c \"import torch; from embpy.embedder import BioEmbedder; e = BioEmbedder(device='auto'); print(f'torch={torch.__version__} cuda={torch.cuda.is_available()} device={e.device} gpus={torch.cuda.device_count()}')\""
+# Register the GPU env as a separate jupyter kernel so notebooks can pick it up explicitly.
+install-kernel-gpu = "python -m ipykernel install --user --name embpy-gpu --display-name 'Python (embpy-gpu)'"
+
+[feature.mps.tasks]
+# Apple Silicon smoke test. MPS is not CUDA; torch.cuda.is_available() should
+# remain false on a MacBook, while torch.backends.mps.is_available() should be true.
+verify-mps = "python -c \"import torch; built=hasattr(torch.backends, 'mps') and torch.backends.mps.is_built(); available=hasattr(torch.backends, 'mps') and torch.backends.mps.is_available(); print(f'torch={torch.__version__} mps_built={built} mps_available={available}'); assert available, 'PyTorch MPS is not available in this pixi env'\""
+# Register this env as a separate Jupyter kernel so notebooks can select it explicitly.
+install-kernel-mps = "python -m ipykernel install --user --name embpy-mps --display-name 'Python (embpy-mps)'"
+
+[feature.helical.tasks]
+# Helical backs single-cell foundation models such as scGPT, Geneformer, UCE,
+# Tahoe, and TranscriptFormer. This env is Linux-only and intentionally
+# separate from default/dev/gpu because Helical pins torch/scipy/transformers.
+verify-helical = "python -c \"import importlib.metadata as md; import torch; import helical; from embpy import BioEmbedder; e=BioEmbedder(device='auto'); print(f'helical={md.version(\\\"helical\\\")} torch={torch.__version__} cuda={torch.cuda.is_available()} device={e.device}')\""
+install-kernel-helical = "python -m ipykernel install --user --name embpy-helical --display-name 'Python (embpy-helical)'"
+
+[feature.dev.tasks]
+test = "pytest -xvs tests/"
+lint = { cmd = "ruff check src/ tests/", description = "Ruff check (no autofix -- per user rule)" }
+
+[feature.docs.tasks]
+build-docs = "sphinx-build -M html docs docs/_build"
+clean-docs = "git clean -fdX -- docs"

@@ -1,0 +1,15 @@
+# scGPT's only torchtext use is a token<->index gene vocab (GeneVocab subclasses
+# torchtext.vocab.Vocab). torchtext is discontinued and its libtorchtext.so is
+# ABI-locked to old torch, so instead of installing it we ship a pure-Python
+# torchtext shim (scgpt_shims/torchtext) added via sys.path at registration and
+# mlflow code_paths at serving. That frees scGPT to run on the serverless runtime's
+# modern torch (2.7.1+cu126) with NO torch/torchtext pins here. flash-attn is
+# omitted (no py3.12 wheel) — scGPT falls back to its non-fast-transformer path.
+# scgpt==0.2.4 may still pull a torchtext wheel transitively; the shim shadows it
+# (sys.path[0] at registration, code_paths[0] at serving), so it is never imported.
+numpy==1.26.4
+gdown==5.2.0
+wget==3.2
+ipython==8.15.0
+scgpt==0.2.4
+wandb==0.19.11

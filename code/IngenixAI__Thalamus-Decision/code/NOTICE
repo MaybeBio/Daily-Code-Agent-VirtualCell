@@ -1,0 +1,11 @@
+Thalamus-Decision
+Copyright 2026 Ingenix.ai
+
+Licensed under the Apache License, Version 2.0; see LICENSE.
+
+The model weights are released under the Ingenix.ai License (see the model repositories on Hugging Face) and derive
+from Thalamus-Reasoning-9B and Qwen3.5-9B (Copyright Alibaba Cloud, Apache License 2.0).
+Expression profiles are built and read with the thalamus-reasoning package (github.com/IngenixAI/Thalamus-Reasoning,
+Apache License 2.0), which downloads Geneformer-V2-104M (Theodoris lab, Apache License 2.0) for tr-embed.
+src/thalamus_decision/model.py adapts the packed (varlen) Qwen3.5 forward of the Hugging Face transformers library
+(Apache License 2.0).

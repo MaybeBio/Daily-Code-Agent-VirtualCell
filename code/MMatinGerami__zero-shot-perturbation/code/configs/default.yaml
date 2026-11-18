@@ -1,0 +1,30 @@
+seed: 0
+paths:
+  raw: data/raw
+  processed: data/processed
+  results: results
+contexts:
+  k562: {file: replogle_k562_gwps_raw_bulk.h5ad, kind: bulk}
+  rpe1: {file: replogle_rpe1_raw_bulk.h5ad, kind: bulk}
+  hepg2: {file: nadig_hepg2_raw_singlecell.h5ad, kind: singlecell}
+  jurkat: {file: nadig_jurkat_raw_singlecell.h5ad, kind: singlecell}
+  # X-Atlas/Orion genome-wide screens, reduced by scripts/00_xatlas_pseudobulk.py; the
+  # file is the fixed evaluation subset of single cells (all cells never touch disk)
+  hct116: {file: xatlas/hct116_eval_cells.h5ad, kind: prebuilt}
+  hek293t: {file: xatlas/hek293t_eval_cells.h5ad, kind: prebuilt}
+  # round 9 sources, built by scripts/13_new_contexts.py; used only when a script asks for them
+  h1: {file: h1/h1_eval_cells.h5ad, kind: prebuilt}
+  cd4: {file: cd4/GWCD4i.DE_stats.h5ad, kind: prebuilt}
+evaluation:
+  # single-cell data needed to score like the challenge; hct116 is from a different lab,
+  # protocol and chemistry (X-Atlas), so holding it out is a study-level test as well
+  held_out: [hepg2, jurkat, hct116]
+  # sources added in round 9; off unless a run names them (--extra-sources), so every earlier
+  # table stays reproducible
+  extra_sources: [h1, cd4]
+  n_perturbations: 200
+  max_cells_per_perturbation: 100
+  min_cells_per_perturbation: 50
+  # control cells used per held-out line (half for the model's basal state, half for the
+  # scorer); genome-wide screens release far more than this and the DE tests scale with it
+  max_control_cells: 12000

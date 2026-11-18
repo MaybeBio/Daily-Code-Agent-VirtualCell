@@ -1,0 +1,41 @@
+bundle:
+  name: genesis_workbench_proteinmpnn
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/*.yml
+
+targets:
+  # Serverless GPU (see resources/register_protein_mpnn.yml) needs no per-target
+  # job_cluster / cloud-attribute overrides. Mirrors esm2_embeddings / boltz.
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}

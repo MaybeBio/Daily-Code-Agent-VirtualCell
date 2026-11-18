@@ -1,0 +1,42 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+from typing import Any
+
+from typing_extensions import override
+
+from langchain_classic.base_memory import BaseMemory
+
+
+class SimpleMemory(BaseMemory):
+    """Simple Memory.
+
+    Simple memory for storing context or other information that shouldn't
+    ever change between prompts.
+    """
+
+    memories: dict[str, Any] = {}
+
+    @property
+    @override
+    def memory_variables(self) -> list[str]:
+        return list(self.memories.keys())
+
+    @override
+    def load_memory_variables(self, inputs: dict[str, Any]) -> dict[str, str]:
+        return self.memories
+
+    def save_context(self, inputs: dict[str, Any], outputs: dict[str, str]) -> None:
+        """Nothing should be saved or changed, my memory is set in stone."""
+
+    def clear(self) -> None:
+        """Nothing to clear, got a memory like a vault."""
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

@@ -1,0 +1,143 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC ## Create Vector Search Index
+# MAGIC
+# MAGIC Creates a Databricks Vector Search endpoint and a Delta Sync index
+# MAGIC over the `sequence_embeddings` table for fast ANN similarity search.
+
+# COMMAND ----------
+
+# DBTITLE 1,Install dependencies
+# MAGIC %pip install -q databricks-sdk==0.50.0
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Run utils (declares widgets, creates UC resources)
+# MAGIC %run ./utils
+
+# COMMAND ----------
+
+# DBTITLE 1,Read widget values
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+# COMMAND ----------
+
+# DBTITLE 1,Create Vector Search endpoint
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.vectorsearch import EndpointType
+import time
+
+w = WorkspaceClient()
+
+VS_ENDPOINT_NAME = "gwb_sequence_search_vs_endpoint"
+
+# Create endpoint if it doesn't exist
+try:
+    endpoint = w.vector_search_endpoints.get_endpoint(VS_ENDPOINT_NAME)
+    print(f"Vector Search endpoint '{VS_ENDPOINT_NAME}' already exists (status: {endpoint.endpoint_status})")
+except Exception:
+    print(f"Creating Vector Search endpoint '{VS_ENDPOINT_NAME}'...")
+    
+    w.vector_search_endpoints.create_endpoint(name=VS_ENDPOINT_NAME, endpoint_type=EndpointType.STANDARD)
+    print("Endpoint creation initiated. Waiting for it to become ready...")
+
+# Wait for endpoint to be ready
+for _ in range(60):
+    endpoint = w.vector_search_endpoints.get_endpoint(VS_ENDPOINT_NAME)
+    if endpoint.endpoint_status and endpoint.endpoint_status.state and endpoint.endpoint_status.state.value == "ONLINE":
+        print(f"Endpoint '{VS_ENDPOINT_NAME}' is ONLINE")
+        break
+    print(f"  Status: {endpoint.endpoint_status}. Waiting...")
+    time.sleep(30)
+else:
+    print("WARNING: Endpoint did not come online within 30 minutes. Index creation may still succeed.")
+
+# COMMAND ----------
+
+# DBTITLE 1,Enable Change Data Feed and create index
+
+# Delta Sync index requires Change Data Feed on the source table
+spark.sql(f"ALTER TABLE {catalog}.{schema}.sequence_embeddings SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
+print("Change Data Feed enabled on sequence_embeddings table")
+
+from databricks.sdk.service.vectorsearch import (
+    DeltaSyncVectorIndexSpecRequest,
+    EmbeddingVectorColumn,
+    VectorIndexType,
+    PipelineType,
+)
+
+source_table = f"{catalog}.{schema}.sequence_embeddings"
+index_name = f"{catalog}.{schema}.sequence_embedding_index"
+
+# Idempotent create-or-sync: try to create, and if the index already exists
+# (ResourceAlreadyExists), fall back to a sync. Driving off create() rather than
+# get_index() avoids a flaky get_index throwing on an existing index and then
+# erroring on create — which fails the whole workflow on re-runs.
+try:
+    print(f"Creating Delta Sync index '{index_name}' over {source_table}...")
+    w.vector_search_indexes.create_index(
+        name=index_name,
+        endpoint_name=VS_ENDPOINT_NAME,
+        primary_key="seq_id",
+        index_type=VectorIndexType.DELTA_SYNC,
+        delta_sync_index_spec=DeltaSyncVectorIndexSpecRequest(
+            source_table=source_table,
+            embedding_vector_columns=[
+                EmbeddingVectorColumn(name="embedding", embedding_dimension=1280),
+            ],
+            pipeline_type=PipelineType.TRIGGERED,
+            columns_to_sync=["seq_id"],
+        ),
+    )
+    print(f"Index '{index_name}' created. Initial sync will begin automatically.")
+except Exception as e:
+    if "already exists" in str(e).lower():
+        print(f"Index '{index_name}' already exists. Triggering sync...")
+        try:
+            w.vector_search_indexes.sync_index(index_name=index_name)
+            print("Sync triggered.")
+        except Exception as se:
+            # A Delta Sync index still running its initial (or a previous) sync rejects a new
+            # sync: "Index is not ready to sync yet. Pipeline ... INITIALIZING". That just means a
+            # sync is already in flight — not an error — so tolerate it and fall through to the
+            # readiness wait below instead of failing the task.
+            if "not ready to sync" in str(se).lower() or "initializing" in str(se).lower():
+                print(f"Sync already in progress; skipping redundant trigger ({se}).")
+            else:
+                raise
+    else:
+        raise
+
+# COMMAND ----------
+
+# DBTITLE 1,Wait for index to be ready
+for _ in range(120):
+    index_status = w.vector_search_indexes.get_index(index_name)
+    status = index_status.status
+    if status and status.ready:
+        print(f"Index '{index_name}' is READY")
+        break
+    print(f"  Index status: {status}. Waiting...")
+    time.sleep(30)
+else:
+    print("WARNING: Index did not become ready within 60 minutes. It may still be syncing.")
+
+# COMMAND ----------
+
+# DBTITLE 1,Test query
+print("Running test query to verify index...")
+test_embedding = spark.table(source_table).limit(1).collect()[0]["embedding"]
+
+results = w.vector_search_indexes.query_index(
+    index_name=index_name,
+    columns=["seq_id"],
+    query_vector=test_embedding,
+    num_results=5,
+)
+
+print("Test query results:")
+for row in results.result.data_array:
+    print(f"  {row}")

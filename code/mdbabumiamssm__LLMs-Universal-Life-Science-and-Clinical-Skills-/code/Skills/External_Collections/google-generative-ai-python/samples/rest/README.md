@@ -1,0 +1,42 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Gemini API REST sample code
+
+This directory contains sample code for key features of the API, organised by high level feature.
+
+These samples are embedded in parts of the [documentation](https://ai.google.dev), most notably in the [API reference](https://ai.google.dev/api).
+
+Each file is structured as a runnable script, ensuring that samples are executable and functional. Each filee contains region tags that are used to demarcate the script from the spotlight code. If you are contributing, code within region tags should follow sample code best practices - being clear, complete and concise.
+
+## Contents
+
+| File | Description |
+| ---- | ----------- |
+| [cache.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/cache.sh) | Context caching |
+| [chat.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/chat.sh) | Multi-turn chat conversations |
+| [code_execution.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/code_execution.sh) | Executing code |
+| [configure_model_parameters.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/configure_model_parameters.sh) | Setting model parameters |
+| [controlled_generation.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/controlled_generation.sh) | Generating content with output constraints (e.g. JSON mode) |
+| [count_tokens.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/count_tokens.sh) | Counting input and output tokens |
+| [embed.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/embed.sh) | Generating embeddings |
+| [files.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/files.sh) | Managing files with the File API |
+| [function_calling.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/function_calling.sh) | Using function calling |
+| [models.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/models.sh) | Listing models and model metadata |
+| [safety_settings.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/safety_settings.sh) | Setting and using safety controls |
+| [system_instruction.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/system_instruction.sh) | Setting system instructions |
+| [text_generation.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/text_generation.sh) | Generating text |
+| [tuned_models.sh](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/rest/tuned_models.sh) | Tuned models |
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

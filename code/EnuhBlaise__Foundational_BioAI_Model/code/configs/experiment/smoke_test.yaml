@@ -1,0 +1,19 @@
+# @package _global_
+# Seconds-long end-to-end check that every component wires together.
+defaults:
+  - override /data: synthetic
+  - override /model: small
+  - override /execution: local_cpu
+
+seed: 0
+train:
+  epochs: 2
+  warmup_steps: 10
+data:
+  source: {n_cells: 1200, n_genes: 600, n_donors: 8}
+  n_hvg: 300
+  batch_size: 32
+  tokenizer: {max_genes: 128}
+model:
+  d_model: 64
+  backbone: {n_layers: 2}

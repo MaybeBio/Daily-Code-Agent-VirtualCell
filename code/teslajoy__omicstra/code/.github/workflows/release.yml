@@ -1,0 +1,202 @@
+# release: build, verify, then publish only on a tag.
+#
+# trusted publishing - PyPI is configured to trust THIS workflow in THIS repo,
+# so no API token is stored anywhere. that is the point: a token in a secret is
+# a credential that outlives the person who made it.
+#
+# every step up to and including `verify` runs on a normal push and on
+# workflow_dispatch, so the release path is exercised continuously rather than
+# discovered on tag day. publish is the only step gated on a tag.
+#
+# the working branches are listed alongside main because work lands there for
+# weeks before it merges, and a branch CI never sees is verified on one laptop
+# against one interpreter. publish stays safe: it is gated on `refs/tags/v`, and
+# a push to a branch does not match that.
+#
+# a GLOB for the release line, because the explicit list went stale: `v1.2` was
+# right for a release and silently covered nothing once the work moved to
+# `v1.3-*` branches, so a pushed branch got no CI at all and nothing said so.
+# `scripts/verify_like_ci.sh` now warns when the current branch matches nothing
+# here.
+name: release
+
+on:
+  push:
+    branches: [main, v1.2, "v1.3-*"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "build and verify, publish nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # the floor in pyproject.toml is a claim; this is what tests it. 3.11 is the
+      # lowest supported, 3.14 is what development happens on.
+      matrix:
+        python-version: ["3.11", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python-version }}" }
+
+      # the bare install goes FIRST and on its own. a core dependency shipped as
+      # an extra is invisible once the extras are installed, so this step is the
+      # one that catches it: no extras, and the server still has to run.
+      - name: install with no extras
+        run: |
+          python -m pip install -q --upgrade pip
+          python -m pip install -q -e .
+
+      - name: a bare install REFUSES legibly
+        run: |
+          set -e
+          # serving is half the contract. the other half is that a command which
+          # needs the numerics says so, by name, instead of a traceback - which
+          # is what `omicstra inventory` did until 2026-10-20, because a
+          # module-level numpy import crashed before any step ran and the
+          # per-sample except then reported a missing reader as unreadable DATA.
+          cd /tmp
+          omicstra init --project-dir /tmp/ci_bare > /dev/null
+          mkdir -p /tmp/ci_bare/data/canonical
+          : > /tmp/ci_bare/data/canonical/s1.h5ad
+          # the `platform` step runs BEFORE `shape` and is pure stdlib, so
+          # without a declaration it fails first and the reader is never
+          # reached. every sample must name a defined platform - an undeclared
+          # sample is a halt, not a guess - so the fixture declares one.
+          cat > /tmp/ci_bare/platform.json <<'JSON'
+          {"platforms": {"ci": {}}, "samples": {"s1": "ci"}}
+          JSON
+          set +e
+          out=$(omicstra inventory --project-dir /tmp/ci_bare 2>&1); rc=$?
+          set -e
+          echo "$out"
+          test $rc -ne 0 || { echo "FAIL: a bare install did not refuse"; exit 1; }
+          echo "$out" | grep -q "omicstra\[measure\]" \
+            || { echo "FAIL: the refusal does not name the measure extra"; exit 1; }
+          echo "$out" | grep -qiv "Traceback" \
+            || { echo "FAIL: the refusal is a traceback"; exit 1; }
+          test ! -f /tmp/ci_bare/inventory.json \
+            || { echo "FAIL: wrote an inventory it could not compute"; exit 1; }
+          echo "bare install refuses legibly, names the extra, writes nothing"
+
+      - name: a bare install serves
+        run: |
+          set -e
+          cd /tmp && omicstra --help > /dev/null && echo "cli ok"
+          cd /tmp && python - <<'PY'
+          import asyncio
+          from omicstra.mcp.server import srv
+          tools = asyncio.run(srv.list_tools())
+          assert tools, "no tools served"
+          print("bare install serves", len(tools), "tools")
+          PY
+
+      - name: install the numerics and the test tooling
+        run: python -m pip install -q -e ".[measure,dev]"
+
+      - name: tests
+        run: python -m pytest tests/ -q
+
+      - name: build
+        run: python -m build
+
+      - name: the sdist ships the server and nothing else
+        # it was 192 MB with a virtualenv inside it. an end user installs the
+        # MCP server, not the cohort, the notebooks or the demo video.
+        run: |
+          set -e
+          SD=$(ls dist/*.tar.gz)
+          SZ=$(python -c "import os,sys;print(os.path.getsize(sys.argv[1]))" "$SD")
+          echo "sdist bytes: $SZ"
+          test "$SZ" -lt 2000000 || { echo "sdist over 2 MB"; exit 1; }
+          ! tar tzf "$SD" | grep -E '(^|/)(venv|notebooks|projects|docs|runs|data|site)/' \
+            || { echo "sdist carries something it should not"; exit 1; }
+
+      - name: the contracts travel inside the wheel
+        # configs/ used to sit at repo root, so `pip install omicstra` shipped a
+        # server that could not find its own contracts.
+        run: |
+          set -e
+          for f in data_contract eda_contract routing_contract compute_contract; do
+            unzip -l dist/*.whl | grep -q "omicstra/configs/$f.json" \
+              || { echo "missing $f.json in the wheel"; exit 1; }
+          done
+
+      - name: install the wheel clean and use it from outside the repo
+        run: |
+          set -e
+          python -m venv /tmp/v
+          /tmp/v/bin/pip install -q dist/*.whl
+          cd /tmp && /tmp/v/bin/omicstra --help > /dev/null
+          cd /tmp && /tmp/v/bin/python -c "
+          import json, omicstra
+          from omicstra.settings import settings
+          d = json.loads((settings.configs_dir / 'eda_contract.json').read_text())
+          assert d['checks'], 'contract loaded empty'
+          print('installed package resolves its contracts:', len(d['checks']), 'checks')"
+
+      - name: server.json agrees with the server
+        run: |
+          /tmp/v/bin/python - <<'PY'
+          import asyncio, json, tomllib, pathlib
+          from omicstra.mcp.server import srv
+          sj = json.loads(pathlib.Path("server.json").read_text())
+          meta = sj["_meta"]["io.github.teslajoy/omicstra"]
+          actual = {t.name for t in asyncio.run(srv.list_tools())}
+          assert set(meta["tools"]) == actual, f"drift: {set(meta['tools']) ^ actual}"
+          pj = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          assert sj["version"] == pj, f"{sj['version']} != {pj}"
+          print("server.json matches:", len(actual), "tools at", pj)
+          PY
+        working-directory: ${{ github.workspace }}
+
+      # one artifact, from one version. the wheel is py3-none-any so every matrix
+      # leg builds the same thing, and upload-artifact@v4 rejects duplicate names.
+      # publish therefore uploads exactly what this leg built and verified.
+      - uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        continue-on-error: true
+        with: { name: dist, path: dist/ }
+
+  verify-encode:
+    # the torch-dependent tests: alignment parity, chain execution, and
+    # entry-point routing. the verify job skips them (importorskip) because it
+    # installs only measure+dev. this job installs the encode extra so the
+    # tests that need torch actually run. one python version because torch is
+    # large and the numerics are version-independent.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.14" }
+      - name: install with encode extra
+        run: |
+          python -m pip install -q --upgrade pip
+          python -m pip install -q -e ".[encode,measure,dev]"
+      - name: torch-dependent tests
+        run: |
+          python -m pytest tests/test_alignment_parity.py tests/test_align_chain.py tests/test_align_routing.py -v
+
+  publish:
+    # ONLY on a tag. a version can be deleted from PyPI but never re-uploaded,
+    # so this runs once per version and only after verify has passed.
+    needs: [verify, verify-encode]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # trusted publishing; no token, no secret
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1

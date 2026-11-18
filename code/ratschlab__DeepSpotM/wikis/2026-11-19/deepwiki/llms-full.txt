@@ -1,0 +1,3175 @@
+# Page: Overview
+
+# Overview
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [CITATION.cff](CITATION.cff)
+- [README.md](README.md)
+- [assets/model_overview.png](assets/model_overview.png)
+
+</details>
+
+
+
+DeepSpot-M is a multimodal foundation model designed for **transcriptome-wide virtual spatial transcriptomics** from H&E-stained histology images. By reformulating gene expression prediction as a query-based task rather than a fixed-output classification or regression, DeepSpot-M can predict the expression of thousands of genes—including those not seen during training—across entire whole-slide images (WSIs).
+
+The system bridges the gap between high-resolution tissue morphology and molecular states, enabling researchers to generate virtual spatial transcriptomics data at scale from routine pathology slides.
+
+## Key Capabilities
+
+*   **Transcriptome-Wide Prediction:** Predicts expression for a panel of ~19k protein-coding genes [src/deepspotm/assets/tokens.csv:1-19339]().
+*   **Zero-Shot Inference:** Leverages frozen biological embeddings (DNA, RNA, protein, single-cell, and text) to predict genes unseen during model training [README.md:24-32]().
+*   **Multimodal Integration:** Combines a pathology-specific image backbone with diverse gene embedding sources such as `scgpt`, `evo2`, `orthrus`, `prott5`, and `apertus` [README.md:73-76]().
+*   **Spatial Interpretability:** Uses cross-attention mechanisms to map specific gene expressions back to spatial patch tokens within a histology tile [README.md:37-42]().
+*   **Scalable Pipeline:** Provides optimized entry points for both individual 224x224 tiles and gigapixel whole-slide images [examples/predict_wsi.py:1-10]().
+
+For a deeper dive into these terms, see [Key Concepts and Terminology](#1.2).
+
+## System Architecture
+
+DeepSpot-M follows a three-stage pipeline: spatial tokenization, gene querying, and dynamic projection.
+
+### Architecture Workflow
+The following diagram illustrates the flow from a raw histology image to gene expression values, mapping natural language components to their implementation classes.
+
+```mermaid
+graph TD
+    subgraph "Image Processing Space"
+        A["H&E Tile (224x224)"] --> B["ImageEncoder"]
+        B -- "Spatial Tokens" --> C["CrossAttentionGeneDecoder"]
+    end
+
+    subgraph "Gene Query Space"
+        D["Gene Symbols"] --> E["MultiSourceGeneEmbedding"]
+        E -- "Gene Embeddings" --> C
+    end
+
+    subgraph "Projection Space"
+        C -- "Contextualized Latents" --> F["GeneRouter (Hypernetwork)"]
+        F -- "Dynamic Weights" --> G["Final Projection"]
+        G --> H["log1p-CPM Expression"]
+    end
+
+    style B stroke-dasharray: 5 5
+    style E stroke-dasharray: 5 5
+```
+**Sources:** [src/deepspotm/model.py:15-80](), [src/deepspotm/modules.py:284-350](), [src/deepspotm/image_encoder.py:17-45]()
+
+### Core Components
+
+| Component | Code Entity | Responsibility |
+| :--- | :--- | :--- |
+| **Model Wrapper** | `DeepSpotM` | High-level API for loading weights, switching gene sources, and running predictions [src/deepspotm/model.py:38](). |
+| **Image Encoder** | `ImageEncoder` | Tokenizes 224x224 tiles into spatial patch embeddings using backbones like `Midnight` [src/deepspotm/image_encoder.py:17](). |
+| **Gene Embedding** | `MultiSourceGeneEmbedding` | Manages biological embeddings from different foundation models (e.g., scGPT) [src/deepspotm/modules.py:284](). |
+| **Gene Decoder** | `CrossAttentionGeneDecoder` | Performs cross-attention between gene queries and spatial image tokens [src/deepspotm/modules.py:440](). |
+| **Hypernetwork** | `GeneRouter` | Generates gene-specific linear projection weights from gene embeddings [src/deepspotm/modules.py:408](). |
+
+For implementation details, see [Core Architecture](#2).
+
+## Data Flow: From Files to Predictions
+
+This diagram bridges the static assets and configuration to the runtime execution of the model.
+
+```mermaid
+graph LR
+    subgraph "Static Assets"
+        T["tokens.csv"]
+        E["ensp_to_gene.csv"]
+        M["midnight_config.json"]
+    end
+
+    subgraph "Logic & Configuration"
+        C["config.py"]
+        U["utils.py"]
+    end
+
+    subgraph "Runtime Prediction"
+        P["predict_wsi.py"]
+        DS["DeepSpotM.from_pretrained()"]
+    end
+
+    T --> DS
+    E --> DS
+    M --> DS
+    C --> DS
+    U --> P
+    DS --> P
+```
+**Sources:** [src/deepspotm/config.py:1-19](), [src/deepspotm/checkpoint.py:80-120](), [src/deepspotm/assets/tokens.csv:1-10]()
+
+## Child Pages
+
+*   **[Getting Started](#1.1)**: Installation guide, dependency management (including `wsi` extras), and your first prediction using `from_pretrained`.
+*   **[Key Concepts and Terminology](#1.2)**: A glossary and conceptual guide to the domain-specific logic used in the codebase, such as LoRA adaptation and log1p-CPM normalization.
+
+## Quick Links
+*   **Pretrained Models**: [HuggingFace Hub](https://huggingface.co/ratschlab/DeepSpotM)
+*   **Atlas Data**: [TCGA Virtual Spatial Transcriptomics Atlas](https://huggingface.co/datasets/ratschlab/TCGA_virtual_spatial_transcriptomics_atlas)
+*   **Research Paper**: [medRxiv Preprint](https://doi.org/10.64898/2026.06.19.26356060)
+
+**Sources:** [README.md:1-15](), [CITATION.cff:1-25]()
+
+---
+
+# Page: Getting Started
+
+# Getting Started
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [pyproject.toml](pyproject.toml)
+- [src/deepspotm/__init__.py](src/deepspotm/__init__.py)
+
+</details>
+
+
+
+DeepSpot-M is a multimodal foundation model designed to predict transcriptome-wide spatial gene expression from H&E histology images. It utilizes a LoRA-adapted pathology backbone and a cross-attention gene decoder to map 224x224 image tiles to expression values across approximately 19,000 genes.
+
+This page covers the installation process, dependency management, and the primary workflows for loading models and performing inference.
+
+## Installation
+
+The package is available on PyPI and requires Python 3.10 or newer due to dependency constraints from `torch`, `transformers`, and `peft` [pyproject.toml:26-28]().
+
+### Basic Installation
+To install the core package for tile-level predictions:
+```bash
+pip install deepspotm
+```
+
+### Whole-Slide Image (WSI) Support
+For processing whole-slide images (e.g., `.svs`, `.ndpi`) and generating `AnnData` objects, install the `wsi` extra. This installs `pyvips` for efficient tiling and `anndata` for spatial data storage [pyproject.toml:59-62]().
+```bash
+pip install "deepspotm[wsi]"
+```
+
+### Development Version
+To track the latest changes from the repository:
+```bash
+pip install git+https://github.com/ratschlab/DeepSpotM.git
+```
+
+### Core Dependencies
+| Package | Version | Purpose |
+| :--- | :--- | :--- |
+| `torch` | >=2.0 | Tensor computations and neural network backend [pyproject.toml:45]() |
+| `lightning` | >=2.0 | Model training and inference framework [pyproject.toml:46]() |
+| `timm` | >=0.9 | Vision backbone implementations [pyproject.toml:47]() |
+| `peft` | >=0.6 | LoRA (Low-Rank Adaptation) management [pyproject.toml:48]() |
+| `transformers`| >=4.43 | HuggingFace integration and image processing [pyproject.toml:49]() |
+| `safetensors` | >=0.3 | Secure model weight loading [pyproject.toml:50]() |
+
+**Sources:** [pyproject.toml:26-71](), [README.md:46-63]()
+
+---
+
+## Loading a Pretrained Model
+
+The `DeepSpotM` class provides a high-level `from_pretrained` method that handles the retrieval of model weights, configuration, and gene vocabulary assets.
+
+### The `from_pretrained` Workflow
+When calling `DeepSpotM.from_pretrained()`, the system performs the following:
+1.  **Asset Retrieval**: Downloads or locates `config.json`, `model.safetensors`, and `tokens.csv` [README.md:70-73]().
+2.  **Backbone Initialization**: Builds the pathology foundation model (defaulting to "Midnight") using an internal configuration to avoid external network calls to the original backbone provider [README.md:71-72]().
+3.  **Source Selection**: Configures the gene router hypernetwork to use a specific biological embedding source (e.g., `scgpt`, `evo2`) [README.md:73-76]().
+
+### Initialization Diagram
+The following diagram illustrates the flow from a HuggingFace repository or local path to a functional `DeepSpotM` instance.
+
+**Model Initialization Flow**
+```mermaid
+graph TD
+    subgraph "Input Space"
+        repo["HuggingFace Repo / Local Dir"]
+    end
+
+    subgraph "DeepSpotM.from_pretrained"
+        load["from_pretrained()"]
+        cfg["Load config.json"]
+        weights["Load model.safetensors"]
+        vocab["Load tokens.csv"]
+    end
+
+    subgraph "Code Entity Space"
+        DSM["DeepSpotM (LightningModule)"]
+        IE["ImageEncoder (Midnight)"]
+        GD["CrossAttentionGeneDecoder"]
+        GR["GeneRouter (Hypernetwork)"]
+    end
+
+    repo --> load
+    load --> cfg
+    load --> weights
+    load --> vocab
+    
+    cfg --> DSM
+    weights --> DSM
+    vocab --> DSM
+    
+    DSM --> IE
+    DSM --> GD
+    DSM --> GR
+```
+**Sources:** [src/deepspotm/model.py:1-10](), [README.md:67-76](), [src/deepspotm/__init__.py:1-15]()
+
+---
+
+## Running Predictions
+
+DeepSpot-M supports three levels of prediction: full transcriptome, specific gene subsets, and whole-slide inference.
+
+### 1. Tile-Level Prediction (Full Panel)
+By default, the model predicts expression for the entire panel defined in `tokens.csv` (~19k genes) [README.md:87-88]().
+
+```python
+from deepspotm import DeepSpotM
+import torch
+
+# 1. Load model
+model, image_processor = DeepSpotM.from_pretrained("ratschlab/DeepSpotM", source="scgpt")
+
+# 2. Prepare tile (224x224 PIL Image)
+tile_tensor = image_processor(my_pil_tile).unsqueeze(0)
+
+# 3. Inference
+with torch.no_grad():
+    expression, _, _ = model(tile_tensor) # (batch, n_genes)
+
+# 4. Map to gene symbols
+results = dict(zip(model.gene_names, expression.squeeze(0).tolist()))
+```
+**Sources:** [README.md:67-85]()
+
+### 2. Specific Gene Prediction
+For faster inference, use `predict_genes`. This avoids computing projections for the entire 19k-gene vocabulary by only processing the requested queries [README.md:91-92]().
+
+```python
+# Returns tensor of shape (1, 3)
+vals = model.predict_genes(tile_tensor, ["EPCAM", "CD3D", "PTPRC"])
+```
+**Sources:** [README.md:94-97]()
+
+### 3. Whole-Slide Inference (CLI)
+For production use-cases, the `predict_wsi.py` script automates tiling, background filtering, and result aggregation into a spatial `AnnData` (`.h5ad`) file [README.md:104-108]().
+
+```bash
+# Process a single slide
+python examples/predict_wsi.py slide.svs -o slide.h5ad --source scgpt
+```
+
+### Prediction Data Flow
+The diagram below traces a histology image through the model components to produce gene expression values.
+
+**Inference Data Pipeline**
+```mermaid
+graph LR
+    subgraph "Input"
+        IMG["224x224 H&E Tile"]
+    end
+
+    subgraph "DeepSpotM.forward"
+        ENC["ImageEncoder.forward_patch_tokens"]
+        DEC["CrossAttentionGeneDecoder"]
+        ROUT["GeneRouter"]
+    end
+
+    subgraph "Output"
+        EXP["Log1p-CPM Expression"]
+    end
+
+    IMG --> ENC
+    ENC -- "Patch Tokens" --> DEC
+    ROUT -- "Gene-Specific Weights" --> DEC
+    DEC --> EXP
+```
+**Sources:** [README.md:24-42](), [src/deepspotm/model.py:1-10]()
+
+---
+
+## Available Embedding Sources
+The model uses frozen biological embeddings to represent genes. When loading the model, you must specify a `source` which determines the "modality" of the gene representation [README.md:75]():
+
+| Source | Foundation Model | Modality |
+| :--- | :--- | :--- |
+| `scgpt` | scGPT | Single-cell RNA-seq |
+| `evo2` | Evo 2 | DNA/Genomic |
+| `orthrus` | Orthrus | RNA/Transcriptomic |
+| `prott5` | ProtT5 | Protein Sequence |
+| `apertus` | Apertus | Text/Literature |
+
+**Sources:** [README.md:27-32](), [README.md:75](), [src/deepspotm/modules.py:1-8]()
+
+---
+
+# Page: Key Concepts and Terminology
+
+# Key Concepts and Terminology
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [CITATION.cff](CITATION.cff)
+- [README.md](README.md)
+- [src/deepspotm/assets/tokens.csv](src/deepspotm/assets/tokens.csv)
+- [src/deepspotm/modules.py](src/deepspotm/modules.py)
+
+</details>
+
+
+
+This page defines the domain-specific terms and technical concepts fundamental to the DeepSpotM codebase. It serves as a reference for new contributors to understand the relationship between biological transcriptomics, pathology foundation models, and the hypernetwork-based architecture implemented in the library.
+
+## Virtual Spatial Transcriptomics
+
+**Virtual Spatial Transcriptomics (VST)** refers to the computational task of predicting gene expression levels directly from histology images (typically H&E stained slides) without performing physical sequencing.
+
+In DeepSpotM, this is implemented as a mapping from a $224 \times 224$ pixel image tile to a vector of predicted expression values for approximately 19,000 genes [README.md:24-32](). The model treats each tile as a "spot" (analogous to spots in Visium or cells in Xenium) and predicts the molecular state based on morphological features captured by a pathology backbone.
+
+### Data Flow: Image to Expression
+The following diagram illustrates the transformation from a raw histology tile to a gene expression vector.
+
+**DeepSpotM High-Level Data Flow**
+```mermaid
+graph TD
+    subgraph "Input Space"
+        A["H&E Tile (224x224)"]
+    end
+
+    subgraph "Code Entities (model.py / image_encoder.py)"
+        B["ImageEncoder (e.g., MidnightEncoder)"]
+        C["CrossAttentionGeneDecoder"]
+        D["GeneRouter (Hypernetwork)"]
+    end
+
+    subgraph "Output Space"
+        E["log1p-CPM Expression Vector"]
+    end
+
+    A --> B
+    B -- "Patch Tokens" --> C
+    C -- "Gene-Specific Queries" --> D
+    D --> E
+```
+Sources: [src/deepspotm/model.py:12-25](), [src/deepspotm/image_encoder.py:11-20](), [src/deepspotm/modules.py:110-117]()
+
+---
+
+## Gene Embedding Sources & Modality Vocabulary
+
+DeepSpotM does not use a fixed output layer for genes. Instead, it represents genes as queryable embeddings derived from biological foundation models.
+
+### Gene Embedding Sources
+A **Source** refers to the specific foundation model used to generate the initial biological priors for genes. DeepSpotM supports several sources:
+*   **evo2**: DNA-based foundation model.
+*   **orthrus**: RNA-based foundation model.
+*   **prott5 / esm2**: Protein-based foundation models.
+*   **scgpt / geneformer**: Single-cell RNA-seq foundation models.
+*   **apertus / genept**: Text/LLM-based gene descriptions.
+
+These are managed by the `MultiSourceGeneEmbedding` class [src/deepspotm/modules.py:148-157](), which handles the loading and adaptation of these priors.
+
+### Modality Vocabulary
+The **Modality Vocabulary** is a canonical ordering of biological data types: `("dna", "rna", "protein", "single_cell", "text")` [src/deepspotm/modules.py:71-71](). 
+*   **Modality Encoding**: A frozen one-hot encoding added to gene queries before cross-attention. This signals to the model which *type* of biological information is being used, allowing the shared decoder to leverage modality-level invariances [src/deepspotm/modules.py:164-171]().
+*   **MODALITY_BY_SOURCE**: A mapping that links specific source names (e.g., `evo2`) to their canonical modality (e.g., `dna`) [src/deepspotm/modules.py:79-92]().
+
+Sources: [src/deepspotm/modules.py:66-92](), [src/deepspotm/modules.py:148-175]()
+
+---
+
+## LoRA Adaptation
+
+**LoRA (Low-Rank Adaptation)** is used to fine-tune the frozen pathology backbones (like Midnight or UNI) for the specific task of transcriptomic prediction without updating all parameters.
+
+In `image_encoder.py`, the `ImageEncoder` uses `peft.LoraConfig` to target specific modules within the backbone [src/deepspotm/image_encoder.py:53-65]().
+*   **Target Modules**: Typically `qkv` or `query`, `value` projections in the Transformer blocks.
+*   **Rank (r)**: Usually set to 8 or 16 to minimize parameter overhead.
+
+Sources: [src/deepspotm/image_encoder.py:44-70](), [src/deepspotm/model.py:120-130]()
+
+---
+
+## Zero-Shot Prediction
+
+Unlike standard models that have a fixed number of output neurons (e.g., a final layer of size 1000 for 1000 genes), DeepSpotM uses a **Gene Router (Hypernetwork)** [src/deepspotm/modules.py:110-117]().
+
+The `GeneRouter` generates the projection weights for a gene *on-the-fly* from its biological embedding [src/deepspotm/modules.py:143-145](). This architecture allows the model to predict expression for genes it never saw during training, provided a biological embedding for that gene is available. This capability is referred to as **Zero-Shot Prediction** [README.md:37-42]().
+
+**Hypernetwork Projection Logic**
+```mermaid
+graph LR
+    subgraph "GeneRouter (modules.py)"
+        G_EMB["Gene Bio Embedding (G, bio_dim)"]
+        W_NET["weight_net (Linear)"]
+        B_NET["bias_net (Linear)"]
+        
+        G_EMB --> W_NET
+        G_EMB --> B_NET
+        
+        W_NET --> PROJ["Weights (G, D)"]
+        B_NET --> BIAS["Bias (G,)"]
+    end
+    
+    subgraph "Prediction"
+        QUERY["Gene Queries (B, G, D)"]
+        PROJ -- "einsum" --> DOT["Dot Product"]
+        QUERY --> DOT
+        DOT --> OUT["Expression (B, G)"]
+        BIAS --> OUT
+    end
+```
+Sources: [src/deepspotm/modules.py:110-146]()
+
+---
+
+## AnnData and log1p-CPM
+
+DeepSpotM adheres to standard bioinformatics data structures and normalization conventions for its outputs.
+
+### log1p-CPM
+The model is trained to predict, and outputs values in, **log1p-CPM** (Counts Per Million) space.
+*   **CPM**: Normalizes for sequencing depth (or total signal per spot).
+*   **log1p**: The transformation $f(x) = \ln(1 + x)$, which stabilizes variance and handles the sparsity typical of transcriptomic data.
+*   The `StructureExpression` class assumes input values are already in this space or similar normalized formats [src/deepspotm/modules.py:12-18]().
+
+### AnnData
+The `predict_wsi.py` pipeline saves results in the `.h5ad` format, which is the `AnnData` (Annotated Data) standard used by the `scanpy` and `squidpy` ecosystems [README.md:104-108]().
+*   **X**: The predicted expression matrix (Spots $\times$ Genes).
+*   **obs**: Metadata for each spot, including spatial coordinates (`array_row`, `array_col`) and pixel coordinates (`px_x`, `px_y`).
+*   **var**: Gene metadata, including gene symbols and Ensembl IDs.
+
+Sources: [README.md:104-116](), [src/deepspotm/modules.py:12-18]()
+
+---
+
+## Modality and Gene Vocabulary Mapping
+
+DeepSpotM maintains a strict internal vocabulary to ensure consistency across different biological priors.
+
+| Term | Definition | Code Entity |
+| :--- | :--- | :--- |
+| **Gene Names Ordered** | The fixed list of 19,338 genes the model is capable of predicting. | `StructureExpression.gene_names_ordered` [src/deepspotm/modules.py:22]() |
+| **Tokens** | The CSV asset containing the gene vocabulary and token types. | `src/deepspotm/assets/tokens.csv` |
+| **ENSP Mapping** | Mapping from Ensembl Protein IDs to Gene Symbols, used for protein-based sources like ProtT5. | `src/deepspotm/assets/ensp_to_gene.csv` |
+| **Expression Mask** | A boolean tensor indicating which genes in the vocabulary were actually measured in a ground-truth sample. | `StructureExpression.structure_expression` [src/deepspotm/modules.py:25-32]() |
+
+Sources: [src/deepspotm/modules.py:11-33](), [src/deepspotm/assets/tokens.csv:1-20]()
+
+---
+
+# Page: Core Architecture
+
+# Core Architecture
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [src/deepspotm/model.py](src/deepspotm/model.py)
+
+</details>
+
+
+
+DeepSpot-M implements a three-stage pipeline that transforms histology images into transcriptome-wide spatial gene expression maps. The architecture bridges pathology foundation models with biological foundation models (DNA, RNA, protein, single-cell, and text) through a cross-attention mechanism and a dynamic projection layer.
+
+### The DeepSpotM Pipeline
+
+The system processes a 224x224 H&E image tile through the following stages:
+1.  **Spatial Tokenization**: The image is encoded into a sequence of patch embeddings.
+2.  **Gene Querying**: A decoder allows individual gene embeddings to attend to specific spatial tokens.
+3.  **Dynamic Projection**: A hypernetwork (Gene Router) projects the attended features into expression values using frozen biological embeddings.
+
+For details on the primary interface and model lifecycle, see [DeepSpotM Model (model.py)](#2.1).
+
+### Architectural Overview
+
+The following diagram illustrates the data flow from the raw image to the predicted gene expression vector, highlighting the key code entities involved in the transformation.
+
+**DeepSpotM Data Flow**
+```mermaid
+graph TD
+    subgraph "Stage 1: Spatial Tokenization"
+        A["H&E Tile (224x224)"] --> B["ImageEncoder (backbone)"]
+        B --> C["Patch Tokens (L x D_patch)"]
+    end
+
+    subgraph "Stage 2: Gene Querying"
+        D["StructureExpression (tokens.csv)"] --> E["MultiSourceGeneEmbedding"]
+        E --> F["Gene Queries (N_genes x D_gene)"]
+        C --> G["CrossAttentionGeneDecoder"]
+        F --> G
+        G --> H["Attended Features (N_genes x D_gene)"]
+    end
+
+    subgraph "Stage 3: Dynamic Projection"
+        H --> I["GeneRouter (Hypernetwork)"]
+        J["Biological Embeddings (Frozen)"] --> I
+        I --> K["Expression Predictions (N_genes)"]
+    end
+
+    style B stroke-dasharray: 5 5
+    style I stroke-dasharray: 5 5
+```
+Sources: [src/deepspotm/model.py:24-42](), [src/deepspotm/model.py:85-117](), [README.md:24-32]()
+
+---
+
+### 1. Image Encoding and Spatial Tokenization
+The `backbone` of the model is a pathology foundation model (typically `MidnightEncoder`) wrapped in a LoRA (Low-Rank Adaptation) adapter. The encoder converts the input tile into a grid of spatial patch tokens. This stage is modular; the `build_encoder` factory allows swapping the backbone for other models like UNI or H1.
+
+*   **Key Class**: `ImageEncoder` in `image_encoder.py`
+*   **Mechanism**: `forward_patch_tokens` produces the sequence used for cross-attention.
+*   **Adaptation**: `LoraConfig` is applied to `target_modules` specific to each backbone.
+
+For details on supported backbones and LoRA integration, see [Image Encoder (image_encoder.py)](#2.2).
+
+Sources: [src/deepspotm/model.py:85-95](), [src/deepspotm/image_encoder.py:1-20]()
+
+---
+
+### 2. Gene Embedding and Vocabulary
+The model maintains a fixed vocabulary of ~19,000 genes defined in `tokens.csv`. Each gene is represented by a query embedding. When the model is configured for "multi-source" mode, it can dispatch queries across different biological modalities (e.g., `scgpt`, `prott5`, `evo2`).
+
+*   **Key Class**: `StructureExpression` and `MultiSourceGeneEmbedding` in `modules.py`
+*   **Asset**: `src/deepspotm/assets/tokens.csv`
+*   **Zero-Shot Capability**: Because genes are embeddings rather than fixed output indices, the model can be retargeted to new vocabularies via `swap_gene_vocabulary`.
+
+For details on how gene names are mapped to indices and embeddings, see [Gene Vocabulary and StructureExpression (modules.py + assets)](#2.4).
+
+Sources: [src/deepspotm/model.py:73-80](), [src/deepspotm/model.py:126-157](), [src/deepspotm/modules.py:1-50]()
+
+---
+
+### 3. Cross-Attention Decoder and Gene Router
+The `CrossAttentionGeneDecoder` acts as the bridge between histology and biology. It uses standard `MultiheadAttention` where gene embeddings serve as **queries** and image patch tokens serve as **keys/values**. 
+
+The final layer is a `GeneRouter` hypernetwork. Instead of a single static linear layer for all genes, the router generates gene-specific weights based on biological embeddings (e.g., DNA sequence from Evo2 or protein sequence from ProtT5).
+
+**Decoder and Router Detail**
+```mermaid
+graph LR
+    subgraph "CrossAttentionGeneDecoder"
+        direction TB
+        Q["Gene Queries"]
+        K["Patch Tokens (Keys)"]
+        V["Patch Tokens (Values)"]
+        MHA["MultiheadAttention"]
+        Q --> MHA
+        K --> MHA
+        V --> MHA
+        MHA --> LN["LayerNorm + MLP"]
+    end
+
+    subgraph "GeneRouter (Hypernetwork)"
+        direction TB
+        LN --> GRP["Gene-wise Projection"]
+        BE["Bio Embeddings"] --> GRP
+    end
+
+    GRP --> OUT["Expression Vector"]
+```
+
+*   **Key Class**: `CrossAttentionGeneDecoder` and `GeneRouter` in `modules.py`
+*   **Modality Encoding**: When multiple sources are used, `use_modality_encoding` adds a learnable bias to differentiate between embedding origins.
+
+For details on the hypernetwork and attention layers, see [Gene Decoder and Hypernetwork (modules.py)](#2.3).
+
+Sources: [src/deepspotm/model.py:98-111](), [src/deepspotm/modules.py:480-550](), [README.md:37-42]()
+
+---
+
+# Page: DeepSpotM Model (model.py)
+
+# 2.1 DeepSpotM Model (model.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/__init__.py](src/deepspotm/__init__.py)
+- [src/deepspotm/model.py](src/deepspotm/model.py)
+
+</details>
+
+
+
+The `DeepSpotM` class, defined in `src/deepspotm/model.py`, is the central `LightningModule` that orchestrates the spatial transcriptomics prediction pipeline. It integrates a vision backbone (image encoder) with a gene-specific decoder to predict gene expression from histology image patches.
+
+## Overview and Architecture
+
+DeepSpotM is designed for modularity, allowing every architectural component to be toggled via hyperparameters for ablation studies. The model supports Parameter-Efficient Fine-Tuning (PEFT) via LoRA and zero-shot gene prediction through a hypernetwork-based "Gene Router".
+
+### Key Components
+*   **Vision Backbone**: Encodes image patches into latent tokens using a variety of supported encoders (e.g., Midnight, UNI, H-Transformer).
+*   **Gene Decoder**: A cross-attention mechanism that queries image tokens using gene embeddings to produce spatial expression values.
+*   **Gene Router**: A hypernetwork that dynamically generates projection weights for genes based on their biological embeddings, enabling prediction for genes not seen during training.
+
+### DeepSpotM System Mapping
+The following diagram bridges the conceptual "Natural Language Space" to the specific "Code Entity Space" within `model.py`.
+
+**Diagram: DeepSpotM Code Entity Map**
+```mermaid
+graph TD
+    subgraph "Natural Language Concepts"
+        A["Histology Image"]
+        B["Spatial Expression"]
+        C["Gene Vocabulary"]
+        D["Transfer Learning (LoRA)"]
+    end
+
+    subgraph "Code Entity Space (model.py)"
+        direction TB
+        E["DeepSpotM (LightningModule)"]
+        F["self.backbone (ImageEncoder)"]
+        G["self.gene_decoder (CrossAttentionGeneDecoder)"]
+        H["self.gene_names (List[str])"]
+        I["predict_genes()"]
+        J["swap_gene_vocabulary()"]
+    end
+
+    A --> E
+    E --> F
+    E --> G
+    G --> I
+    I --> B
+    H --> C
+    D --> F
+```
+**Sources:** [src/deepspotm/model.py:15-117](), [src/deepspotm/model.py:171-205](), [src/deepspotm/model.py:231-267]()
+
+---
+
+## Constructor Hyperparameters
+
+The `DeepSpotM` constructor [src/deepspotm/model.py:38-68]() initializes the architecture based on several key categories of hyperparameters:
+
+| Category | Parameter | Description |
+| :--- | :--- | :--- |
+| **Vision** | `encoder_model` | String identifier for the backbone (e.g., `"MidnightEncoder"`) [src/deepspotm/model.py:40](). |
+| | `use_lora` | Whether to wrap the backbone with LoRA adapters [src/deepspotm/model.py:54](). |
+| **Decoder** | `use_cross_attention` | Toggles between the `CrossAttentionGeneDecoder` and a simple MLP head [src/deepspotm/model.py:42](). |
+| | `gene_embed_dim` | The latent dimension for gene queries [src/deepspotm/model.py:43](). |
+| | `init_gene_embeddings` | Strategy for gene embeddings: `"xavier"`, a specific source key, or a list for multi-source [src/deepspotm/model.py:47](). |
+| **Zero-Shot** | `use_router` | Enables the `GeneRouter` hypernetwork for dynamic weight projection [src/deepspotm/model.py:49](). |
+| **Vocab** | `token_path` | Path to the `tokens.csv` defining the gene set [src/deepspotm/model.py:57](). |
+
+**Sources:** [src/deepspotm/model.py:38-68](), [src/deepspotm/model.py:85-117]()
+
+---
+
+## Data Flow and Forward Pass
+
+The `forward` pass transforms raw image tensors into predicted gene expression vectors.
+
+**Diagram: DeepSpotM Data Flow**
+```mermaid
+sequenceDiagram
+    participant X as "Input Image (Tensor)"
+    participant B as "backbone (ImageEncoder)"
+    participant D as "gene_decoder (CrossAttentionGeneDecoder)"
+    participant Y as "Output (Expression Vector)"
+
+    X->>B: forward_patch_tokens()
+    B-->>X: Latent Tokens (B, N, D_img)
+    X->>D: forward(tokens, gene_indices)
+    D-->>Y: Log1p-CPM Predictions (B, G)
+```
+**Sources:** [src/deepspotm/model.py:171-180](), [src/deepspotm/model.py:231-267]()
+
+### Key Methods
+
+#### `predict_genes(x, gene_indices=None)`
+A wrapper around `forward` specifically for inference. It allows subsetting the output to specific genes by their indices in `self.gene_names` [src/deepspotm/model.py:231-267]().
+
+#### `get_gene_attention_maps(x, gene_indices=None)`
+Extracts the attention weights from the `CrossAttentionGeneDecoder`. This is used for interpretability, visualizing which image patches the model focuses on for specific genes [src/deepspotm/model.py:269-305]().
+
+---
+
+## Gene Vocabulary Management
+
+DeepSpotM allows dynamic modification of the gene vocabulary and embedding sources after initialization.
+
+### Multi-Source Management
+When using multi-source embeddings (e.g., protein sequences + gene ontologies), the model manages a `MultiSourceGeneEmbedding` module.
+*   **`sources`**: Property returning the list of available embedding sources [src/deepspotm/model.py:214-216]().
+*   **`current_source`**: Property returning the currently active source (or "multi" if not collapsed) [src/deepspotm/model.py:218-220]().
+*   **`set_source(source_name)`**: Collapses a multi-source model to a single specific source to reduce memory/computation during inference [src/deepspotm/model.py:222-229]().
+
+### `swap_gene_vocabulary`
+This method [src/deepspotm/model.py:126-160]() retargets the decoder to a custom vocabulary in-place. It:
+1.  Loads new embeddings from a `.pt` file.
+2.  Validates the new `tokens.csv`.
+3.  Rebuilds the vocabulary-specific layers (`gene_embeddings`, `gene_query_proj`, and the router/head) [src/deepspotm/model.py:134-156]().
+
+**Sources:** [src/deepspotm/model.py:126-160](), [src/deepspotm/model.py:214-229]()
+
+---
+
+## Factory Methods and Loading
+
+DeepSpotM provides specialized methods for loading models from Hugging Face or local checkpoints.
+
+### `from_pretrained(model_id, ...)`
+Downloads a checkpoint from the Hugging Face Hub. It handles the mapping of `bio_dims` (embedding dimensions) and sets `backbone_pretrained=False` to ensure vision weights are loaded from the checkpoint rather than re-downloaded from upstream vision providers [src/deepspotm/model.py:307-353]().
+
+### `load_for_inference(checkpoint_path, ...)`
+A utility to load a local `.ckpt` file. It ensures the LoRA wrappers are correctly initialized before loading state dicts, maintaining the "LoRA save/load contract" [src/deepspotm/model.py:355-392]().
+
+### LoRA Save/Load Contract
+When `use_lora=True`, the backbone is wrapped by PEFT. The model requires that LoRA remains **wrapped** during prediction. Calling `model.backbone.merge_and_unload()` is prohibited in the inference path because it breaks the state-dict key structure (`backbone.base_model.model...`) expected by the `LightningModule` [src/deepspotm/model.py:22-36]().
+
+**Sources:** [src/deepspotm/model.py:22-36](), [src/deepspotm/model.py:307-392]()
+
+---
+
+# Page: Image Encoder (image_encoder.py)
+
+# Image Encoder (image_encoder.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/image_encoder.py](src/deepspotm/image_encoder.py)
+- [src/deepspotm/utils.py](src/deepspotm/utils.py)
+
+</details>
+
+
+
+The `image_encoder.py` module defines the vision backbone architecture for DeepSpotM. It provides a unified interface for pathology foundation models (e.g., UNI, H-Transformer) and general-purpose vision models (e.g., CLIP, Midnight). The module handles weight resolution from the Hugging Face Hub, automated image transformation pipelines, and extraction of spatial patch tokens required by the gene decoder.
+
+## Encoder Architecture
+
+DeepSpotM uses a hierarchical class structure to manage different vision backbones. The base `ImageEncoder` defines the contract for all encoders, while specialized mixins like `_TimmEncoder` handle the boilerplate for models integrated via the `timm` library.
+
+### Class Hierarchy and Data Flow
+
+The following diagram illustrates how the `ImageEncoder` interface abstracts different model families into a consistent API for the `DeepSpotM` model.
+
+**Vision Backbone Abstraction**
+```mermaid
+graph TD
+    subgraph "Interface Space"
+        IE["ImageEncoder (Base Class)"]
+        FP["forward_patch_tokens()"]
+        GB["_build()"]
+    end
+
+    subgraph "Implementation Space"
+        TE["_TimmEncoder"]
+        UNI["UNI1Encoder / UNI2Encoder"]
+        H["H0Encoder / H1Encoder"]
+        MN["MidnightEncoder"]
+        CLIP["ImageCLIPEncoder"]
+    end
+
+    IE --> TE
+    TE --> UNI
+    TE --> H
+    IE --> MN
+    IE --> CLIP
+
+    UNI -- "Uses" --> TIMM["timm.create_model"]
+    MN -- "Uses" --> HF["transformers.AutoModel"]
+    CLIP -- "Uses" --> CLIP_LIB["open_clip"]
+
+    FP -- "Contract" --> DECODER["CrossAttentionGeneDecoder"]
+```
+**Sources:** [src/deepspotm/image_encoder.py:34-153](), [src/deepspotm/image_encoder.py:162-284]()
+
+### The ImageEncoder Base Class
+The `ImageEncoder` class [src/deepspotm/image_encoder.py:34-106]() is a `torch.nn.Module` that standardizes:
+*   **Normalization Constants**: `NORM_MEAN` and `NORM_STD` must be defined by subclasses to ensure consistent preprocessing [src/deepspotm/image_encoder.py:40-41]().
+*   **LoRA Targets**: `LORA_TARGET_MODULES` defines which layers are targeted during Parameter-Efficient Fine-Tuning (defaulting to `["qkv"]` for standard ViTs) [src/deepspotm/image_encoder.py:37]().
+*   **Build Lifecycle**: The `__init__` method triggers `_build()`, which returns the model, its specific `transforms`, and the `hidden_dim` [src/deepspotm/image_encoder.py:52]().
+
+## Concrete Encoder Implementations
+
+DeepSpotM supports several state-of-the-art pathology and general vision encoders. These are registered in the `ENCODER_REGISTRY` [src/deepspotm/image_encoder.py:334-342]().
+
+| Class Name | Backbone Family | Hidden Dim | Source / Architecture |
+| :--- | :--- | :--- | :--- |
+| `UNI1Encoder` | timm (ViT-L/16) | 1024 | Mahmood Lab (UNI) |
+| `UNI2Encoder` | timm (ViT-G/14) | 1536 | Mahmood Lab (UNI2-h) |
+| `H0Encoder` | timm (ViT-S/16) | 384 | Bioptimus (H-Transformer) |
+| `H1Encoder` | timm (ViT-L/14) | 1024 | Bioptimus (H-Transformer) |
+| `MidnightEncoder` | HF Transformers | 1152 | Bioptimus (Midnight) |
+| `ImageCLIPEncoder` | open_clip | 768 | ViT-L/14 (OpenAI/DataComp) |
+
+**Sources:** [src/deepspotm/image_encoder.py:162-332]()
+
+### Weight Resolution and Loading
+Weights are resolved via `_resolve_weights` [src/deepspotm/image_encoder.py:6-21](), which prioritizes local paths before attempting to download from the Hugging Face Hub using `hf_hub_download`. The `_load_state_dict` utility [src/deepspotm/image_encoder.py:24-32]() automatically detects and handles both standard PyTorch `.bin`/`.pt` files and `.safetensors` formats.
+
+## Spatial Token Contract: `forward_patch_tokens`
+
+The primary interface between the Image Encoder and the Gene Decoder is the `forward_patch_tokens` method. DeepSpotM relies on the spatial context of an image rather than just a global summary (CLS) token.
+
+**Token Extraction Logic**
+```mermaid
+graph TD
+    Input["Input Image (B, 3, H, W)"] --> Model["Encoder Backbone"]
+    Model --> Family{Model Family?}
+    
+    Family -- "timm" --> T1["forward_features()"]
+    T1 --> T2["Strip Prefix Tokens (CLS/Reg)"]
+    T2 --> Out["Patch Tokens (B, N, D)"]
+    
+    Family -- "HF AutoModel" --> H1["last_hidden_state"]
+    H1 --> H2["Strip CLS + Register Tokens"]
+    H2 --> Out
+    
+    Family -- "Custom" --> C1["Override forward_patch_tokens"]
+    C1 --> Out
+```
+
+The method [src/deepspotm/image_encoder.py:70-96]() handles the removal of non-spatial tokens (like CLS tokens or DINOv2 register tokens) to ensure the `CrossAttentionGeneDecoder` only receives tokens corresponding to physical image patches.
+
+**Sources:** [src/deepspotm/image_encoder.py:70-96](), [src/deepspotm/image_encoder.py:142-151]()
+
+## Factory and Registry
+
+The `build_encoder` function serves as the central factory for instantiating vision backbones.
+
+```python
+def build_encoder(name, weights_path=None, pretrained=True, **kwargs):
+    """
+    Instantiates an encoder from the ENCODER_REGISTRY.
+    'name' corresponds to the keys in ENCODER_REGISTRY (e.g., 'uni', 'h1').
+    """
+```
+
+### Registry Mapping
+The `ENCODER_REGISTRY` maps short strings to encoder classes:
+*   `"uni"`: `UNI1Encoder`
+*   `"uni2"`: `UNI2Encoder`
+*   `"h0"`, `"h0mini"`, `"h1"`: Respective Bioptimus models.
+*   `"midnight"`: `MidnightEncoder`
+*   `"clip"`: `ImageCLIPEncoder`
+
+**Sources:** [src/deepspotm/image_encoder.py:334-351]()
+
+## Image Preprocessing
+
+Encoders use the `get_eval_transforms` utility from `utils.py` [src/deepspotm/utils.py:26-74]() to construct their pipeline. This pipeline is designed for robustness during inference, handling multiple input types:
+1.  **NumPy Arrays**: Converts `uint8` or `float` arrays to PIL Images [src/deepspotm/utils.py:34-37]().
+2.  **Tensors**: Handles `CHW` tensors, converting them back to `HWC` for PIL processing [src/deepspotm/utils.py:39-46]().
+3.  **PIL Images**: Passed through directly [src/deepspotm/utils.py:47-48]().
+
+The pipeline follows a strict sequence: `Ensure PIL` → `Resize (Bicubic)` → `CenterCrop (Optional)` → `ToTensor` → `Normalize`.
+
+**Sources:** [src/deepspotm/utils.py:26-74](), [src/deepspotm/image_encoder.py:62-69]()
+
+---
+
+# Page: Gene Decoder and Hypernetwork (modules.py)
+
+# Gene Decoder and Hypernetwork (modules.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/modules.py](src/deepspotm/modules.py)
+- [tests/test_decoder.py](tests/test_decoder.py)
+
+</details>
+
+
+
+The `modules.py` file contains the core architectural components responsible for translating high-dimensional image patch tokens into gene expression values. The architecture follows a query-based design where biological gene embeddings act as queries that attend to image features via cross-attention, followed by a dynamic projection through a hypernetwork.
+
+## Architecture Overview
+
+The decoding process consists of three main stages:
+1.  **Multi-Source Embedding**: Biological priors (e.g., scGPT, ESM-2) are projected into a shared query space.
+2.  **Cross-Attention**: Gene queries interact with image patch tokens to extract spatial context.
+3.  **Gene Router (Hypernetwork)**: A dynamic projection layer generates gene-specific weights and biases to produce the final expression scalar.
+
+### Data Flow Diagram
+
+The following diagram illustrates the flow from raw biological embeddings to the final expression output.
+
+```mermaid
+graph TD
+    subgraph "Natural Language & Bio Space"
+        B["Biological Priors (scGPT, ESM-2, etc.)"]
+        M["MODALITY_VOCABULARY"]
+    end
+
+    subgraph "Code Entity Space (modules.py)"
+        MSE["MultiSourceGeneEmbedding"]
+        CAL["CrossAttentionLayer"]
+        GR["GeneRouter"]
+    end
+
+    B -->|Initialize| MSE
+    M -->|One-Hot| MSE
+    MSE -->|Gene Queries| CAL
+    CAL -->|Refined Queries| GR
+    GR -->|Dynamic Weights/Biases| Expression["Gene Expression (B, G)"]
+
+    Sources1["Sources: [src/deepspotm/modules.py:110-170]()"]
+```
+
+## Multi-Source Gene Embedding
+
+The `MultiSourceGeneEmbedding` class handles the dispatching and adaptation of biological embeddings from different sources (e.g., DNA, RNA, Protein).
+
+### Modality Vocabulary and Registry
+The system uses a canonical ordering for modalities to ensure checkpoint compatibility. Sources are mapped to modalities via `MODALITY_BY_SOURCE`.
+
+| Modality | Index | Description |
+| :--- | :--- | :--- |
+| `dna` | 0 | DNA-based priors (e.g., `evo2`) |
+| `rna` | 1 | RNA-based priors (e.g., `orthrus`) |
+| `protein` | 2 | Protein-based priors (e.g., `esm2`, `prott5`) |
+| `single_cell` | 3 | Single-cell foundation models (e.g., `scgpt`, `geneformer`) |
+| `text` | 4 | Text-based embeddings (e.g., `apertus`, `genept`) |
+
+*   **Implementation**: `MODALITY_VOCABULARY` is a tuple defining the frozen index order [src/deepspotm/modules.py:71]().
+*   **Mapping**: `MODALITY_BY_SOURCE` maps specific model names to these modalities [src/deepspotm/modules.py:79-92]().
+
+### Key Functions
+*   **`collapse_to_source(source_name)`**: Switches the active embedding source by updating internal buffers and projection layers [src/deepspotm/modules.py:255-276]().
+*   **Modality Encoding**: An optional frozen one-hot encoding is added to gene queries to signal the modality (DNA vs Protein) to the cross-attention layers [src/deepspotm/modules.py:164-169]().
+
+Sources: [src/deepspotm/modules.py:66-92](), [src/deepspotm/modules.py:148-170]()
+
+## Cross-Attention Gene Decoder
+
+The `CrossAttentionGeneDecoder` is the top-level container for the query-based expression prediction.
+
+### Component Breakdown
+1.  **`CrossAttentionLayer`**: Implements standard Multi-Head Attention where `gene_queries` are the `query` and `patch_tokens` are the `key` and `value` [src/deepspotm/modules.py:38-62]().
+2.  **Gene Subsetting**: The `forward` method accepts a `gene_indices` tensor, allowing the model to compute expression for only a specific subset of genes, which significantly reduces computation during inference [src/deepspotm/modules.py:326-335]().
+3.  **Interpretability**: If `need_weights=True`, the decoder returns the attention maps for each layer, enabling visualization of which image patches contributed to the prediction of specific genes [src/deepspotm/modules.py:348-350]().
+
+### Output Contract
+The `forward` method returns a three-tuple:
+1.  **Expression**: `(Batch, N_Genes)` tensor of predicted log1p-CPM values.
+2.  **Gene Features**: `(Batch, Gene_Embed_Dim)` aggregated features.
+3.  **Attention Weights**: List of attention tensors or `None`.
+
+Sources: [src/deepspotm/modules.py:302-353](), [tests/test_decoder.py:46-55]()
+
+## Gene Router (Hypernetwork)
+
+The `GeneRouter` enables **zero-shot prediction** for genes not seen during training. Instead of learning a fixed weight matrix for every gene, it uses a hypernetwork to generate projection parameters on-the-fly.
+
+### Dynamic Projection Logic
+The router takes the raw biological embedding ($E_{bio}$) and the cross-attention refined query ($Q_{refined}$) to produce the expression value $y$:
+
+$$y = Q_{refined} \cdot \text{WeightNet}(E_{bio}) + \text{BiasNet}(E_{bio})$$
+
+*   **`weight_net`**: A 2-layer MLP that generates the projection vector for the query dimension [src/deepspotm/modules.py:123-127]().
+*   **`bias_net`**: A 2-layer MLP that generates a per-gene bias scalar [src/deepspotm/modules.py:129-133]().
+*   **Einsum implementation**: The final projection uses `torch.einsum('bgd,gd->bg', gene_queries, proj)` for efficient batch computation [src/deepspotm/modules.py:145]().
+
+### Code Entity Interaction
+
+```mermaid
+classDiagram
+    class CrossAttentionGeneDecoder {
+        +forward(patch_tokens, gene_indices)
+    }
+    class MultiSourceGeneEmbedding {
+        +collapse_to_source(source_name)
+        +forward(gene_indices)
+    }
+    class CrossAttentionLayer {
+        +forward(gene_queries, patch_kv)
+    }
+    class GeneRouter {
+        +weight_net: nn.Sequential
+        +bias_net: nn.Sequential
+        +forward(bio_emb, queries)
+    }
+
+    CrossAttentionGeneDecoder *-- MultiSourceGeneEmbedding
+    CrossAttentionGeneDecoder *-- CrossAttentionLayer
+    CrossAttentionGeneDecoder *-- GeneRouter
+    
+    Sources2["Sources: [src/deepspotm/modules.py:110-146](), [src/deepspotm/modules.py:302-315]()"]
+```
+
+## Expression Structuring
+
+The `StructureExpression` class serves as a utility for handling the 19,338-gene vocabulary defined in `tokens.csv`.
+
+*   **Gene Lookup**: It filters the vocabulary for entries where `token_type == 'gene'` [src/deepspotm/modules.py:22]().
+*   **Missing Data**: In the `structure_expression` method, missing genes are filled with `0.0`, and a boolean `gene_mask` is generated to track which genes were actually measured in a given sample [src/deepspotm/modules.py:24-32]().
+*   **Clamping**: It ensures all expression values are non-negative via `clamp_(min=0)` [src/deepspotm/modules.py:31]().
+
+Sources: [src/deepspotm/modules.py:11-32]()
+
+---
+
+# Page: Gene Vocabulary and StructureExpression (modules.py + assets)
+
+# Gene Vocabulary and StructureExpression (modules.py + assets)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/assets/__init__.py](src/deepspotm/assets/__init__.py)
+- [src/deepspotm/assets/ensp_to_gene.csv](src/deepspotm/assets/ensp_to_gene.csv)
+- [src/deepspotm/assets/tokens.csv](src/deepspotm/assets/tokens.csv)
+- [src/deepspotm/modules.py](src/deepspotm/modules.py)
+- [tests/test_structure_expression.py](tests/test_structure_expression.py)
+
+</details>
+
+
+
+The DeepSpotM framework utilizes a fixed, high-dimensional gene vocabulary to ensure consistency across different biological sources and spatial transcriptomics datasets. This page details the implementation of `StructureExpression`, the handling of packaged gene assets, and the logic for mapping sparse gene expression data into dense tensors suitable for model input.
+
+## Vocabulary Assets
+
+DeepSpotM relies on two primary static assets to manage gene identity and mapping. These files are bundled within the package and resolved at runtime via the `Config` module.
+
+### Gene Tokens (`tokens.csv`)
+This file defines the canonical vocabulary of 19,338 genes [tests/test_structure_expression.py:15-15](). It contains three columns:
+*   `token`: The gene symbol (e.g., `NAALADL1`, `REXO2`) [src/deepspotm/assets/tokens.csv:2-3]().
+*   `token_type`: Categorizes the token. `StructureExpression` specifically filters for rows where `token_type == 'gene'` [src/deepspotm/modules.py:22-22]().
+*   `token_id`: An integer index for internal tracking.
+
+### ID Mapping (`ensp_to_gene.csv`)
+This asset provides a mapping between Ensembl Protein IDs (ENSP) and gene symbols (e.g., `ENSP00000000233` to `ARF5`) [src/deepspotm/assets/ensp_to_gene.csv:1-1](). This is used primarily when dealing with protein-centric biological priors like ESM-2 or ProtT5.
+
+## StructureExpression Implementation
+
+The `StructureExpression` class in `modules.py` acts as the bridge between raw, per-sample expression dictionaries and the fixed-length tensors required by the `GeneRouter` and `CrossAttentionGeneDecoder`.
+
+### Initialization and Loading
+Upon instantiation, the class loads the vocabulary from the path defined in `config.ALPHABET_PATH` [src/deepspotm/modules.py:21-21](). It extracts only the symbols designated as "gene" to populate `self.gene_names_ordered` [src/deepspotm/modules.py:22-22]().
+
+### The `structure_expression` Method
+This method transforms a dictionary of `{gene_symbol: value}` into two synchronized tensors:
+1.  **Expression Tensor**: A `float32` tensor where the value at index `i` corresponds to the expression of the gene at `self.gene_names_ordered[i]` [src/deepspotm/modules.py:28-30]().
+2.  **Gene Mask**: A `bool` tensor indicating whether a gene was actually present in the input dictionary [src/deepspotm/modules.py:25-27]().
+
+### Logic Flow: Natural Language to Code Entity
+
+The following diagram illustrates how biological gene symbols are resolved through the system entities.
+
+**Gene Resolution Flow**
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        A["Gene Symbol (e.g., 'CD4')"]
+        B["Protein ID (e.g., 'ENSP00000011653')"]
+    end
+
+    subgraph "Code Entity Space (assets/)"
+        C["ensp_to_gene.csv"]
+        D["tokens.csv"]
+    end
+
+    subgraph "Code Entity Space (modules.py)"
+        E["StructureExpression.gene_names_ordered"]
+        F["StructureExpression.structure_expression()"]
+    end
+
+    A --> D
+    B --> C
+    C --> A
+    D --> E
+    E --> F
+    F --> G["expression_tensor (Dense Float)"]
+    F --> H["gene_mask (Boolean Mask)"]
+```
+Sources: [src/deepspotm/modules.py:11-32](), [src/deepspotm/assets/tokens.csv:1-20](), [src/deepspotm/assets/ensp_to_gene.csv:1-45]()
+
+## Expression Semantics and Constraints
+
+The `StructureExpression` logic enforces several constraints to maintain data integrity during the transformation process:
+
+| Feature | Implementation Detail | Source |
+| :--- | :--- | :--- |
+| **Normalization** | None. Input is expected to be pre-normalized (e.g., log1p-CPM). | [src/deepspotm/modules.py:14-17]() |
+| **Clamping** | All values are clamped to a minimum of `0.0` to prevent negative expression. | [src/deepspotm/modules.py:31-31]() |
+| **OOV Handling** | Out-of-Vocabulary (OOV) genes are ignored; they do not shift indices. | [tests/test_structure_expression.py:47-54]() |
+| **Padding** | Special tokens like `<pad>` are excluded from the ordered gene list. | [tests/test_structure_expression.py:16-17]() |
+| **Default Value** | Genes missing from the input dictionary are assigned a value of `0.0`. | [src/deepspotm/modules.py:29-29]() |
+
+## Data Flow: Sparse Dict to Dense Tensor
+
+The transformation process involves a lookup against the ordered vocabulary to ensure that every sample, regardless of which genes were measured, results in a tensor of the same dimensionality.
+
+**Tensor Construction Process**
+```mermaid
+graph LR
+    subgraph "Input"
+        Dict["dict: {'AASS': 3.0, 'Unknown': 5.0}"]
+    end
+
+    subgraph "StructureExpression Class"
+        Vocab["gene_names_ordered: ['NAALADL1', 'REXO2', 'KCNJ6', 'AASS', ...]"]
+        Loop["Iterate through Vocab"]
+        Lookup["expression.get(gene, 0.0)"]
+        Clamp["clamp_(min=0)"]
+    end
+
+    subgraph "Output Tensors"
+        Val["expression_tensor: [0.0, 0.0, 0.0, 3.0, ...]"]
+        Mask["gene_mask: [F, F, F, T, ...]"]
+    end
+
+    Dict --> Loop
+    Vocab --> Loop
+    Loop --> Lookup
+    Lookup --> Clamp
+    Clamp --> Val
+    Loop --> Mask
+```
+Sources: [src/deepspotm/modules.py:24-32](), [tests/test_structure_expression.py:20-35]()
+
+## OOV and Masking Behavior
+
+The `gene_mask` is critical for downstream loss calculation and evaluation. It allows the model to distinguish between a gene having "zero expression" (measured but not detected) and a gene being "missing" (not part of the assay). 
+
+*   **Measured Gene (Value 0)**: `expression_tensor[i] = 0.0`, `gene_mask[i] = True`.
+*   **Unmeasured/OOV Gene**: `expression_tensor[i] = 0.0`, `gene_mask[i] = False` [tests/test_structure_expression.py:51-54]().
+
+Sources:
+*   [src/deepspotm/modules.py:11-32]()
+*   [src/deepspotm/assets/tokens.csv:1-376]()
+*   [src/deepspotm/assets/ensp_to_gene.csv:1-294]()
+*   [tests/test_structure_expression.py:1-54]()
+
+---
+
+# Page: Inference Pipelines
+
+# Inference Pipelines
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [examples/predict.py](examples/predict.py)
+- [examples/predict_wsi.py](examples/predict_wsi.py)
+
+</details>
+
+
+
+DeepSpotM provides three primary entry points for inference, ranging from individual image tiles to whole-slide images (WSI) and evaluation notebooks. These pipelines leverage the `DeepSpotM.from_pretrained` method to load models and perform zero-shot or panel-wide gene expression prediction.
+
+## Pipeline Entry Points
+
+The following table summarizes the available inference workflows:
+
+| Entry Point | Target Data | Output Format | Dependencies |
+| :--- | :--- | :--- | :--- |
+| `predict.py` | Individual 224x224 tiles | CSV or Console | Core package |
+| `predict_wsi.py` | Whole-Slide Images (.svs, .tif, etc.) | AnnData (`.h5ad`) | `pyvips`, `anndata` |
+| `predict_tcga_skcm.ipynb` | TCGA WSI + Ground Truth | Visual Plots / Metrics | `scanpy`, `matplotlib` |
+
+### Core Inference Logic
+All pipelines share a common execution flow using the `DeepSpotM` class. They utilize `model.predict_genes` for targeted gene queries or the standard `forward` pass for the full ~19k gene panel.
+
+#### Data Flow Diagram: Tile to Prediction
+This diagram illustrates how the CLI scripts interact with the core model entities to produce expression values.
+
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        Input["H&E Image Tile"]
+        TargetGenes["Gene Symbols (e.g. 'EPCAM')"]
+    end
+
+    subgraph "Code Entity Space"
+        Input --> Proc["get_eval_transforms()"]
+        Proc --> Model["DeepSpotM.from_pretrained()"]
+        TargetGenes --> Pred["model.predict_genes()"]
+        Model --> Pred
+        Pred --> Out["log1p-CPM Expression"]
+    end
+```
+**Sources:** [examples/predict.py:121-125](), [examples/predict_wsi.py:97-100]()
+
+---
+
+## 3.1 Tile-Level Prediction (predict.py)
+The `predict.py` script is designed for processing pre-extracted H&E tiles. It is the most lightweight entry point and supports both single-gene and transcriptome-wide scoring.
+
+- **Background Filtering**: Uses a `--white-mean` threshold to skip tiles that are likely empty (e.g., slide background) [examples/predict.py:88-91]().
+- **Batching**: Tiles are processed in configurable batches to optimize GPU utilization [examples/predict.py:103-141]().
+- **Output**: Can print the top $N$ expressed genes to the console or save all results to a structured CSV [examples/predict.py:76-78]().
+
+For detailed CLI arguments and usage examples, see [Tile-Level Prediction (predict.py)](#3.1).
+
+**Sources:** [examples/predict.py:31-141]()
+
+---
+
+## 3.2 Whole-Slide Image Prediction (predict_wsi.py)
+The `predict_wsi.py` script provides a high-performance pipeline for clinical-scale slides. It uses `pyvips` for efficient random-access reading of multi-gigabyte files without loading the entire slide into memory.
+
+- **Two-Stage Filtering**: A low-resolution thumbnail is first used to identify candidate tissue regions, followed by a high-resolution check on individual tiles [examples/predict_wsi.py:47-76]().
+- **Spatial Metadata**: Generates an `AnnData` object where `obsm["spatial"]` contains the center coordinates of each tile, enabling immediate downstream analysis in `scanpy` or `squidpy` [examples/predict_wsi.py:116-136]().
+- **Native Resolution**: Automatically tiles the slide at its native resolution (typically ~20x) to match the model's training distribution [examples/predict_wsi.py:10-11]().
+
+For details on the AnnData construction and WSI tiling, see [Whole-Slide Image Prediction (predict_wsi.py)](#3.2).
+
+#### System Architecture: WSI Pipeline
+```mermaid
+graph LR
+    WSI["WSI File (.svs)"] -- "pyvips.Image" --> Tiler["tile_slide()"]
+    Tiler -- "224x224 PIL" --> Batcher["predict_slide()"]
+    Batcher -- "DeepSpotM" --> Results["Expression Tensors"]
+    Results --> AD["to_anndata()"]
+    AD --> H5AD[".h5ad file"]
+```
+**Sources:** [examples/predict_wsi.py:47-136]()
+
+---
+
+## 3.3 TCGA SKCM Evaluation Notebook
+The `predict_tcga_skcm.ipynb` notebook serves as a validation tutorial. It demonstrates how to use DeepSpotM in a "zero-shot" capacity to predict spatial expression on The Cancer Genome Atlas (TCGA) slides.
+
+- **Preprocessing**: Shows how to download open-access slides and prepare them for inference.
+- **Evaluation**: Compares model predictions against bulk or spatial ground truth using ROC-AUC and PR-AUC metrics.
+- **Visualization**: Provides code to overlay predicted gene expression heatmaps (e.g., *BRAF*, *CD37*) directly onto the H&E tissue image.
+
+For a walkthrough of the SKCM reproduction, see [TCGA SKCM Evaluation Notebook](#3.3).
+
+**Sources:** [README.md:129-138]()
+
+---
+
+# Page: Tile-Level Prediction (predict.py)
+
+# Tile-Level Prediction (predict.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [examples/predict.py](examples/predict.py)
+
+</details>
+
+
+
+The `predict.py` script provides a command-line interface (CLI) for performing spatial gene expression prediction on individual histology image tiles. It is designed for processing pre-cut 224x224 RGB patches, offering features for background filtering, gene subsetting, and batched inference.
+
+### Implementation Overview
+
+The script follows a standard data flow: path expansion, model initialization, batched prediction with optional background filtering, and result reporting.
+
+#### Image Collection and Filtering
+The script uses `collect_images` to resolve input paths into a sorted list of absolute `Path` objects [examples/predict.py:31-43](). It filters files based on a predefined set of image extensions (`.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff`, `.bmp`, `.webp`) [examples/predict.py:15-15]().
+
+Background filtering is implemented in the `predict` function loop. If `--skip-background` is enabled, the script calculates the mean pixel value of each tile using `np.asarray(image).mean()`. Tiles with a mean exceeding the `--white-mean` threshold (default 220.0) are discarded before being passed to the model [examples/predict.py:130-138]().
+
+#### Prediction Batch Loop
+The `predict` function manages the inference lifecycle:
+1.  **Batching**: It accumulates PIL images into `batch_tiles` until the `--batch-size` is reached [examples/predict.py:134-136]().
+2.  **Forward Pass**: Inside the `flush()` closure, tiles are stacked into a tensor and moved to the target device [examples/predict.py:120-120]().
+3.  **Gene Subsetting**: If specific genes are requested via `--genes`, it calls `model.predict_genes()` to compute only the relevant queries [examples/predict.py:122-123](). Otherwise, it executes a full forward pass [examples/predict.py:125-125]().
+4.  **Collection**: Predictions are moved back to CPU and concatenated into a single result tensor [examples/predict.py:126-140]().
+
+**Sources:** [examples/predict.py:31-43](), [examples/predict.py:103-141](), [examples/predict.py:15-15]().
+
+---
+
+### System Data Flow
+
+The following diagram illustrates the flow from raw image files to the final CSV or terminal output, highlighting the interaction between CLI arguments and core model functions.
+
+**Tile Prediction Data Flow**
+```mermaid
+graph TD
+    subgraph "Input Handling"
+        A["CLI Inputs (files/folders)"] --> B["collect_images()"]
+        B --> C["Sorted Path List"]
+    end
+
+    subgraph "Processing Loop"
+        C --> D["PIL.Image.open()"]
+        D --> E{"--skip-background?"}
+        E -- "Yes" --> F{"Mean > --white-mean?"}
+        F -- "True" --> G["Discard Tile"]
+        F -- "False" --> H["image_processor()"]
+        E -- "No" --> H
+        H --> I["Batch Buffer"]
+        I -- "Full" --> J["flush()"]
+    end
+
+    subgraph "Model Inference"
+        J --> K{"--genes set?"}
+        K -- "Yes" --> L["model.predict_genes()"]
+        K -- "No" --> M["model.forward()"]
+        L --> N["CPU Tensor Collection"]
+        M --> N
+    end
+
+    subgraph "Output"
+        N --> O{"--output CSV?"}
+        O -- "Yes" --> P["Write CSV (tiles x genes)"]
+        O -- "No" --> Q["Print Top-N Genes"]
+    end
+```
+**Sources:** [examples/predict.py:31-43](), [examples/predict.py:103-141](), [examples/predict.py:184-192]().
+
+---
+
+### CLI Arguments and Configuration
+
+The script exposes several parameters to control the behavior of the `DeepSpotM` model and the inference environment.
+
+| Argument | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `inputs` | Positional | N/A | One or more H&E tiles or folders of tiles. |
+| `--repo` | String | `ratschlab/DeepSpotM` | Hugging Face repo ID or local directory containing model files. |
+| `--source` | String | `scgpt` | Gene-embedding source (evo2, orthrus, prott5, scgpt, apertus). |
+| `--genes` | List | None | List of gene symbols to score (e.g., `EPCAM CD3D`). |
+| `--top` | Integer | 10 | Number of highest-expression genes to print if `--genes` is not set. |
+| `--output` | String | None | Path to write a CSV of all predictions. |
+| `--batch-size` | Integer | 16 | Number of tiles per forward pass. |
+| `--skip-background`| Flag | False | Filter out near-white tiles. |
+| `--white-mean` | Float | 220.0 | Pixel mean threshold for background filtering. |
+| `--device` | String | Auto | Compute device (`cuda` or `cpu`). |
+
+**Sources:** [examples/predict.py:53-100](), [examples/predict.py:16-16]().
+
+---
+
+### Code Entity Mapping
+
+This diagram maps CLI concepts to specific implementation entities within `predict.py` and `DeepSpotM`.
+
+**CLI to Code Entity Mapping**
+```mermaid
+graph LR
+    subgraph "CLI Layer (predict.py)"
+        ARG_SOURCE["--source"]
+        ARG_GENES["--genes"]
+        ARG_INPUTS["inputs"]
+        FUNC_PREDICT["predict()"]
+    end
+
+    subgraph "Model Layer (model.py)"
+        M_LOAD["DeepSpotM.from_pretrained"]
+        M_PRED_GENES["model.predict_genes"]
+        M_FWD["model.forward"]
+        M_GENES["model.gene_names"]
+    end
+
+    ARG_SOURCE -.-> M_LOAD
+    ARG_GENES -.-> M_PRED_GENES
+    ARG_INPUTS -.-> FUNC_PREDICT
+    FUNC_PREDICT --> M_PRED_GENES
+    FUNC_PREDICT --> M_FWD
+    M_GENES -.-> FUNC_PREDICT
+```
+**Sources:** [examples/predict.py:113-113](), [examples/predict.py:123-125](), [examples/predict.py:161-161]().
+
+---
+
+### Usage Examples
+
+#### Single Tile Analysis
+To identify the most expressed genes in a specific patch:
+```bash
+python examples/predict.py tile.png --top 5
+```
+**Sources:** [examples/predict.py:20-21]().
+
+#### Targeted Marker Scoring
+To score specific markers across a dataset and save the results for downstream analysis:
+```bash
+python examples/predict.py tiles/ --genes BRAF CD37 COL1A1 --output markers.csv
+```
+**Sources:** [examples/predict.py:23-24]().
+
+#### Background-Aware Batch Processing
+To process a large folder of tiles while skipping empty space, using a specific biological embedding source:
+```bash
+python examples/predict.py tiles/ --source prott5 --skip-background --white-mean 230 --batch-size 32
+```
+**Sources:** [examples/predict.py:84-91](), [examples/predict.py:62-65]().
+
+---
+
+# Page: Whole-Slide Image Prediction (predict_wsi.py)
+
+# Whole-Slide Image Prediction (predict_wsi.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [examples/predict_wsi.py](examples/predict_wsi.py)
+- [pyproject.toml](pyproject.toml)
+
+</details>
+
+
+
+The `predict_wsi.py` script provides a high-performance command-line interface for generating virtual spatial transcriptomics from Whole-Slide Images (WSIs). Unlike the basic `predict.py` script which handles individual image tiles, `predict_wsi.py` implements a complete pipeline for large-scale slide processing, including efficient background filtering using `pyvips`, batched model inference, and structured output in the `AnnData` format.
+
+### Data Flow and Architecture
+
+The script follows a linear pipeline: it discovers slide files, iterates through them to extract tissue-containing tiles, performs inference using a loaded `DeepSpotM` model, and aggregates results into a spatial `AnnData` object.
+
+#### WSI Prediction Pipeline
+```mermaid
+graph TD
+    subgraph "Input & Discovery"
+        A["CLI Arguments"] --> B["collect_slides()"]
+        B --> C["Slide Path List"]
+    end
+
+    subgraph "Tiling Engine (tile_slide)"
+        C --> D["pyvips.Image.thumbnail_image"]
+        D --> E["Stage 1: Grid Mean Filter"]
+        E --> F["Stage 2: Exact Pixel Filter"]
+        F --> G["PIL Image Generator"]
+    end
+
+    subgraph "Inference Engine (predict_slide)"
+        G --> H["image_processor"]
+        H --> I["DeepSpotM.predict_genes() / forward()"]
+        I --> J["Batch Accumulator"]
+    end
+
+    subgraph "Output Generation (to_anndata)"
+        J --> K["AnnData Construction"]
+        K --> L[".h5ad Output File"]
+    end
+```
+**Sources:** `[examples/predict_wsi.py:32-44]()`, `[examples/predict_wsi.py:47-77]()`, `[examples/predict_wsi.py:79-114]()`, `[examples/predict_wsi.py:116-136]()`
+
+---
+
+### Implementation Details
+
+#### 1. Efficient Tiling with `tile_slide()`
+The `tile_slide()` function implements a two-stage background filter to avoid processing empty regions (e.g., white space around the tissue) `[examples/predict_wsi.py:47-77]()`:
+
+*   **Stage 1 (Coarse):** It generates a thumbnail where one pixel represents one tile (e.g., 224x224 pixels) using `pyvips.Image.thumbnail_image` `[examples/predict_wsi.py:63-66]()`. Tiles whose corresponding thumbnail pixel is above a threshold (default `white_mean + 10`) are discarded immediately.
+*   **Stage 2 (Fine):** Candidate tiles are read at full resolution. If the mean pixel value of the actual 224x224 tile exceeds `--white-mean`, it is skipped `[examples/predict_wsi.py:74-75]()`.
+
+#### 2. Batched Inference with `predict_slide()`
+This function manages the interaction with the `DeepSpotM` model `[examples/predict_wsi.py:79-114]()`:
+*   **Gene Subsetting:** If specific genes are requested via `--genes`, it uses `model.predict_genes()` for optimized computation `[examples/predict_wsi.py:97-98]()`. Otherwise, it performs a full transcriptome forward pass `[examples/predict_wsi.py:99-100]()`.
+*   **Memory Management:** Tiles are accumulated into batches defined by `--batch-size` (default 64) before being moved to the GPU/device `[examples/predict_wsi.py:107-109]()`.
+
+#### 3. AnnData Construction
+The `to_anndata()` function formats the predictions for downstream analysis with `scanpy` or `squidpy` `[examples/predict_wsi.py:116-136]()`:
+*   **Spatial Coordinates:** Stores tile-center coordinates in `adata.obsm["spatial"]` `[examples/predict_wsi.py:131]()`.
+*   **Metadata:** The `adata.uns["deepspotm"]` dictionary tracks the slide name, tile size, gene embedding source, and expression units (log1p-CPM) `[examples/predict_wsi.py:132-135]()`.
+
+---
+
+### CLI Reference and Usage
+
+The script supports various WSI formats including `.svs`, `.ndpi`, and `.mrxs` `[examples/predict_wsi.py:29]()`.
+
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `inputs` | One or more slide paths or directories. | (Required) |
+| `--output`, `-o` | Output `.h5ad` file or directory. | `.` |
+| `--source` | Gene-embedding source (`scgpt`, `evo2`, etc.). | `scgpt` |
+| `--genes` | List of gene symbols to predict (space-separated). | Full Panel |
+| `--white-mean` | Pixel threshold for background filtering. | `220.0` |
+| `--batch-size` | Number of tiles per forward pass. | `64` |
+
+#### Code Entity Mapping
+```mermaid
+classDiagram
+    class CLI_Entrypoint {
+        +main()
+        +parse_args()
+    }
+    class SlideProcessor {
+        +collect_slides()
+        +tile_slide()
+    }
+    class ModelInference {
+        +predict_slide()
+        +flush()
+    }
+    class DataExporter {
+        +to_anndata()
+    }
+
+    CLI_Entrypoint --> SlideProcessor : "Discovers files"
+    SlideProcessor --> ModelInference : "Yields PIL Tiles"
+    ModelInference --> DataExporter : "Aggregates Tensors"
+```
+**Sources:** `[examples/predict_wsi.py:171-213]()`, `[examples/predict_wsi.py:32-44]()`, `[examples/predict_wsi.py:79-114]()`, `[examples/predict_wsi.py:116-136]()`
+
+#### Examples
+**Predict a specific marker panel for a single slide:**
+```bash
+python examples/predict_wsi.py sample.svs -o sample.h5ad --genes EPCAM CD3D PTPRC
+```
+
+**Process an entire directory of slides using the `evo2` source:**
+```bash
+python examples/predict_wsi.py ./slides_dir/ -o ./results/ --source evo2
+```
+
+**Sources:** `[examples/predict_wsi.py:17-21]()`, `[examples/predict_wsi.py:140-168]()`
+
+---
+
+# Page: TCGA SKCM Evaluation Notebook
+
+# TCGA SKCM Evaluation Notebook
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [examples/predict_tcga_skcm.ipynb](examples/predict_tcga_skcm.ipynb)
+
+</details>
+
+
+
+This page documents the `predict_tcga_skcm.ipynb` workflow, which demonstrates the end-to-end application of DeepSpotM on a whole-slide image (WSI) from the TCGA Skin Cutaneous Melanoma (SKCM) cohort. The notebook serves as a technical template for performing virtual spatial transcriptomics on large-scale pathology datasets.
+
+## Overview
+
+The evaluation notebook implements a pipeline that downloads a high-resolution `.svs` slide, performs background-aware tiling, and executes model inference to predict transcriptome-wide expression for specific marker genes. It reproduces the methodology used to generate the [TCGA virtual spatial transcriptomics atlas](https://huggingface.co/datasets/ratschlab/TCGA_virtual_spatial_transcriptomics_atlas).
+
+### Data Flow Architecture
+
+The diagram below illustrates the flow from raw WSI data to spatial gene expression maps.
+
+**WSI Inference Data Flow**
+```mermaid
+graph TD
+    subgraph "Data Acquisition"
+        GDC["GDC Data Portal"] -- "UUID Download" --> SVS["TCGA-SKCM .svs Slide"]
+    end
+
+    subgraph "Preprocessing (pyvips)"
+        SVS --> Thumb["Thumbnail (1px/tile)"]
+        Thumb --> Filter["Background Filter (Mean < 220)"]
+        Filter --> Tiles["Tissue Tiles (224x224)"]
+    end
+
+    subgraph "DeepSpotM Inference"
+        Tiles --> Enc["ImageEncoder (Midnight)"]
+        Enc --> Dec["CrossAttentionGeneDecoder"]
+        Dec --> Preds["Log1p-CPM Predictions"]
+    end
+
+    subgraph "Visualization"
+        Preds --> Overlay["Spatial Heatmap Overlay"]
+    end
+
+    style GDC stroke-dasharray: 5 5
+```
+
+**Sources:** `examples/predict_tcga_skcm.ipynb:8-46`()
+
+---
+
+## Implementation Details
+
+### 1. Data Loading and Preprocessing
+The notebook uses `pyvips` for lazy loading of pyramidal slides, which is critical for handling TCGA images that often exceed 90,000 pixels in width `[examples/predict_tcga_skcm.ipynb:156-159]()`. 
+
+*   **Background Filtering**: To optimize inference, a two-stage filter is applied. First, a low-resolution thumbnail is generated where one pixel corresponds to one 224x224 tile `[examples/predict_tcga_skcm.ipynb:162-167]()`. Second, an exact mean pixel filter (`WHITE_MEAN = 220`) is applied to individual tiles during the batch read process `[examples/predict_tcga_skcm.ipynb:74-74]()`.
+*   **Tiling**: The slide is divided into a non-overlapping grid of 224x224 patches, matching the expected input size of the `ImageEncoder` `[examples/predict_tcga_skcm.ipynb:73-73]()`.
+
+### 2. Model Inference
+The core of the prediction logic utilizes the `DeepSpotM.predict_genes` method. This allows for efficient querying of specific gene embeddings without computing the full 19,338-gene vocabulary.
+
+*   **Gene Selection**: In the SKCM example, three specific markers are targeted: `BRAF` (Melanoma driver), `CD37` (Lymphocytes), and `COL1A1` (Stroma) `[examples/predict_tcga_skcm.ipynb:72-72]()`.
+*   **Batch Processing**: Tiles are processed in batches (default `BATCH = 128`) to maximize GPU utilization `[examples/predict_tcga_skcm.ipynb:75-75]()`.
+
+### 3. Entity Mapping: Code to Logic
+The following diagram maps the logical steps in the notebook to the specific classes and methods within the `deepspotm` package.
+
+**Code Entity Mapping**
+```mermaid
+graph LR
+    subgraph "Notebook Logic"
+        Load["Load Model"]
+        Query["Query Genes"]
+        Inf["Run Inference"]
+    end
+
+    subgraph "deepspotm Package"
+        DSM["DeepSpotM (model.py)"]
+        GEB["MultiSourceGeneEmbedding (modules.py)"]
+        CAGD["CrossAttentionGeneDecoder (modules.py)"]
+    end
+
+    Load -- "from_pretrained()" --> DSM
+    Query -- "GENES list" --> GEB
+    Inf -- "predict_genes()" --> CAGD
+```
+
+**Sources:** `src/deepspotm/model.py:22-30`(), `src/deepspotm/modules.py:448-460`()
+
+---
+
+## Adapting to Other TCGA Cohorts
+
+The notebook is designed to be modular. To adapt this workflow to other cancer types (e.g., LUAD, BRCA), users should modify the following parameters:
+
+| Parameter | Description |
+| :--- | :--- |
+| `SLIDE_UUID` | The GDC File UUID for the target slide. |
+| `SLIDE_MD5` | The MD5 checksum for data integrity verification. |
+| `GENES` | A list of gene symbols relevant to the specific cancer type's pathology. |
+| `WHITE_MEAN` | May need adjustment if the slide has significant artifacts or different staining intensity. |
+
+### Evaluation Metrics
+While the notebook focuses on visualization, it sets the stage for quantitative evaluation:
+*   **ROC-AUC / PR-AUC**: If bulk RNA-seq data is available for the same patient, the spatial predictions can be aggregated (mean expression across all tissue tiles) and compared against bulk ground truth across a cohort.
+*   **Spatial Correlation**: If paired Visium data is available, the `AnnData` output can be used to calculate Spearman correlation between predicted and observed counts per spot.
+
+**Sources:** `examples/predict_tcga_skcm.ipynb:106-124`(), `src/deepspotm/model.py:202-215`()
+
+---
+
+# Page: Configuration and Assets
+
+# Configuration and Assets
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/assets/midnight_config.json](src/deepspotm/assets/midnight_config.json)
+- [src/deepspotm/assets/tokens.csv](src/deepspotm/assets/tokens.csv)
+- [src/deepspotm/config.py](src/deepspotm/config.py)
+
+</details>
+
+
+
+DeepSpotM utilizes a centralized configuration layer and a suite of packaged static assets to ensure consistency across its inference pipelines and model architectures. This infrastructure manages the gene vocabulary, cross-modality mappings, and offline model configurations required for spatial transcriptomics prediction.
+
+### Configuration Layer
+
+The package uses a singleton `Config` object to resolve system-level paths and environment settings. Its primary responsibility is locating the gene vocabulary "alphabet" file, which is critical for the `StructureExpression` module and the `DeepSpotM` LightningModule.
+
+The configuration logic implements a robust resolution strategy using `importlib.resources` to support various deployment environments, including standard pip installations and development clones.
+
+For details, see [Config Module (config.py)](#4.1).
+
+### Packaged Assets
+
+DeepSpotM bundles several essential data files within the `src/deepspotm/assets/` directory. These assets provide the biological and structural context necessary for the model to map visual features to gene expression levels:
+
+*   **Gene Vocabulary**: A comprehensive list of 19,338 gene entries used to define the output space of the decoder.
+*   **Protein Mappings**: Cross-reference tables for Ensembl protein IDs to gene symbols.
+*   **Backbone Configurations**: JSON definitions for offline image encoders, such as the Midnight backbone.
+
+For details, see [Packaged Assets](#4.2).
+
+### System Relationship Diagram
+
+The following diagram illustrates how the `Config` module bridges the physical asset files to the functional code entities within the model.
+
+**Configuration and Asset Flow**
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        A["Gene Vocabulary"]
+        B["Backbone Config"]
+        C["Protein Map"]
+    end
+
+    subgraph "Code Entity Space (Assets)"
+        direction TB
+        ASSET1["tokens.csv"]
+        ASSET2["midnight_config.json"]
+        ASSET3["ensp_to_gene.csv"]
+    end
+
+    subgraph "Code Entity Space (Logic)"
+        CONF["Config class"]
+        SE["StructureExpression"]
+        ME["MidnightEncoder"]
+    end
+
+    A --- ASSET1
+    B --- ASSET2
+    C --- ASSET3
+
+    ASSET1 -->|"ALPHABET_PATH"| CONF
+    CONF --> SE
+    ASSET2 --> ME
+```
+**Sources:** [src/deepspotm/config.py:5-19](), [src/deepspotm/assets/tokens.csv:1-376](), [src/deepspotm/assets/midnight_config.json:1-47]()
+
+### Asset Resolution Logic
+
+The package prioritizes modern Python resource handling but maintains fallbacks for legacy environments. This ensures that the `ALPHABET_PATH` is always valid, whether the package is running from a `.whl` file or a local source tree.
+
+**Asset Resolution Hierarchy**
+```mermaid
+graph TD
+    START["Request Asset Path"]
+    TRY["importlib.resources.files()"]
+    SUCCESS["Path resolved via package metadata"]
+    FAIL["Fallback to __file__.parent"]
+    END["ALPHABET_PATH"]
+
+    START --> TRY
+    TRY -- "Success" --> SUCCESS
+    TRY -- "Exception" --> FAIL
+    SUCCESS --> END
+    FAIL --> END
+```
+**Sources:** [src/deepspotm/config.py:11-16]()
+
+### Summary Table of Assets
+
+| Asset File | Purpose | Primary Consumer |
+| :--- | :--- | :--- |
+| `tokens.csv` | Defines the 19,338 gene vocabulary and token IDs. | `StructureExpression` [src/deepspotm/config.py:12-16]() |
+| `midnight_config.json` | Configuration for the `Dinov2Model` backbone. | `MidnightEncoder` [src/deepspotm/assets/midnight_config.json:1-5]() |
+| `ensp_to_gene.csv` | Maps Ensembl Protein IDs to Gene Symbols. | Gene Decoder utilities |
+
+**Sources:** [src/deepspotm/config.py:11-16](), [src/deepspotm/assets/tokens.csv:1-20](), [src/deepspotm/assets/midnight_config.json:1-16]()
+
+---
+
+# Page: Config Module (config.py)
+
+# Config Module (config.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- [src/deepspotm/config.py](src/deepspotm/config.py)
+
+</details>
+
+
+
+The `config.py` module serves as the centralized configuration layer for the DeepSpotM package. Its primary responsibility is the resolution and management of paths to static assets required by the model, specifically the gene vocabulary. It provides a singleton `config` object that is consumed by other modules to ensure consistent access to packaged data regardless of the installation environment (e.g., source tree, installed wheel, or editable install).
+
+### The Config Class
+
+The `Config` class encapsulates global settings and asset paths. In the current implementation, it focuses on the robust resolution of the gene vocabulary file (`tokens.csv`).
+
+#### ALPHABET_PATH Resolution Logic
+
+The module employs a two-tier resolution strategy for `ALPHABET_PATH` to ensure compatibility across different Python versions and deployment scenarios:
+
+1.  **Primary Path (`importlib.resources.files`)**: The implementation uses `importlib.resources.files` to locate assets within the `deepspotm.assets` namespace [src/deepspotm/config.py:8-14](). This is the modern, non-deprecated method for accessing package data, replacing the context-managed `path()` function which could lead to invalid references if the path outlived the context manager [src/deepspotm/config.py:8-10]().
+2.  **Fallback Path (`__file__`)**: If the resource-based lookup fails (e.g., in environments where the package structure is not standard or during certain development setups), the class falls back to a relative path resolution using `Path(__file__).resolve().parent` to navigate to the `assets` directory [src/deepspotm/config.py:15-16]().
+
+| Attribute | Type | Description |
+| :--- | :--- | :--- |
+| `ALPHABET_PATH` | `pathlib.Path` | Resolved absolute path to the `tokens.csv` file containing the 19,338 gene vocabulary entries. |
+
+**Sources:**
+- [src/deepspotm/config.py:5-17]()
+
+---
+
+### Config Consumption and Lifecycle
+
+The module exports a singleton instance named `config` [src/deepspotm/config.py:19](). This instance is initialized at import time, performing the path resolution immediately.
+
+#### Entity Relationship Diagram
+
+The following diagram illustrates how the `config` singleton bridges the filesystem assets to the high-level model components.
+
+"Config and Asset Resolution"
+```mermaid
+graph TD
+    subgraph "Filesystem / Package Assets"
+        A["tokens.csv"]
+    end
+
+    subgraph "deepspotm.config"
+        B["Config Class"]
+        C["config (singleton)"]
+        D["ALPHABET_PATH"]
+    end
+
+    subgraph "deepspotm.modules"
+        E["StructureExpression"]
+    end
+
+    A -.->|Resolved by| B
+    B -->|Instantiated as| C
+    C -->|Exposes| D
+    D -->|Consumed by| E
+```
+**Sources:**
+- [src/deepspotm/config.py:5-19]()
+- [.github/workflows/ci.yml:79-82]()
+
+---
+
+### Integration with Core Modules
+
+The `ALPHABET_PATH` provided by the `config` object is critical for the initialization of the `StructureExpression` class in `modules.py`. This class uses the path to load the gene vocabulary, which defines the indices and names for the spatial transcriptomics prediction tasks.
+
+The integrity of this configuration is validated during the Continuous Integration (CI) process. Specifically, the `import-check` job verifies that:
+1.  The `config.ALPHABET_PATH` points to a valid file within a built wheel [ .github/workflows/ci.yml:81]().
+2.  The `StructureExpression` class can successfully load exactly 19,338 gene names using this path [ .github/workflows/ci.yml:82]().
+
+#### Data Flow: Config to Model
+
+"Config to Model Data Flow"
+```mermaid
+flowchart LR
+    subgraph "Config Space"
+        CONFIG["config.py"]
+        PATH["config.ALPHABET_PATH"]
+    end
+
+    subgraph "Logic Space"
+        SE["StructureExpression"]
+        LOAD["pd.read_csv()"]
+    end
+
+    subgraph "State Space"
+        GENES["gene_names_ordered"]
+    end
+
+    CONFIG --> PATH
+    PATH --> SE
+    SE -->|Uses Path| LOAD
+    LOAD -->|Populates| GENES
+```
+
+**Sources:**
+- [src/deepspotm/config.py:11-16]()
+- [.github/workflows/ci.yml:79-82]()
+
+---
+
+# Page: Packaged Assets
+
+# Packaged Assets
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [pyproject.toml](pyproject.toml)
+- [src/deepspotm/assets/__init__.py](src/deepspotm/assets/__init__.py)
+- [src/deepspotm/assets/ensp_to_gene.csv](src/deepspotm/assets/ensp_to_gene.csv)
+- [src/deepspotm/assets/midnight_config.json](src/deepspotm/assets/midnight_config.json)
+- [src/deepspotm/assets/tokens.csv](src/deepspotm/assets/tokens.csv)
+
+</details>
+
+
+
+This page documents the static data files bundled within the `deepspotm` package. These assets provide the necessary metadata for gene vocabulary management, protein-to-gene mapping, and offline model configuration. These files are located in `src/deepspotm/assets/` and are essential for the `StructureExpression` module and various image encoders.
+
+## Packaging and Distribution
+
+The assets are bundled into the Python package using `setuptools`. The `pyproject.toml` file explicitly includes all `.csv` and `.json` files within the `assets` directory to ensure they are available in the installed site-packages.
+
+| Asset File | Format | Purpose |
+|:---|:---|:---|
+| `tokens.csv` | CSV | Master vocabulary of 19,338 genes and tokens. |
+| `ensp_to_gene.csv` | CSV | Mapping from Ensembl Protein IDs to Gene Symbols. |
+| `midnight_config.json` | JSON | Offline configuration for the Midnight (DINOv2-based) backbone. |
+
+**Sources:**
+* `pyproject.toml` [82-83]()
+
+## Gene Vocabulary (`tokens.csv`)
+
+The `tokens.csv` file defines the canonical ordering and indexing for the DeepSpotM model's output space. It contains 19,338 entries.
+
+### Structure
+The file contains three columns:
+1.  `token`: The string identifier (e.g., "KRT19").
+2.  `token_type`: Categorization of the token, primarily `gene`.
+3.  `token_id`: The integer index used for tensor operations.
+
+### Implementation Flow
+The `StructureExpression` class in `modules.py` loads this file to initialize the `gene_names_ordered` list. This list determines the mapping between the model's output logits and specific gene symbols.
+
+**Sources:**
+* `src/deepspotm/assets/tokens.csv` [1-376]()
+
+## Protein Mapping (`ensp_to_gene.csv`)
+
+This asset provides a lookup table to translate Ensembl Protein IDs (ENSP) to standard Gene Symbols. This is particularly useful when interfacing with external datasets or foundation models that utilize protein-level identifiers.
+
+### Data Example
+| ENSP ID | Gene Symbol |
+|:---|:---|
+| `ENSP00000000233` | `ARF5` |
+| `ENSP00000000412` | `M6PR` |
+| `ENSP00000011653` | `CD4` |
+
+**Sources:**
+* `src/deepspotm/assets/ensp_to_gene.csv` [1-294]()
+
+## Midnight Configuration (`midnight_config.json`)
+
+This file contains the architectural parameters for the `MidnightEncoder`. It allows the model to initialize the `Dinov2Model` backbone without requiring an active internet connection to fetch configurations from the Hugging Face Hub.
+
+### Key Parameters
+*   **Architecture**: `Dinov2Model` [src/deepspotm/assets/midnight_config.json:4]()
+*   **Hidden Size**: 1536 [src/deepspotm/assets/midnight_config.json:10]()
+*   **Patch Size**: 14 [src/deepspotm/assets/midnight_config.json:26]()
+*   **Target Layers**: Configured to extract features from `stage12` (index 12) [src/deepspotm/assets/midnight_config.json:20-25]()
+
+**Sources:**
+* `src/deepspotm/assets/midnight_config.json` [1-47]()
+
+## Data Flow: Assets to Model Entities
+
+The following diagram illustrates how these packaged assets are consumed by the core classes of the DeepSpotM library.
+
+### Asset Consumption Diagram
+```mermaid
+graph TD
+    subgraph "Packaged Assets (src/deepspotm/assets/)"
+        A1["tokens.csv"]
+        A2["ensp_to_gene.csv"]
+        A3["midnight_config.json"]
+    end
+
+    subgraph "Code Entities"
+        C1["StructureExpression (modules.py)"]
+        C2["MidnightEncoder (image_encoder.py)"]
+        C3["Config (config.py)"]
+    end
+
+    A1 -->|"loads gene_names_ordered"| C1
+    A3 -->|"initializes Dinov2Model"| C2
+    A1 & A2 & A3 -->|"resolved via ALPHABET_PATH"| C3
+    C3 -->|"provides paths to"| C1
+    C3 -->|"provides paths to"| C2
+```
+**Sources:**
+* `pyproject.toml` [82-83]()
+* `src/deepspotm/assets/tokens.csv` [1-1]()
+* `src/deepspotm/assets/midnight_config.json` [1-16]()
+
+## Vocabulary Resolution Logic
+
+The system uses a centralized `Config` entity to resolve the location of these assets, ensuring that whether the package is installed as a site-package or used in a development environment, the files are correctly located.
+
+### Path Resolution Sequence
+```mermaid
+sequenceDiagram
+    participant M as DeepSpotM Module
+    participant CFG as config.py (Config)
+    participant RES as importlib.resources
+    participant AST as assets/tokens.csv
+
+    M->>CFG: Request ALPHABET_PATH
+    CFG->>RES: files("deepspotm.assets")
+    RES-->>CFG: Return absolute path
+    CFG-->>M: Path to tokens.csv
+    M->>AST: Read 19,338 gene entries
+```
+
+**Sources:**
+* `pyproject.toml` [79-83]()
+* `src/deepspotm/assets/tokens.csv` [1-376]()
+
+---
+
+# Page: Checkpoint Loading and State-Dict Utilities
+
+# Checkpoint Loading and State-Dict Utilities
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/checkpoint.py](src/deepspotm/checkpoint.py)
+- [tests/test_checkpoint.py](tests/test_checkpoint.py)
+
+</details>
+
+
+
+The `checkpoint.py` module provides robust utilities for loading model weights into the `DeepSpotM` architecture. It serves as a safety layer to prevent "silent failures" where a model might load partially mismatched weights (e.g., due to vocabulary changes or hyperparameter drift) and produce garbage predictions without raising an error.
+
+### State-Dict Filtering and Drift Detection
+
+DeepSpotM employs a strict loading policy. Because the model's gene vocabulary and embedding sources can be dynamically swapped, standard PyTorch `load_state_dict` calls are wrapped in guards that distinguish between expected architectural differences and unexpected weight drift.
+
+#### Key Prefixes
+The `VOCAB_SPECIFIC_PREFIXES` constant identifies keys that are tied to the specific gene vocabulary used during training. These keys must be handled carefully during cross-vocabulary loading [src/deepspotm/checkpoint.py:20-23]().
+
+| Prefix | Description |
+| :--- | :--- |
+| `gene_decoder.gene_embeddings` | The weight matrix for gene tokens. |
+| `gene_decoder._router_bio_emb` | The biological embeddings used by the `GeneRouter` hypernetwork. |
+
+#### Implementation Logic
+The loading process uses `filter_state_dict` to remove specific keys from a checkpoint before injection [src/deepspotm/checkpoint.py:50-54](). Following the load, `check_state_dict_load` compares the missing and unexpected keys against allow-lists. If any keys are missing or unexpected that were not explicitly permitted, a `RuntimeError` is raised to prevent execution with uninitialized weights [src/deepspotm/checkpoint.py:57-87]().
+
+**Sources:** [src/deepspotm/checkpoint.py:20-23](), [src/deepspotm/checkpoint.py:50-54](), [src/deepspotm/checkpoint.py:57-87](), [tests/test_checkpoint.py:24-32]().
+
+---
+
+### Loading for Prediction
+
+The `load_for_prediction` function is the primary entry point for inference. It handles three distinct scenarios: standard loads, cross-vocabulary loads, and multi-source collapse [src/deepspotm/checkpoint.py:89-95]().
+
+#### Data Flow: Checkpoint to Model
+The following diagram illustrates how `load_for_prediction` orchestrates the construction of a `DeepSpotM` instance from a `.ckpt` file.
+
+**Checkpoint Loading Sequence**
+```mermaid
+sequenceDiagram
+    participant C as Checkpoint File
+    participant H as Hyperparameters
+    participant M as DeepSpotM Instance
+    participant D as CrossAttentionGeneDecoder
+
+    C->>H: Extract hparams
+    Note over H: If cross_vocab, set token_path=None
+    H->>M: Instantiate DeepSpotM(**hparams)
+    
+    alt is cross_vocab
+        M->>D: swap_gene_vocabulary(target_vocab)
+        Note right of D: Reinitializes embeddings/routers
+        C->>C: filter_state_dict(VOCAB_SPECIFIC_PREFIXES)
+    end
+
+    alt is multi_source
+        C->>C: _multi_source_drop_prefixes(other_sources)
+        Note right of C: Discard non-target source weights
+    end
+
+    C->>M: load_state_dict(filtered_state, strict=False)
+    M->>M: check_state_dict_load(missing, unexpected)
+```
+**Sources:** [src/deepspotm/checkpoint.py:89-159](), [src/deepspotm/checkpoint.py:26-47]().
+
+---
+
+### Cross-Vocabulary and Multi-Source Support
+
+DeepSpotM supports models trained on one set of genes (e.g., a specific panel) being applied to another (e.g., Whole Transcriptome) via the `CrossAttentionGeneDecoder.swap_vocabulary` mechanism.
+
+#### Multi-Source Collapse
+When a checkpoint contains multiple embedding sources (e.g., `["protbert", "esm2"]`), the loader can "collapse" the model to a single source at load time. This is managed by `_multi_source_drop_prefixes`, which identifies and removes weights belonging to the unused sources [src/deepspotm/checkpoint.py:26-47]().
+
+*   **Logic**: It drops `bio_{other}`, `adapters.{other}.*`, and `routers.{other}.*` for every source except the one specified by the `source` argument [src/deepspotm/checkpoint.py:39-46]().
+
+#### Function Mapping
+| Feature | Code Entity | Purpose |
+| :--- | :--- | :--- |
+| **Cross-Vocab** | `load_for_prediction` | Detects `token_path` and `gene_embeddings_path` to trigger `swap_gene_vocabulary` [src/deepspotm/checkpoint.py:119-148](). |
+| **Filtering** | `filter_state_dict` | Prevents shape-mismatched weights from overwriting freshly swapped layers [src/deepspotm/checkpoint.py:50-54](). |
+| **Validation** | `check_state_dict_load` | Ensures that the `RuntimeError` is only suppressed for keys that were intentionally dropped [src/deepspotm/checkpoint.py:75-87](). |
+
+**Sources:** [src/deepspotm/checkpoint.py:26-47](), [src/deepspotm/checkpoint.py:89-159]().
+
+---
+
+### LoRA Save/Load Contract
+
+While `checkpoint.py` handles the state-dict level, the `DeepSpotM` model (defined in `model.py`) manages the structural integration of LoRA (Low-Rank Adaptation) weights within the `ImageEncoder`.
+
+**System Name to Code Entity Mapping**
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        LORA["LoRA Adaptation"]
+        CKPT["Model Checkpoint"]
+        STATE["State Dictionary"]
+    end
+
+    subgraph "Code Entity Space"
+        DS["DeepSpotM (model.py)"]
+        IE["ImageEncoder (image_encoder.py)"]
+        CF["filter_state_dict (checkpoint.py)"]
+        CL["check_state_dict_load (checkpoint.py)"]
+    end
+
+    LORA -->|Integrated into| IE
+    CKPT -->|Parsed by| DS
+    STATE -->|Cleaned by| CF
+    STATE -->|Validated by| CL
+    DS -->|Uses| IE
+```
+
+#### Implementation Details
+*   **Initialization**: When `DeepSpotM` is initialized, it builds the encoder via `build_encoder`. If `lora_rank` is specified in hyperparameters, the encoder wraps specific layers (e.g., `qkv` projections) with LoRA weights.
+*   **Loading**: Because LoRA weights are new parameters not present in the base backbone, `load_for_prediction` must account for these keys during `check_state_dict_load`. If the checkpoint was trained with LoRA, the runtime model must also be instantiated with the same `lora_rank` to ensure the `state_dict` keys match.
+
+**Sources:** [src/deepspotm/checkpoint.py:89-163](), [src/deepspotm/model.py:21-45]().
+
+---
+
+# Page: Image Preprocessing Utilities (utils.py)
+
+# Image Preprocessing Utilities (utils.py)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [src/deepspotm/utils.py](src/deepspotm/utils.py)
+- [tests/test_utils.py](tests/test_utils.py)
+
+</details>
+
+
+
+The `utils.py` module provides robust image transformation pipelines designed to standardize heterogeneous input formats into the specific tensor formats required by DeepSpotM's image encoders. It ensures that data originating from diverse sources—such as TIAToolbox (numpy-uint8), PIL-based WSI loaders, or pre-loaded PyTorch tensors—undergo identical normalization and geometric processing.
+
+### Multi-Format Input Handling
+
+The primary utility, `get_eval_transforms`, constructs a `torchvision.transforms.Compose` pipeline that dynamically handles four distinct input types:
+1.  **NumPy uint8**: Standard HWC arrays (0-255).
+2.  **NumPy float**: HWC arrays (0.0-1.0).
+3.  **PIL Image**: Standard Python Imaging Library objects.
+4.  **PyTorch Tensor**: CHW tensors, which are converted back to HWC for consistent geometric transformation via PIL.
+
+#### Transform Pipeline Logic
+The pipeline follows a strict sequence to ensure consistency:
+1.  **Format Canonicalization**: All inputs are converted to a PIL Image via the internal `ensure_pil` lambda [src/deepspotm/utils.py:33-52](). This handles the `CHW -> HWC` permutation and `float -> uint8` scaling for tensors [src/deepspotm/utils.py:41-45]().
+2.  **Geometric Scaling**: If `target_img_size` is specified, the image is resized using `BICUBIC` interpolation [src/deepspotm/utils.py:55-56]().
+3.  **Spatial Alignment**: If `center_crop` is enabled, a square crop is taken from the center of the resized image [src/deepspotm/utils.py:58-61]().
+4.  **Tensor Conversion**: The PIL Image is converted to a `torch.Tensor` (scaling values to `[0.0, 1.0]`) [src/deepspotm/utils.py:63-68]().
+5.  **Standardization**: If mean and standard deviation are provided, the tensor is normalized [src/deepspotm/utils.py:71-72]().
+
+**Entity Mapping: Input Types to Processing Logic**
+
+| Input Entity | Code Implementation | Target State |
+| :--- | :--- | :--- |
+| `np.ndarray` (uint8) | `Image.fromarray(x)` | PIL Image |
+| `np.ndarray` (float) | `(x * 255).clip(0, 255).astype(np.uint8)` | PIL Image |
+| `torch.Tensor` | `x.permute(1, 2, 0).numpy()` | PIL Image |
+| `PIL.Image` | Pass-through | PIL Image |
+
+Sources: [src/deepspotm/utils.py:26-74](), [tests/test_utils.py:26-48]()
+
+### Normalization Parameter Extraction
+
+DeepSpotM supports various backbone architectures (e.g., Midnight, CLIP, TIMM-based models), each requiring specific normalization constants. The `get_normalize_params` function provides an introspection layer to extract these parameters from different configuration objects.
+
+#### Supported Sources
+*   **torchvision.transforms.Compose**: Iterates through the transform list to find a `transforms.Normalize` instance [src/deepspotm/utils.py:14-18]().
+*   **HuggingFace Processors/Dicts**: Retrieves `image_mean` and `image_std` keys, commonly used in `CLIPImageProcessor` [src/deepspotm/utils.py:20-23]().
+
+**Natural Language to Code Entity: Parameter Extraction**
+
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        A["'Standardization Constants'"]
+        B["'HuggingFace Config'"]
+        C["'Torchvision Pipeline'"]
+    end
+
+    subgraph "Code Entity Space (utils.py)"
+        D["get_normalize_params()"]
+        E["transforms.Normalize"]
+        F["obj.get('image_mean')"]
+    end
+
+    A --> D
+    B --> F
+    C --> E
+    D --> E
+    D --> F
+```
+Sources: [src/deepspotm/utils.py:7-23](), [tests/test_utils.py:74-95]()
+
+### Data Flow Diagram
+
+The following diagram illustrates the flow of a raw input (e.g., a tile from a Whole Slide Image) through the `get_eval_transforms` pipeline to the final tensor used by the `ImageEncoder`.
+
+**Image Preprocessing Pipeline**
+
+```mermaid
+flowchart LR
+    Input["Input (NP/PIL/Tensor)"] --> PIL["ensure_pil()"]
+    PIL --> Resize["transforms.Resize"]
+    Resize --> Crop["transforms.CenterCrop"]
+    Crop --> ToTensor["ensure_tensor()"]
+    ToTensor --> Norm["transforms.Normalize"]
+    Norm --> Final["Output Tensor (3, H, W)"]
+
+    subgraph "Format Standardization"
+        PIL
+    end
+
+    subgraph "Geometric Transform"
+        Resize
+        Crop
+    end
+
+    subgraph "Value Normalization"
+        ToTensor
+        Norm
+    end
+```
+Sources: [src/deepspotm/utils.py:26-74](), [tests/test_utils.py:3-6]()
+
+### Summary of Implementation Details
+
+| Feature | implementation | Requirement/Constraint |
+| :--- | :--- | :--- |
+| **Resize Interpolation** | `InterpolationMode.BICUBIC` | [src/deepspotm/utils.py:56]() |
+| **Center Crop Guard** | `assert target_img_size > 0` | Requires target size if cropping [src/deepspotm/utils.py:59]() |
+| **Tensor Conversion** | `transforms.ToTensor()` | Converts HWC [0, 255] to CHW [0.0, 1.0] [src/deepspotm/utils.py:67]() |
+| **Unsupported Types** | `TypeError` | Fails loudly on non-image inputs [src/deepspotm/utils.py:51-52]() |
+
+Sources: [src/deepspotm/utils.py:1-74](), [tests/test_utils.py:50-72]()
+
+---
+
+# Page: Testing
+
+# Testing
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [tests/test_checkpoint.py](tests/test_checkpoint.py)
+- [tests/test_decoder.py](tests/test_decoder.py)
+- [tests/test_packaging.py](tests/test_packaging.py)
+- [tests/test_structure_expression.py](tests/test_structure_expression.py)
+- [tests/test_utils.py](tests/test_utils.py)
+
+</details>
+
+
+
+The DeepSpotM test suite is designed to ensure the integrity of the spatial transcriptomics pipeline, from image preprocessing to gene expression decoding. Because the model weights are gated, the test suite emphasizes **contract testing** and **asset integrity** to ensure that the package functions correctly across different environments without requiring a GPU or large model downloads.
+
+The testing philosophy focuses on preventing silent regressions in the output format (e.g., gene ordering) and verifying that the packaged assets (vocabulary files) are correctly bundled in the distribution wheel.
+
+### Test Architecture Overview
+
+The following diagram maps the testing modules to the core system components they validate.
+
+**System Validation Map**
+```mermaid
+graph TD
+    subgraph "Testing Suite"
+        T_DEC["test_decoder.py"]
+        T_SE["test_structure_expression.py"]
+        T_CP["test_checkpoint.py"]
+        T_UTIL["test_utils.py"]
+        T_PKG["test_packaging.py"]
+    end
+
+    subgraph "DeepSpotM Core Entities"
+        C_DEC["CrossAttentionGeneDecoder"]
+        C_SE["StructureExpression"]
+        C_UTIL["get_eval_transforms"]
+        C_LOAD["check_state_dict_load"]
+        C_ASSETS["/assets/*.csv"]
+    end
+
+    T_DEC -- "validates contract of" --> C_DEC
+    T_SE -- "validates vocabulary of" --> C_SE
+    T_UTIL -- "validates transforms in" --> C_UTIL
+    T_CP -- "validates loading logic in" --> C_LOAD
+    T_PKG -- "validates existence of" --> C_ASSETS
+```
+**Sources:** [tests/test_decoder.py:1-8](), [tests/test_packaging.py:1-7](), [tests/test_checkpoint.py:1-6]()
+
+---
+
+### Unit Tests: Decoder, StructureExpression, and Utils
+
+These tests verify the mathematical and logical correctness of the core modules. They use small, randomly initialized versions of the model components to assert that the internal data flow remains consistent.
+
+*   **Decoder Contract**: Ensures `CrossAttentionGeneDecoder` returns the standard `(expression, gene_features, attn_weights)` triple [tests/test_decoder.py:46-55](). It specifically validates that the `gene_indices` parameter correctly subsets and reorders the output tensor [tests/test_decoder.py:57-78]().
+*   **Vocabulary Handling**: Verifies that `StructureExpression` correctly maps gene symbols to tensor indices and handles Out-of-Vocabulary (OOV) symbols or negative expression values via clamping [tests/test_structure_expression.py:37-54]().
+*   **Preprocessing Pipeline**: Validates `get_eval_transforms` against multiple input formats including `numpy-uint8`, `PIL`, and `torch.Tensor` to ensure they all normalize to the same expected shape and distribution [tests/test_utils.py:26-48]().
+
+For details, see [Unit Tests: Decoder, StructureExpression, and Utils](#7.1).
+
+**Sources:** [tests/test_decoder.py:13-17](), [tests/test_structure_expression.py:9-10](), [tests/test_utils.py:14-14]()
+
+---
+
+### Checkpoint and Packaging Tests
+
+These tests focus on the distribution and deployment safety of the DeepSpotM package. They ensure that users installing the package via `pip` receive all necessary metadata and that model weights load predictably.
+
+*   **State-Dict Guards**: Validates the `check_state_dict_load` function, which prevents silent failures when loading checkpoints by detecting "key drift" between the saved weights and the model architecture [tests/test_checkpoint.py:55-59]().
+*   **Asset Integrity**: Confirms that critical files like `tokens.csv` (containing the 19,338 gene vocabulary) and `ensp_to_gene.csv` are physically present in the installed wheel [tests/test_packaging.py:35-44]().
+*   **Modality Consistency**: Ensures that the internal modality registries (e.g., `MODALITY_VOCABULARY`) are consistent with the source mapping [tests/test_decoder.py:89-93]().
+
+For details, see [Checkpoint and Packaging Tests](#7.2).
+
+**Sources:** [tests/test_checkpoint.py:10-14](), [tests/test_packaging.py:17-19](), [tests/test_packaging.py:46-58]()
+
+---
+
+### Test Execution Flow
+
+The test suite is designed to be run via `pytest`. The following diagram illustrates how the tests interact with the packaged assets versus the code logic.
+
+**Test Data Interaction**
+```mermaid
+sequenceDiagram
+    participant P as Pytest Runner
+    participant T as Test Modules
+    participant C as deepspotm.config
+    participant A as Packaged Assets (tokens.csv)
+
+    P->>T: Execute test_vocabulary_loads_from_packaged_assets
+    T->>C: Request ALPHABET_PATH
+    C->>A: Resolve via importlib.resources
+    A-->>T: Load 19,338 gene names
+    T->>T: Assert len(gene_names_ordered) == 19338
+    T-->>P: Pass/Fail
+```
+**Sources:** [tests/test_packaging.py:59-63](), [tests/test_structure_expression.py:12-18]()
+
+---
+
+### Summary of Coverage
+
+| Test Module | Primary Target | Key Assertion |
+| :--- | :--- | :--- |
+| `test_decoder.py` | `CrossAttentionGeneDecoder` | Output shape is `(batch, n_genes)` [tests/test_decoder.py:51]() |
+| `test_structure_expression.py` | `StructureExpression` | Maps `{"gene": val}` to correct tensor index [tests/test_structure_expression.py:20-35]() |
+| `test_utils.py` | `get_eval_transforms` | Normalizes `numpy` and `PIL` to identical tensors [tests/test_utils.py:42-48]() |
+| `test_checkpoint.py` | `filter_state_dict` | Correctly drops `VOCAB_SPECIFIC_PREFIXES` [tests/test_checkpoint.py:24-32]() |
+| `test_packaging.py` | `deepspotm.assets` | `tokens.csv` is present and non-empty [tests/test_packaging.py:39-44]() |
+
+**Sources:** [tests/test_decoder.py:1-93](), [tests/test_structure_expression.py:1-54](), [tests/test_utils.py:1-95](), [tests/test_checkpoint.py:1-68](), [tests/test_packaging.py:1-63]()
+
+---
+
+# Page: Unit Tests: Decoder, StructureExpression, and Utils
+
+# Unit Tests: Decoder, StructureExpression, and Utils
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [tests/test_decoder.py](tests/test_decoder.py)
+- [tests/test_structure_expression.py](tests/test_structure_expression.py)
+- [tests/test_utils.py](tests/test_utils.py)
+
+</details>
+
+
+
+This section covers the unit testing suite for the core gene decoding logic, the vocabulary mapping system, and the image preprocessing utilities. These tests ensure the mathematical contract of the decoder is maintained, the packaged gene assets are valid, and the multi-format image pipeline is robust against varying input types.
+
+## Decoder Contract and Integrity
+
+The tests in `test_decoder.py` validate the `CrossAttentionGeneDecoder` without requiring large pretrained checkpoints. They focus on the output shapes, the behavior of gene subsetting, and the consistency of the modality registry.
+
+### Decoder Output Contract
+The `forward` method of the `CrossAttentionGeneDecoder` is required to return a specific three-tuple: `(expression, gene_features, attn_weights)` [tests/test_decoder.py:46-49]().
+*   **Expression**: A tensor of shape `(batch, n_requested_genes)` [tests/test_decoder.py:51]().
+*   **Gene Features**: A tensor of shape `(batch, gene_embed_dim)` representing the aggregated query features [tests/test_decoder.py:52]().
+*   **Attention**: Defaults to `None` unless `need_weights=True` is passed for interpretability paths [tests/test_decoder.py:53, 80-87]().
+
+### Subsetting and Ordering
+The decoder supports a `gene_indices` argument which allows for efficient computation of only a subset of the vocabulary. The tests verify that:
+1.  **Subsetting**: Passing a tensor of indices returns only those specific genes, matching the values produced in a full forward pass [tests/test_decoder.py:57-65]().
+2.  **Ordering**: The order of columns in the output tensor strictly follows the order of indices provided in the `gene_indices` tensor [tests/test_decoder.py:68-78]().
+
+### Modality Registry Consistency
+The system maintains a mapping between data sources and modalities. The tests ensure that every entry in `MODALITY_BY_SOURCE` maps to a valid entry in `MODALITY_VOCABULARY` and that "dna" remains the canonical first entry (index 0) for one-hot encoding stability [tests/test_decoder.py:89-93]().
+
+### Decoder Testing Logic
+The following diagram illustrates the relationship between the test fixtures and the decoder's internal logic.
+
+**Decoder Test Flow**
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        A["Gene Selection"]
+        B["Interpretability"]
+    end
+
+    subgraph "Code Entity Space"
+        direction TB
+        C["test_gene_indices_subset_the_output"]
+        D["test_need_weights_returns_attention"]
+        E["CrossAttentionGeneDecoder.forward()"]
+        F["gene_indices (Tensor)"]
+        G["need_weights (Bool)"]
+        
+        C -->|provides| F
+        D -->|sets| G
+        F --> E
+        G --> E
+        E --> H["(expression, gene_features, attn)"]
+    end
+```
+**Sources:** [tests/test_decoder.py:1-93](), [src/deepspotm/modules.py:1-50]()
+
+---
+
+## StructureExpression and Vocabulary
+
+`test_structure_expression.py` validates the `StructureExpression` class, which handles the conversion of raw gene-expression dictionaries into fixed-length tensors compatible with the model's vocabulary.
+
+### Vocabulary Integrity
+The tests verify that the packaged `tokens.csv` is correctly resolved and loaded. The standard vocabulary size is expected to be exactly **19,338** genes [tests/test_structure_expression.py:12-15](). It also ensures that special tokens like `<pad>` are filtered out of the `gene_names_ordered` list [tests/test_structure_expression.py:16-17]().
+
+### Mapping and Masking Logic
+The `structure_expression()` method performs several critical operations:
+*   **Placement**: Maps gene symbols to their correct index in the output tensor [tests/test_structure_expression.py:20-31]().
+*   **Masking**: Generates a boolean mask where `True` indicates the gene was present in the input dictionary [tests/test_structure_expression.py:32-33]().
+*   **Clamping**: Ensures all expression values are non-negative by clamping values below zero [tests/test_structure_expression.py:37-45]().
+*   **OOV Handling**: Out-of-vocabulary (OOV) symbols are silently ignored and do not corrupt the resulting tensor or mask [tests/test_structure_expression.py:47-54]().
+
+**Vocabulary Mapping System**
+```mermaid
+graph LR
+    subgraph "Input Data"
+        D["Dict[str, float]"]
+    end
+
+    subgraph "StructureExpression (Code Entity)"
+        S["structure_expression()"]
+        V["gene_names_ordered"]
+        C["Clamping Logic"]
+    end
+
+    subgraph "Outputs"
+        T["values (Tensor)"]
+        M["mask (BoolTensor)"]
+    end
+
+    D --> S
+    V --> S
+    S --> C
+    C --> T
+    S --> M
+```
+**Sources:** [tests/test_structure_expression.py:1-54](), [src/deepspotm/modules.py:1-50]()
+
+---
+
+## Image Preprocessing Utilities
+
+`test_utils.py` covers the `get_eval_transforms` and `get_normalize_params` functions, which form the entry point for all image data into the model.
+
+### Multi-Format Input Pipeline
+`get_eval_transforms` is designed to be polymorphic. The test suite uses a parameter matrix to ensure that the following input types all result in a standardized `(3, 224, 224)` float32 tensor [tests/test_utils.py:26-48]():
+*   **Numpy (uint8)**: Standard HWC image arrays.
+*   **Numpy (float32)**: Normalized arrays.
+*   **PIL Image**: Standard Python Imaging Library objects.
+*   **Torch Tensor**: CHW formatted tensors.
+
+### Constraints and Errors
+*   **Normalization**: The tests verify that if `mean` and `std` are provided, the output is standardized; otherwise, it is scaled to `[0, 1]` [tests/test_utils.py:56-65]().
+*   **Validation**: The transform rejects unsupported types (e.g., strings) with a `TypeError` [tests/test_utils.py:50-54]().
+*   **Configuration**: `center_crop=True` requires a valid `target_img_size` to be specified, or it raises an `AssertionError` [tests/test_utils.py:68-72]().
+
+### Parameter Recovery
+`get_normalize_params` is tested for its ability to extract normalization constants from two distinct sources:
+1.  **Torchvision Pipelines**: Introspecting a `transforms.Compose` object to find a `Normalize` step [tests/test_utils.py:74-82]().
+2.  **HuggingFace Processors**: Reading from a dictionary containing `image_mean` and `image_std` keys [tests/test_utils.py:90-95]().
+
+| Input Source | Recovery Method | Expected Result |
+| :--- | :--- | :--- |
+| `transforms.Compose` | Search for `transforms.Normalize` | `(mean, std)` |
+| `dict` | Key lookup (`image_mean`) | `(mean, std)` |
+| `Compose` (no Norm) | Exhaustive search | `(None, None)` |
+
+**Sources:** [tests/test_utils.py:1-95](), [src/deepspotm/utils.py:1-50]()
+
+---
+
+# Page: Checkpoint and Packaging Tests
+
+# Checkpoint and Packaging Tests
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- [tests/test_checkpoint.py](tests/test_checkpoint.py)
+- [tests/test_packaging.py](tests/test_packaging.py)
+
+</details>
+
+
+
+This page documents the testing infrastructure responsible for ensuring the integrity of the DeepSpotM distribution and the safety of model weight loading. These tests prevent silent failures caused by missing assets in the wheel or partial state-dict loads that would otherwise result in uninitialized weights during inference.
+
+## Checkpoint Guard Mechanism
+
+The `checkpoint.py` module implements guards to prevent architecture-checkpoint mismatches. `test_checkpoint.py` validates these guards to ensure that any "key drift" (missing or unexpected keys) between a state-dict and a model instance is explicitly caught unless specifically allowed.
+
+### State-Dict Filtering and Validation
+The system identifies specific modules that are tied to the gene vocabulary. When loading a model with a different vocabulary or source configuration, these keys are expected to drift. The `VOCAB_SPECIFIC_PREFIXES` constant defines these sensitive areas [tests/test_checkpoint.py:10-14]().
+
+| Function | Purpose | Implementation Detail |
+| :--- | :--- | :--- |
+| `filter_state_dict` | Removes keys matching specific prefixes. | Used to strip vocabulary-specific weights when performing cross-vocabulary loading [tests/test_checkpoint.py:24-33](). |
+| `check_state_dict_load` | Validates `missing_keys` and `unexpected_keys`. | Raises `RuntimeError` if drift is detected outside of allowed prefixes [tests/test_checkpoint.py:55-59](). |
+
+### Key Drift Detection Flow
+The following diagram illustrates how `check_state_dict_load` evaluates the success of a weight loading operation.
+
+**Checkpoint Validation Logic**
+```mermaid
+graph TD
+    subgraph "check_state_dict_load"
+        A["Input: missing_keys, unexpected_keys"] --> B{"Are lists empty?"}
+        B -- "Yes" --> C["Accept Clean Load"]
+        B -- "No" --> D{"Are drifts in allow_lists?"}
+        D -- "Yes" --> E["Permit Load (Expected Drift)"]
+        D -- "No" --> F["Raise RuntimeError: unaccounted-for key drift"]
+    end
+    
+    subgraph "test_checkpoint.py"
+        T1["test_check_state_dict_load_accepts_clean_load"] --> A
+        T2["test_check_state_dict_load_rejects_unexplained_drift"] --> A
+        T3["test_check_state_dict_load_honours_allow_lists"] --> A
+    end
+```
+**Sources:** [tests/test_checkpoint.py:43-68]()
+
+## Packaging and Asset Integrity
+
+The packaging tests in `test_packaging.py` verify that the DeepSpotM wheel is correctly built and contains all static assets required for inference. Since model weights are gated on the Hugging Face Hub, these tests ensure the package structure is sound even when the environment is offline (`HF_HUB_OFFLINE=1`) [.github/workflows/ci.yml:60-61]().
+
+### Asset Verification
+The test suite confirms the existence and non-zero size of critical files in `deepspotm.assets` [tests/test_packaging.py:35-43]():
+*   `tokens.csv`: The gene vocabulary and token ID mapping.
+*   `ensp_to_gene.csv`: Ensembl protein ID to gene symbol mapping.
+*   `midnight_config.json`: Configuration for the Midnight backbone.
+
+### Vocabulary Integrity
+A core requirement for model consistency is the stability of the gene panel. `test_token_vocabulary_matches_model_panel` asserts that `tokens.csv` contains exactly 19,338 gene entries [tests/test_packaging.py:17-19](). It also verifies that `token_id` values form a dense range from `0` to `n-1`, as the `CrossAttentionGeneDecoder` indexes into these IDs directly [tests/test_packaging.py:54-57]().
+
+**Sources:** [tests/test_packaging.py:1-63]()
+
+## CI/CD Integration
+
+The testing philosophy is enforced through three primary GitHub Action jobs in `ci.yml`.
+
+### Job: `test`
+Runs the `pytest` suite across a matrix of Python versions (3.10–3.13) [.github/workflows/ci.yml:30-36](). It installs a CPU-only version of `torch` and `torchvision` to optimize runner performance and avoid CUDA dependency conflicts [.github/workflows/ci.yml:49-50]().
+
+### Job: `import-check`
+This is a "black-box" validation job. It builds a wheel, moves outside the source tree to `/tmp`, and installs the wheel [.github/workflows/ci.yml:73-77](). It executes a script to verify:
+1.  `config.ALPHABET_PATH` resolves to a valid file within the installed site-packages [.github/workflows/ci.yml:81]().
+2.  `StructureExpression().gene_names_ordered` reports exactly 19,338 genes [.github/workflows/ci.yml:82]().
+
+### System Component Mapping
+The following diagram bridges the CI validation steps to the internal code entities they protect.
+
+**CI Validation to Code Entity Mapping**
+```mermaid
+graph LR
+    subgraph "CI Job: import-check"
+        IC1["config.ALPHABET_PATH existence"]
+        IC2["len(gene_names_ordered) == 19338"]
+    end
+
+    subgraph "Code Entity Space"
+        Config["deepspotm.config.Config"]
+        SE["deepspotm.modules.StructureExpression"]
+        Assets["deepspotm/assets/tokens.csv"]
+    end
+
+    IC1 -.->|"validates path in"| Config
+    Config -->|"points to"| Assets
+    IC2 -.->|"validates count in"| SE
+    SE -->|"parses"| Assets
+```
+**Sources:** [.github/workflows/ci.yml:63-84](), [tests/test_packaging.py:59-63]()
+
+## Summary of Test Constraints
+
+| Test Target | Constraint / Requirement | Source |
+| :--- | :--- | :--- |
+| **State-Dict Keys** | Must match exactly unless prefix is in `VOCAB_SPECIFIC_PREFIXES`. | [tests/test_checkpoint.py:17-22]() |
+| **Gene Count** | Must be exactly 19,338 in `tokens.csv`. | [tests/test_packaging.py:46-52]() |
+| **Token IDs** | Must be a dense range (0, 1, 2... N). | [tests/test_packaging.py:54-57]() |
+| **Environment** | `HF_HUB_OFFLINE` must be set to `1` during CI. | [.github/workflows/ci.yml:60-61]() |
+| **Installation** | Package must be importable from a built `.whl` file. | [.github/workflows/ci.yml:74-84]() |
+
+**Sources:** [tests/test_checkpoint.py:1-68](), [tests/test_packaging.py:1-63](), [.github/workflows/ci.yml:1-100]()
+
+---
+
+# Page: CI/CD and Release Infrastructure
+
+# CI/CD and Release Infrastructure
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.github/dependabot.yml](.github/dependabot.yml)
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+- [.github/workflows/release.yml](.github/workflows/release.yml)
+
+</details>
+
+
+
+The DeepSpotM project utilizes GitHub Actions to automate the software development lifecycle, ensuring code quality through rigorous testing and facilitating secure package distribution. The infrastructure is designed to handle the specific challenges of machine learning repositories, such as managing large dependencies (PyTorch) and verifying the integrity of packaged assets like gene vocabularies.
+
+## Automation Overview
+
+The automation suite is divided into three primary functional areas:
+1.  **Continuous Integration**: Validates code changes via linting, multi-version testing, and wheel integrity checks.
+2.  **Release Management**: Handles automated publishing to PyPI using Trusted Publishing (OIDC).
+3.  **Dependency Maintenance**: Keeps the "model stack" and scientific computing libraries up to date via grouped updates.
+
+### System Workflow Diagram
+
+The following diagram illustrates the relationship between code changes, the CI pipeline, and the eventual release to PyPI.
+
+**DeepSpotM Pipeline Orchestration**
+```mermaid
+graph TD
+    subgraph "Development"
+        PR["Pull Request / Push"]
+    end
+
+    subgraph "CI Pipeline (ci.yml)"
+        LINT["ruff check/format"]
+        TEST["pytest (Python 3.10-3.13)"]
+        IMPC["import-check (Wheel Validation)"]
+        BUILD["twine check --strict"]
+    end
+
+    subgraph "Release (release.yml)"
+        TAG["Git Tag v*"]
+        VER["tomllib Version Check"]
+        PYPI["PyPI (OIDC Publishing)"]
+    end
+
+    PR --> LINT
+    PR --> TEST
+    PR --> IMPC
+    LINT & TEST & IMPC --> BUILD
+    TAG --> VER
+    VER --> PYPI
+```
+Sources: [.github/workflows/ci.yml:1-100](), [.github/workflows/release.yml:1-88]()
+
+---
+
+## Continuous Integration (CI)
+
+The CI pipeline is triggered on every push to the `main` branch and all pull requests. It focuses on ensuring that the package remains functional across supported Python versions and that the internal gene vocabulary assets are correctly bundled.
+
+Key features of the CI environment:
+*   **CPU-only Optimization**: To minimize runner overhead, CI uses CPU-only `torch` and `torchvision` wheels, avoiding massive CUDA downloads [.github/workflows/ci.yml:49-50]().
+*   **Offline Mode**: The environment variable `HF_HUB_OFFLINE: "1"` is enforced to ensure tests rely only on local assets or mock data, preventing failures due to gated Hugging Face Hub access [.github/workflows/ci.yml:60-61]().
+*   **Wheel Validation**: A dedicated `import-check` job installs the built `.whl` in a clean environment to verify that `ALPHABET_PATH` and the `StructureExpression` vocabulary are correctly included [.github/workflows/ci.yml:63-84]().
+
+For detailed configuration of the test matrix and environment constraints, see **[Continuous Integration (ci.yml)](#8.1)**.
+
+Sources: [.github/workflows/ci.yml:30-62](), [.github/workflows/ci.yml:63-84]()
+
+---
+
+## Release and Dependency Management
+
+DeepSpotM uses a secure release process and proactive dependency tracking to maintain stability in a fast-moving ecosystem.
+
+### Secure Publishing
+Releases are primarily triggered by Git tags (e.g., `v1.0.0`). The `release.yml` workflow performs a strict version check, ensuring the Git tag matches the `version` field in `pyproject.toml` before publishing [.github/workflows/release.yml:38-50](). It utilizes **OpenID Connect (OIDC)** Trusted Publishing, which eliminates the need for long-lived PyPI tokens stored in repository secrets [.github/workflows/release.yml:3-6]().
+
+### Proactive Maintenance
+Dependabot is configured to manage updates on a weekly cadence. To prevent PR fatigue, updates are organized into logical groups:
+*   `model-stack`: Deep learning libraries like `torch`, `timm`, and `peft`.
+*   `scientific-python`: Core data science tools like `numpy` and `pandas`.
+*   `dev-tooling`: Testing and linting utilities.
+
+For details on the release triggers and OIDC configuration, see **[Release and Dependency Management](#8.2)**.
+
+**Code-to-Workflow Association**
+```mermaid
+graph LR
+    subgraph "Code Entities"
+        PYPROJ["pyproject.toml"]
+        STRUCT["StructureExpression"]
+        CONFIG["config.ALPHABET_PATH"]
+    end
+
+    subgraph "Workflow Actions"
+        VER_CHECK["tomllib.loads() Validation"]
+        IMP_CHECK["python -c 'import deepspotm'"]
+    end
+
+    PYPROJ -- "version source" --> VER_CHECK
+    STRUCT -- "gene count check" --> IMP_CHECK
+    CONFIG -- "file existence check" --> IMP_CHECK
+```
+Sources: [.github/workflows/ci.yml:77-84](), [.github/workflows/release.yml:41-44](), [.github/dependabot.yml:1-41]()
+
+---
+
+## Child Pages
+
+*   **[Continuous Integration (ci.yml)](#8.1)**: Detailed breakdown of the `lint`, `test`, `import-check`, and `build` jobs.
+*   **[Release and Dependency Management](#8.2)**: Guide to the release workflow, OIDC setup, and Dependabot grouping strategy.
+
+---
+
+# Page: Continuous Integration (ci.yml)
+
+# Continuous Integration (ci.yml)
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
+
+</details>
+
+
+
+The Continuous Integration (CI) pipeline for DeepSpotM is defined in `.github/workflows/ci.yml`. It ensures code quality through automated linting, validates the package against multiple Python versions, and performs "black-box" verification of the built distribution to ensure critical assets are correctly bundled.
+
+Sources: [.github/workflows/ci.yml:1-7]()
+
+## Pipeline Workflow Overview
+
+The CI workflow is triggered on every `push` to the `main` branch, all `pull_request` events, and manual `workflow_dispatch` triggers [.github/workflows/ci.yml:3-7](). To optimize runner usage, `concurrency` is configured to cancel in-progress runs if a new commit is pushed to the same branch [.github/workflows/ci.yml:9-11]().
+
+### CI Job Structure
+
+| Job | Purpose | Environment |
+| :--- | :--- | :--- |
+| `lint` | Enforces code style and formatting using `ruff`. | Ubuntu, Python 3.12 |
+| `test` | Runs the `pytest` suite across a Python version matrix. | Ubuntu, Python 3.10–3.13 |
+| `import-check` | Validates that the built wheel contains necessary assets (CSV files). | Ubuntu, Python 3.12 |
+| `build` | Verifies the build process and checks distribution metadata. | Ubuntu, Python 3.12 |
+
+Sources: [.github/workflows/ci.yml:17-100]()
+
+## Implementation Details
+
+### Linting and Formatting
+The `lint` job uses `ruff` to check and format the codebase. Currently, this is scoped specifically to the `tests/` directory to maintain existing style in the core library while ensuring new tests adhere to standards [.github/workflows/ci.yml:24-28]().
+
+### Test Matrix and Environment
+The `test` job executes the suite against Python versions 3.10, 3.11, 3.12, and 3.13 [.github/workflows/ci.yml:34-36](). 
+
+#### Torch Synchronization Requirement
+A critical constraint in the environment setup is the synchronization of `torch` and `torchvision`. The pipeline explicitly installs CPU-only versions from the PyTorch index [.github/workflows/ci.yml:49-50](). This prevents the runner from downloading large CUDA binaries (~2.5 GB) and avoids a common failure where `timm` or `lightning` might pull a mismatched `torchvision` version from PyPI, leading to the error: `"operator torchvision::nms does not exist"` [.github/workflows/ci.yml:45-48]().
+
+#### Offline Execution
+Because DeepSpotM model weights are gated on the Hugging Face Hub, the CI environment does not have access to authentication tokens. The `test` job sets `HF_HUB_OFFLINE: "1"` to ensure tests only use packaged assets or randomly initialized modules, preventing attempts to reach the external Hub [.github/workflows/ci.yml:55-61]().
+
+### Wheel Validation (import-check)
+The `import-check` job is a "black-box" validation step. Unlike the `test` job which runs against the source tree, this job builds a `.whl`, installs it, and runs a script from a temporary directory [.github/workflows/ci.yml:73-77](). This verifies that `package-data` defined in `pyproject.toml` is correctly included in the distribution.
+
+It specifically validates:
+1.  **Asset Resolution**: Confirms `config.ALPHABET_PATH` points to a valid file on disk [.github/workflows/ci.yml:81]().
+2.  **Vocabulary Integrity**: Instantiates `StructureExpression` and asserts that the `gene_names_ordered` list contains exactly 19,338 genes [.github/workflows/ci.yml:82]().
+
+Sources: [.github/workflows/ci.yml:30-85]()
+
+## Data Flow and Logic
+
+The following diagram illustrates the progression of code from a commit through the various validation stages of the CI pipeline.
+
+**CI Pipeline Data Flow**
+```mermaid
+graph TD
+    subgraph "Triggers"
+        A["git push / PR"] --> B["ci.yml"]
+    end
+
+    subgraph "Validation Jobs"
+        B --> L["Job: lint"]
+        B --> T["Job: test (Matrix 3.10-3.13)"]
+        B --> IC["Job: import-check"]
+        B --> BU["Job: build"]
+    end
+
+    subgraph "Test Execution Environment"
+        T --> T1["pip install torch torchvision --index-url (CPU)"]
+        T1 --> T2["HF_HUB_OFFLINE=1"]
+        T2 --> T3["pytest"]
+    end
+
+    subgraph "Wheel Verification Logic"
+        IC --> IC1["python -m build"]
+        IC1 --> IC2["pip install dist/*.whl"]
+        IC2 --> IC3["Check config.ALPHABET_PATH"]
+        IC3 --> IC4["Check len(StructureExpression().gene_names_ordered)"]
+    end
+
+    subgraph "Distribution"
+        BU --> D1["twine check --strict"]
+        D1 --> D2["Upload Artifact: dist"]
+    end
+```
+Sources: [.github/workflows/ci.yml:17-100]()
+
+## Code Entity Association
+
+This diagram maps the CI configuration steps to the specific Python entities and assets they validate within the DeepSpotM package.
+
+**CI Validation to Code Mapping**
+```mermaid
+graph LR
+    subgraph "GitHub Action Step"
+        S1["import-check: config.ALPHABET_PATH"]
+        S2["import-check: gene_names_ordered count"]
+        S3["test: pytest -q"]
+        S4["lint: ruff check tests/"]
+    end
+
+    subgraph "Codebase Entity"
+        E1["deepspotm.config.Config"]
+        E2["deepspotm.modules.StructureExpression"]
+        E3["tests/*.py"]
+    end
+
+    subgraph "System Assets"
+        A1["src/deepspotm/assets/tokens.csv"]
+    end
+
+    S1 -- "validates path in" --> E1
+    E1 -- "resolves to" --> A1
+    S2 -- "verifies count in" --> E2
+    E2 -- "loads data from" --> A1
+    S3 -- "executes" --> E3
+    S4 -- "checks style in" --> E3
+```
+Sources: [.github/workflows/ci.yml:27-28](), [.github/workflows/ci.yml:79-82]()
+
+---
+
+# Page: Release and Dependency Management
+
+# Release and Dependency Management
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.github/dependabot.yml](.github/dependabot.yml)
+- [.github/workflows/release.yml](.github/workflows/release.yml)
+
+</details>
+
+
+
+This page documents the automation infrastructure for releasing DeepSpotM to the Python Package Index (PyPI) and the strategy for managing third-party dependencies. The system leverages GitHub Actions for secure, OIDC-based publishing and Dependabot for structured dependency updates.
+
+## Release Workflow (`release.yml`)
+
+The release process is managed by `.github/workflows/release.yml`. It supports two primary triggers: tag-based production releases and manual dispatch for testing.
+
+### Execution Triggers
+1.  **Tag-based Release**: Pushing a tag matching the pattern `v*` (e.g., `v1.0.0`) triggers a build and deployment to the production PyPI environment [`.github/workflows/release.yml`:8-13]().
+2.  **Manual Dispatch**: Developers can manually trigger the workflow via `workflow_dispatch`, selecting either `testpypi` or `pypi` as the target destination [`.github/workflows/release.yml`:14-21]().
+
+### Build and Validation Logic
+The `build` job ensures that the package is valid before any publishing occurs:
+*   **Artifact Generation**: Uses the `build` module to generate source distributions and wheels [`.github/workflows/release.yml`:34-35]().
+*   **Strict Twine Check**: Executes `twine check --strict` to validate that the package metadata is compliant and will be accepted by PyPI [`.github/workflows/release.yml`:36-36]().
+*   **Version Validation**: For tag-based triggers, the workflow uses `tomllib` to extract the version from `pyproject.toml` and compares it against the git tag. If they do not match, the workflow fails to prevent version mismatch in the repository history [`.github/workflows/release.yml`:38-49]().
+
+### OIDC Trusted Publishing
+DeepSpotM uses **Trusted Publishing** (OpenID Connect). This eliminates the need for long-lived PyPI API tokens stored as repository secrets.
+*   **Permissions**: The jobs require `id-token: write` permissions to exchange a GitHub token for a short-lived PyPI session token [`.github/workflows/release.yml`:63-64](), [`.github/workflows/release.yml`:81-82]().
+*   **Environments**: Publishing is gated by GitHub Environments (`pypi` and `testpypi`), allowing for environment-specific protection rules [`.github/workflows/release.yml`:60-62](), [`.github/workflows/release.yml`:78-80]().
+
+### Release Pipeline Flow
+The following diagram illustrates the data flow from a developer action to the final PyPI publication.
+
+**Release Workflow Data Flow**
+```mermaid
+graph TD
+    subgraph "Trigger Space"
+        A["git tag v*"] -- "Push Tags" --> B["GitHub Action: Release"]
+        C["Manual Dispatch"] -- "Select Target" --> B
+    end
+
+    subgraph "Build Job (ubuntu-latest)"
+        B --> D["python -m build"]
+        D --> E["twine check --strict"]
+        E --> F{"Is Tag Trigger?"}
+        F -- "Yes" --> G["tomllib Version Check"]
+        G --> H["Upload Artifact: dist/"]
+        F -- "No" --> H
+    end
+
+    subgraph "Publishing Space (OIDC)"
+        H --> I{"Target?"}
+        I -- "testpypi" --> J["pypa/gh-action-pypi-publish"]
+        I -- "pypi" --> K["pypa/gh-action-pypi-publish"]
+        J -- "OIDC Exchange" --> L["TestPyPI Repository"]
+        K -- "OIDC Exchange" --> M["PyPI Repository"]
+    end
+```
+*Sources: [`.github/workflows/release.yml`:1-89]()*
+
+## Dependency Management (`dependabot.yml`)
+
+DeepSpotM uses `.github/dependabot.yml` to maintain its dependency tree. Given the fast-moving nature of the machine learning ecosystem, the configuration uses **Dependency Grouping** to minimize noise while ensuring the model stack remains current.
+
+### Grouping Strategy
+Dependencies are categorized into four logical groups to consolidate Pull Requests [`.github/dependabot.yml`:12-42]():
+
+| Group | Included Patterns | Purpose |
+| :--- | :--- | :--- |
+| `model-stack` | `torch`, `lightning`, `timm`, `peft`, `transformers`, `safetensors`, `huggingface_hub` | Core ML infrastructure; high risk of breaking changes. |
+| `scientific-python` | `numpy`, `pandas`, `pillow` | Data processing and array manipulation. |
+| `dev-tooling` | `pytest*`, `ruff`, `build`, `twine` | Testing, linting, and packaging tools. |
+| `actions` | `*` (GitHub Actions) | CI/CD workflow security and feature updates. |
+
+### Configuration Parameters
+*   **Schedule**: Checked weekly to avoid daily interruption [`.github/dependabot.yml`:10-10](), [`.github/dependabot.yml`:37-37]().
+*   **Open PR Limit**: Capped at 5 open PRs to prevent backlog exhaustion [`.github/dependabot.yml`:11-11]().
+*   **Ecosystems**: Covers both `pip` (via `pyproject.toml`) and `github-actions` [`.github/dependabot.yml`:7-7](), [`.github/dependabot.yml`:34-34]().
+
+### Dependency Ecosystem Mapping
+This diagram maps the logical groups defined in the configuration to the specific code entities and ecosystems they manage.
+
+**Dependency Grouping Architecture**
+```mermaid
+graph LR
+    subgraph "Dependabot Configuration"
+        Config[".github/dependabot.yml"]
+    end
+
+    subgraph "Group: model-stack"
+        GS1["torch / lightning"]
+        GS2["timm / peft"]
+        GS3["transformers / safetensors"]
+    end
+
+    subgraph "Group: scientific-python"
+        GP1["numpy"]
+        GP2["pandas"]
+        GP3["pillow"]
+    end
+
+    subgraph "Group: dev-tooling"
+        GD1["pytest"]
+        GD2["ruff"]
+        GD3["twine / build"]
+    end
+
+    Config --> GS1 & GS2 & GS3
+    Config --> GP1 & GP2 & GP3
+    Config --> GD1 & GD2 & GD3
+    
+    GS1 & GS2 & GS3 -.-> P1["pyproject.toml [project.dependencies]"]
+    GP1 & GP2 & GP3 -.-> P1
+    GD1 & GD2 & GD3 -.-> P2["pyproject.toml [project.optional-dependencies]"]
+```
+*Sources: [`.github/dependabot.yml`:1-42]()*
+
+## Summary of Release Operations
+
+| Task | Command / Action | File Reference |
+| :--- | :--- | :--- |
+| **Validate Version** | `python -c "import tomllib; ..."` | [`.github/workflows/release.yml`:41-44]() |
+| **Strict Check** | `twine check --strict dist/*` | [`.github/workflows/release.yml`:36-36]() |
+| **Publish** | `pypa/gh-action-pypi-publish` | [`.github/workflows/release.yml`:70-70](), [`.github/workflows/release.yml`:88-88]() |
+| **Group Updates** | `dependabot.yml` groups | [`.github/dependabot.yml`:12-32]() |
+
+Sources:
+*   [`.github/workflows/release.yml`:1-89]()
+*   [`.github/dependabot.yml`:1-42]()
+
+---
+
+# Page: Glossary
+
+# Glossary
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [CITATION.cff](CITATION.cff)
+- [README.md](README.md)
+- [pyproject.toml](pyproject.toml)
+- [src/deepspotm/assets/tokens.csv](src/deepspotm/assets/tokens.csv)
+- [src/deepspotm/checkpoint.py](src/deepspotm/checkpoint.py)
+- [src/deepspotm/image_encoder.py](src/deepspotm/image_encoder.py)
+- [src/deepspotm/model.py](src/deepspotm/model.py)
+- [src/deepspotm/modules.py](src/deepspotm/modules.py)
+- [tests/test_decoder.py](tests/test_decoder.py)
+
+</details>
+
+
+
+This glossary defines technical terms, domain concepts, and implementation details specific to the **DeepSpotM** codebase. It serves as a reference for engineers to understand the mapping between biological concepts and the architectural components of the model.
+
+## 1. Core Model Concepts
+
+### Virtual Spatial Transcriptomics
+The process of predicting transcriptome-wide gene expression from histology (H&E) images. DeepSpotM performs this by tokenizing image tiles and using gene-specific queries to predict expression levels [README.md:24-32]().
+
+### Zero-Shot Gene Prediction
+The ability to predict expression for genes not seen during training. This is enabled by the `GeneRouter` hypernetwork, which generates output projections from biological embeddings rather than learning a fixed weight matrix for a static set of genes [README.md:39-42](), [src/deepspotm/modules.py:111-117]().
+
+### Biological Embeddings (Bio-Embeddings)
+High-dimensional vectors representing genes, extracted from external foundation models (e.g., scGPT, Evo 2, ProtT5). These serve as the "prior" knowledge for the model [README.md:27-32](). In the code, these are handled by `MultiSourceGeneEmbedding` [src/deepspotm/modules.py:148-157]().
+
+### Gene Router (Hypernetwork)
+A specialized module (`GeneRouter`) that takes a biological embedding as input and produces a gene-specific linear projection (weight and bias). This allows the model to generalize to any gene for which a bio-embedding exists [src/deepspotm/modules.py:110-134]().
+
+**Natural Language to Code Entity Mapping: Gene Prediction Flow**
+```mermaid
+graph TD
+    subgraph "Natural Language Space"
+        A["Gene Symbol (e.g., 'EPCAM')"]
+        B["Biological Prior"]
+        C["Spatial Features"]
+        D["Predicted Expression"]
+    end
+
+    subgraph "Code Entity Space (src/deepspotm/)"
+        A1["StructureExpression.gene_names_ordered"]
+        B1["MultiSourceGeneEmbedding.bio_{source}"]
+        C1["ImageEncoder.forward_patch_tokens"]
+        D1["DeepSpotM.forward output"]
+        
+        A1 --> B1
+        B1 --> R["GeneRouter.weight_net / bias_net"]
+        C1 --> DEC["CrossAttentionGeneDecoder"]
+        R --> DEC
+        DEC --> D1
+    end
+    
+    A -.-> A1
+    B -.-> B1
+    C -.-> C1
+    D -.-> D1
+```
+Sources: [src/deepspotm/model.py:73-111](), [src/deepspotm/modules.py:110-146](), [src/deepspotm/image_encoder.py:70-84]()
+
+---
+
+## 2. Architectural Components
+
+### Image Encoder
+The vision backbone that processes 224x224 H&E tiles into spatial patch tokens. The default is `MidnightEncoder` [src/deepspotm/model.py:40](). It supports various architectures via the `ImageEncoder` base class and `ENCODER_REGISTRY` [src/deepspotm/image_encoder.py:34-43]().
+
+### Cross-Attention Gene Decoder
+The module (`CrossAttentionGeneDecoder`) that allows gene queries to attend to spatial image tokens. It consists of multiple `CrossAttentionLayer` instances [src/deepspotm/modules.py:38-62]().
+
+### Modality Vocabulary
+A canonical ordering of biological data types (DNA, RNA, Protein, Single-cell, Text) used to provide context to the model when using multiple embedding sources [src/deepspotm/modules.py:71-72](). The mapping is defined in `MODALITY_BY_SOURCE` [src/deepspotm/modules.py:79-92]().
+
+### LoRA (Low-Rank Adaptation)
+A parameter-efficient fine-tuning technique used to adapt the vision backbone. DeepSpotM maintains a contract where LoRA adapters remain wrapped during inference to ensure state-dict compatibility [src/deepspotm/model.py:22-36]().
+
+**System Component Interaction**
+```mermaid
+graph LR
+    subgraph "Vision Path"
+        IMG["H&E Tile (224x224)"] --> ENC["ImageEncoder (e.g. Midnight)"]
+        ENC --> LORA["PEFT/LoRA Adapter"]
+        LORA --> TOK["Patch Tokens (B, N, D)"]
+    end
+
+    subgraph "Gene Path"
+        EMB["Bio-Embeddings"] --> MSG["MultiSourceGeneEmbedding"]
+        MSG --> MOD["Modality Encoding"]
+        MOD --> QRY["Gene Queries (G, D)"]
+    end
+
+    TOK --> DEC["CrossAttentionGeneDecoder"]
+    QRY --> DEC
+    DEC --> ROUT["GeneRouter (Hypernetwork)"]
+    ROUT --> OUT["Expression Vector (1, N_genes)"]
+```
+Sources: [src/deepspotm/model.py:86-111](), [src/deepspotm/modules.py:135-146](), [src/deepspotm/modules.py:148-175]()
+
+---
+
+## 3. Data & State Management
+
+### AnnData (.h5ad)
+The standard file format for spatial transcriptomics data. The `predict_wsi.py` script outputs predictions in this format, where `X` contains log1p-CPM values and `obsm['spatial']` contains coordinates [README.md:105-112]().
+
+### log1p-CPM
+The normalization scheme used for predictions: $log_e(1 + \text{Counts Per Million})$. The TCGA atlas and model outputs follow this convention [README.md:148-150]().
+
+### StructureExpression
+A utility class that manages the gene vocabulary. It uses `tokens.csv` to map gene symbols to indices and handles out-of-vocabulary (OOV) genes [src/deepspotm/modules.py:11-32]().
+
+### State-Dict Filtering
+A mechanism in `checkpoint.py` to handle "cross-vocab" loading. When loading weights for a different set of genes than the training set, `VOCAB_SPECIFIC_PREFIXES` are dropped from the state dict to allow the model to re-initialize these layers for the new vocabulary [src/deepspotm/checkpoint.py:16-23]().
+
+### OOV (Out of Vocabulary)
+Refers to genes not present in the primary `tokens.csv` asset. While the model can predict new genes via the `GeneRouter`, the standard inference panel is limited to the ~19k genes defined in the bundled assets [README.md:87-92](), [src/deepspotm/assets/tokens.csv:1-376]().
+
+---
+
+## 4. Key Functions & Symbols Reference
+
+| Symbol | Location | Description |
+| :--- | :--- | :--- |
+| `DeepSpotM` | [src/deepspotm/model.py:15]() | The main LightningModule orchestrating the backbone and decoder. |
+| `from_pretrained` | [src/deepspotm/model.py:236]() | Factory method to load model, config, and vocabulary from HuggingFace or local disk. |
+| `predict_genes` | [src/deepspotm/model.py:328]() | Optimized inference method that only computes queries for requested gene symbols. |
+| `swap_gene_vocabulary` | [src/deepspotm/model.py:126]() | In-place modification of the model to target a new set of gene embeddings. |
+| `forward_patch_tokens` | [src/deepspotm/image_encoder.py:70]() | Extracts spatial features from the vision backbone, stripping CLS or register tokens. |
+| `ALPHABET_PATH` | [src/deepspotm/config.py:18]() | Path to the default `tokens.csv` gene vocabulary asset. |
+| `MODALITY_VOCABULARY` | [src/deepspotm/modules.py:71]() | The fixed list of modalities (`dna`, `rna`, `protein`, etc.) used for modality encoding. |
+
+Sources: [src/deepspotm/model.py:15-350](), [src/deepspotm/image_encoder.py:70-96](), [src/deepspotm/modules.py:11-92](), [src/deepspotm/config.py:8-19]()

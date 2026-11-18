@@ -1,0 +1,44 @@
+resources:
+  jobs:
+    register_proteina_complexa:
+      name: register_proteina_complexa_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: register_proteina_complexa_binder_design
+          max_retries: 0
+          disable_auto_optimization: true
+          retry_on_timeout: false
+          environment_key: gpu_env
+          compute:
+            hardware_accelerator: GPU_1xA10
+          notebook_task:
+            notebook_path: ../notebooks/01_register_proteina_complexa.py
+
+      environments:
+        - environment_key: gpu_env
+          spec:
+            client: "4"
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: proteina_complexa_v1
+        - name: cache_dir
+          default: ${resources.volumes.proteina_complexa_cache_dir.name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          default: ${var.gpu_medium_setting}
+
+      tags: ${var.common_resource_tags}

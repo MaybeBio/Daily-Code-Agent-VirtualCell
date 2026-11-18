@@ -1,0 +1,18 @@
+[project]
+name = "zfbrain-external-geneformer"
+version = "0.1.0"
+description = "Pinned environment for Geneformer embeddings, separate from the project environment"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "geneformer",
+    "pandas<3",
+    "transformers<5",
+    "anndata",
+    "scanpy",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+geneformer = { path = "Geneformer" }

@@ -1,0 +1,5 @@
+# scGPT-style per-cell equal-frequency bins. Depth-invariant.
+name: binned
+n_bins: 51
+max_genes: 512
+nonzero_only: true

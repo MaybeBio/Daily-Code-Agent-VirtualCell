@@ -1,0 +1,8 @@
+# LEAKAGE CONTROL ONLY. Cells from one donor land in train and test, so the
+# resulting numbers are inflated. Use to measure the size of that inflation,
+# never as a headline result. Requires data.fail_on_leakage=false.
+name: random
+val: 0.15
+test: 0.2
+seed: ${seed}
+silence_warning: false

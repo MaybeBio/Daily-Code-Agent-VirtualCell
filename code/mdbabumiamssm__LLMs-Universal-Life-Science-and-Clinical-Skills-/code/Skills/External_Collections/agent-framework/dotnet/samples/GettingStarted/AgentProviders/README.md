@@ -1,0 +1,79 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Creating an AIAgent instance for various providers
+
+These samples show how to create an AIAgent instance using various providers.
+This is not an exhaustive list, but shows a variety of the more popular options.
+
+For other samples that demonstrate how to use AIAgent instances,
+see the [Getting Started With Agents](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/Agents/README.md) samples.
+
+## Prerequisites
+
+See the README.md for each sample for the prerequisites for that sample.
+
+## Samples
+
+|Sample|Description|
+|---|---|
+|[Creating an AIAgent with A2A](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_A2A)|This sample demonstrates how to create AIAgent for an existing A2A agent.|
+|[Creating an AIAgent with Anthropic](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_Anthropic)|This sample demonstrates how to create an AIAgent using Anthropic Claude models as the underlying inference service|
+|[Creating an AIAgent with Foundry Agents using Azure.AI.Agents.Persistent](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_AzureAIAgentsPersistent)|This sample demonstrates how to create a Foundry Persistent agent and expose it as an AIAgent using the Azure.AI.Agents.Persistent SDK|
+|[Creating an AIAgent with Foundry Agents using Azure.AI.Project](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_AzureAIProject)|This sample demonstrates how to create an Foundry Project agent and expose it as an AIAgent using the Azure.AI.Project SDK|
+|[Creating an AIAgent with AzureFoundry Model](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_AzureFoundryModel)|This sample demonstrates how to use any model deployed to Azure Foundry to create an AIAgent|
+|[Creating an AIAgent with Azure OpenAI ChatCompletion](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_AzureOpenAIChatCompletion)|This sample demonstrates how to create an AIAgent using Azure OpenAI ChatCompletion as the underlying inference service|
+|[Creating an AIAgent with Azure OpenAI Responses](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_AzureOpenAIResponses)|This sample demonstrates how to create an AIAgent using Azure OpenAI Responses as the underlying inference service|
+|[Creating an AIAgent with a custom implementation](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_CustomImplementation)|This sample demonstrates how to create an AIAgent with a custom implementation|
+|[Creating an AIAgent with Ollama](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_Ollama)|This sample demonstrates how to create an AIAgent using Ollama as the underlying inference service|
+|[Creating an AIAgent with ONNX](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_ONNX)|This sample demonstrates how to create an AIAgent using ONNX as the underlying inference service|
+|[Creating an AIAgent with OpenAI Assistants](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_OpenAIAssistants)|This sample demonstrates how to create an AIAgent using OpenAI Assistants as the underlying inference service.</br>WARNING: The Assistants API is deprecated and will be shut down. For more information see the OpenAI documentation: https://platform.openai.com/docs/assistants/migration|
+|[Creating an AIAgent with OpenAI ChatCompletion](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_OpenAIChatCompletion)|This sample demonstrates how to create an AIAgent using OpenAI ChatCompletion as the underlying inference service|
+|[Creating an AIAgent with OpenAI Responses](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/dotnet/samples/GettingStarted/AgentProviders/Agent_With_OpenAIResponses)|This sample demonstrates how to create an AIAgent using OpenAI Responses as the underlying inference service|
+
+## Running the samples from the console
+
+To run the samples, navigate to the desired sample directory, e.g.
+
+```powershell
+cd AIAgent_With_AzureOpenAIChatCompletion
+```
+
+Set the required environment variables as documented in the sample readme.
+If the variables are not set, you will be prompted for the values when running the samples.
+Execute the following command to build the sample:
+
+```powershell
+dotnet build
+```
+
+Execute the following command to run the sample:
+
+```powershell
+dotnet run --no-build
+```
+
+Or just build and run in one step:
+
+```powershell
+dotnet run
+```
+
+## Running the samples from Visual Studio
+
+Open the solution in Visual Studio and set the desired sample project as the startup project. Then, run the project using the built-in debugger or by pressing `F5`.
+
+You will be prompted for any required environment variables if they are not already set.
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

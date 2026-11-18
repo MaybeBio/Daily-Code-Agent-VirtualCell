@@ -1,0 +1,145 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aestetik"
+version = "0.3.1"
+description = "AESTETIK: Convolutional autoencoder for learning spot representations from spatial transcriptomics and morphology data"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.14"
+authors = [
+    {name = "Kalin Nonchev"},
+]
+keywords = [
+    "spatial-transcriptomics",
+    "autoencoder",
+    "representation-learning",
+    "multimodal",
+    "computational-pathology",
+    "digital-pathology",
+    "histopathology",
+    "deep-learning",
+    "pytorch",
+    "single-cell",
+    "bioinformatics",
+    "spatial-biology",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "lightning>=2.0",
+    "numpy>=1.23",
+    "pandas>=1.5",
+    "scipy>=1.10",
+    "anndata>=0.9",
+    "scanpy>=1.9",
+    "squidpy>=1.2",
+    "matplotlib>=3.7",
+    "scikit-learn>=1.2",
+    "joblib>=1.2",
+    "tqdm>=4.64",
+]
+
+[project.optional-dependencies]
+# Pyvips is needed for the morphology spot-extraction utilities. It
+# pulls a libvips system dependency, so install on demand.
+vips = ["pyvips>=2.2"]
+# Plotnine is only used by find_optimal_n_clusters() in
+# utils_clustering. Keep it optional to avoid forcing the dep.
+viz = ["plotnine>=0.10"]
+# Optional clustering / HVG dependencies for the leiden/louvain paths
+# in utils_clustering and the seurat_v3 HVG flavor in preprocess_adata.
+graph = [
+    "igraph>=0.10",
+    "leidenalg>=0.9",
+    "louvain>=0.8",
+    "scikit-misc>=0.3",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+# Convenience extra: everything you need to run the full pytest suite.
+test-all = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "igraph>=0.10",
+    "leidenalg>=0.9",
+    "louvain>=0.8",
+    "scikit-misc>=0.3",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/ratschlab/aestetik"
+Repository = "https://github.com/ratschlab/aestetik"
+"Bug Tracker" = "https://github.com/ratschlab/aestetik/issues"
+"Preprint" = "https://www.medrxiv.org/content/10.1101/2024.06.04.24308256v1"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Expose PEP 561 type hints to downstream consumers.
+aestetik = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "slow: end-to-end tests that train a model (deselect with `-m 'not slow'`)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/aestetik"]
+branch = false
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+extend-exclude = [".codeboarding", "example", "scripts"]
+
+[tool.ruff.lint]
+# Conservative ruleset to start: pyflakes, pycodestyle errors, isort,
+# bugbear and a handful of best-practice rules. Style fixes can be
+# applied with `ruff check --fix`.
+select = ["E", "F", "I", "B", "UP", "SIM", "W"]
+ignore = [
+    "E501",  # line too long — handled by formatter not lint
+    "B008",  # function call in argument defaults (fine here)
+    "UP007", # Optional vs `| None` (keep typing.Optional for py3.9 docstrings)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # late imports after pytest.importorskip
+"src/aestetik/__init__.py" = ["F401"]  # re-exports

@@ -1,0 +1,391 @@
+name: Runtime Box production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: Catalog model to build and release
+        required: true
+        type: choice
+        options:
+          - ctheodoris-geneformer-v1-10m
+          - bowang-scgpt-whole-human
+          - snap-stanford-uce-4layer
+          - openvax-mhcflurry-class1-presentation
+          - griffithlab-pvactools-pvacseq
+          - openmm-openmm
+          - autodock-vina-molecular-docking
+          - mdanalysis-molecular-analysis
+          - cobrapy-metabolic-modeling
+          - pysb-biochemical-simulation
+          - physicell-multicellular-simulation
+          - gnina-pose-rescoring
+          - jwohlwend-boltz-2
+          - bytedance-protenix-base-v1-0-0
+      target_id:
+        description: Checked native target
+        required: true
+        type: choice
+        options: [macos-aarch64-metal, macos-aarch64-cpu, linux-x86_64-cpu, linux-x86_64-cuda12.6, linux-x86_64-cuda12.8, linux-x86_64-cuda12.9, windows-x86_64-cpu, windows-x86_64-cuda12.8, windows-x86_64-cuda12.9]
+      channel:
+        description: Allowed release channel
+        required: true
+        type: choice
+        options: [beta]
+
+concurrency:
+  group: runtime-box-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  preflight:
+    name: Resolve protected release inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      recipe_id: ${{ steps.resolve.outputs.recipe_id }}
+      version: ${{ steps.resolve.outputs.version }}
+      runs_on: ${{ steps.resolve.outputs.runs_on }}
+      timeout_minutes: ${{ steps.resolve.outputs.timeout_minutes }}
+      validator_script: ${{ steps.resolve.outputs.validator_script }}
+      release_path: ${{ steps.resolve.outputs.release_path }}
+      channel_path: ${{ steps.resolve.outputs.channel_path }}
+      heartbeat_seconds: ${{ steps.resolve.outputs.heartbeat_seconds }}
+      pixi_version: ${{ steps.resolve.outputs.pixi_version }}
+    steps:
+      - name: Require the exact main ref
+        run: test "${{ github.ref }}" = "refs/heads/main"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - id: resolve
+        name: Resolve only catalog-approved release fields
+        run: >-
+          npm run runtime-box:ci -- release-resolve
+          --model "${{ inputs.model_id }}"
+          --target "${{ inputs.target_id }}"
+
+      - name: Verify the clean checked-out revision
+        run: test -z "$(git status --porcelain)"
+
+  release:
+    name: Build, validate, publish, then promote
+    needs: preflight
+    environment: runtime-box-production
+    runs-on: ${{ needs.preflight.outputs.runs_on }}
+    timeout-minutes: ${{ fromJSON(needs.preflight.outputs.timeout_minutes) }}
+    env:
+      LIATIR_RUNTIME_BOX_HEARTBEAT_SECONDS: ${{ needs.preflight.outputs.heartbeat_seconds }}
+      UV_PYTHON_INSTALL_DIR: ${{ github.workspace }}/.runtime-box-ci/python
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      LIATIR_RUNTIME_BOX_ADMIN_TOKEN: ${{ secrets.LIATIR_RUNTIME_BOX_ADMIN_TOKEN }}
+      LIATIR_RUNTIME_BOX_SIGNER_URL: ${{ vars.LIATIR_RUNTIME_BOX_SIGNER_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Dependencies come before the first script, and before the host probe, because the CI
+      # entry point imports the published Scrollcase contract: on an ephemeral runner with no
+      # node_modules it cannot even start. This is not the paid setup the probe guards — that is
+      # the pixi environment, the model weights and the build, all of which still come after it.
+      - run: npm ci
+
+      - name: Clean stale Runtime Box state
+        run: node scripts/runtime-box-ci.mjs clean
+
+      - name: Verify native host and working storage before paid setup
+        run: >-
+          npm run runtime-box:ci -- host-probe
+          --model "${{ inputs.model_id }}"
+          --recipe "${{ needs.preflight.outputs.recipe_id }}"
+          --target "${{ inputs.target_id }}"
+          --mode native-lifecycle
+          --output .runtime-box-ci/host.json
+
+      - id: release-auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_RELEASE_SERVICE_ACCOUNT }}
+          token_format: id_token
+          id_token_audience: ${{ vars.LIATIR_RUNTIME_BOX_SIGNER_URL }}
+          id_token_include_email: true
+
+      # No setup-gcloud here on purpose. The release never shells out to the CLI: the auth action
+      # above mints the audience-bound identity token itself, both steps that reach the signer are
+      # handed that token explicitly, and publish and promote authenticate to the Registry with its
+      # admin token — promote only uploads a document the build already signed. The `gcloud auth
+      # print-identity-token` path in signer-command.mjs is the manual-operator fallback, which a
+      # release never takes.
+      #
+      # Installing it was also actively harmful on a self-hosted Windows host, where the runner has
+      # no preinstalled SDK: the action downloads the archive to an extensionless temp file and
+      # `Expand-Archive` refuses anything not named `.zip`, so run 31296206018 died there before
+      # reaching any paid setup. GitHub-hosted Windows never hit it because gcloud ships in the
+      # image and the download is skipped.
+      - name: Fail fast if the deployed signer policy is stale
+        env:
+          LIATIR_RUNTIME_BOX_SIGNER_ID_TOKEN: ${{ steps.release-auth.outputs.id_token }}
+        run: >-
+          npm run runtime-box:ci -- verify-signer-policy
+          --signer "${{ vars.LIATIR_RUNTIME_BOX_SIGNER_URL }}"
+
+      # Byte-for-byte the toolchain the validation workflow installs. A release that resolved its
+      # environment with a different pixi would not reproduce the archive that target was validated
+      # on, so the pin is the point, not the presence.
+      - name: Install pinned pixi and conda-pack (POSIX)
+        if: needs.preflight.outputs.pixi_version != '' && !startsWith(inputs.target_id, 'windows-')
+        shell: bash
+        env:
+          PIXI_VERSION: v${{ needs.preflight.outputs.pixi_version }}
+          PIXI_HOME: ${{ github.workspace }}/.runtime-box-ci/pixi
+          PIXI_NO_PATH_UPDATE: "1"
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | bash
+          "$PIXI_HOME/bin/pixi" global install "conda-pack==0.9.2"
+          # `pixi global install` exposes the conda-pack shim next to pixi, so one PATH entry covers both.
+          echo "$PIXI_HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned pixi and conda-pack (Windows)
+        if: needs.preflight.outputs.pixi_version != '' && startsWith(inputs.target_id, 'windows-')
+        # Windows PowerShell (5.1), not pwsh: a self-hosted Windows box need not have PowerShell Core.
+        shell: powershell
+        env:
+          PIXI_VERSION: v${{ needs.preflight.outputs.pixi_version }}
+          PIXI_HOME: ${{ github.workspace }}/.runtime-box-ci/pixi
+          PIXI_NO_PATH_UPDATE: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          scripts/install-pixi-windows.ps1 `
+            -Version $env:PIXI_VERSION `
+            -PixiHome $env:PIXI_HOME `
+            -ExpectedSha256 '02c3e1bb4712199f62124deb1b1e9a5ddae32c413d21fda1586e198cd6f9cf2a'
+          # pixi and the conda-pack shim both live in PIXI_HOME\bin.
+          "$env:PIXI_HOME\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Select Git Bash for Windows composite actions
+        if: startsWith(inputs.target_id, 'windows-')
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBash = 'C:\Program Files\Git\bin'
+          if (-not (Test-Path "$gitBash\bash.exe")) {
+            throw "Git Bash is unavailable at $gitBash."
+          }
+          $gitBash | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Add Windows native inspection tools
+        if: startsWith(inputs.target_id, 'windows-')
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            throw "vswhere.exe is unavailable at $vswhere."
+          }
+          $installation = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installation) {
+            throw 'Visual Studio C++ tools are unavailable.'
+          }
+          $toolsets = Join-Path $installation 'VC\Tools\MSVC'
+          $toolset = Get-ChildItem -Path $toolsets -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          $bin = Join-Path $toolset.FullName 'bin\Hostx64\x64'
+          if (-not (Test-Path (Join-Path $bin 'dumpbin.exe'))) {
+            throw "dumpbin.exe is unavailable at $bin."
+          }
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Linux product lifecycle dependencies
+        if: startsWith(inputs.target_id, 'linux-')
+        run: bash scripts/install-runtime-box-linux-product-deps.sh
+
+      - name: Install pinned Rust 1.95.0 for the product lifecycle
+        uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
+        with:
+          toolchain: "1.95.0"
+
+      - name: Require a clean exact revision before signing
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          test -z "$(git status --porcelain)"
+
+      - name: Build with the private KMS signer and verify locally
+        id: build
+        env:
+          LIATIR_RUNTIME_BOX_SIGNER_ID_TOKEN: ${{ steps.release-auth.outputs.id_token }}
+        run: >-
+          npm run runtime-box:ci -- tracked-build
+          --model "${{ inputs.model_id }}"
+          --recipe "${{ needs.preflight.outputs.recipe_id }}"
+          --target "${{ inputs.target_id }}"
+          --mode native-lifecycle
+          --channel "${{ inputs.channel }}"
+          --signer "${{ vars.LIATIR_RUNTIME_BOX_SIGNER_URL }}"
+          --signer-audience "${{ vars.LIATIR_RUNTIME_BOX_SIGNER_URL }}"
+          --public-key runtime-boxes/trust/production-public.json
+          --metrics .runtime-box-ci/build-metrics.json
+
+      - name: Verify the signed release and native self-test
+        # macOS has a short AF_UNIX socket-path limit, so dependencies such as pymp need the short
+        # system temp root. On WSL /tmp is a small tmpfs, so other hosts retain the large work volume.
+        env:
+          TMPDIR: ${{ startsWith(inputs.target_id, 'macos-') && '/tmp' || runner.temp }}
+        run: >-
+          npm run runtime-box -- verify "${{ steps.build.outputs.release_path }}"
+          --public-key runtime-boxes/trust/production-public.json
+          --self-test
+          --receipt .runtime-box-ci/verification.json
+
+      - name: Run scientific validation before publication
+        env:
+          TMPDIR: ${{ startsWith(inputs.target_id, 'macos-') && '/tmp' || runner.temp }}
+        run: >-
+          npm run runtime-box:ci -- run-validator
+          --model "${{ inputs.model_id }}"
+          --recipe "${{ needs.preflight.outputs.recipe_id }}"
+          --target "${{ inputs.target_id }}"
+          --mode native-lifecycle
+          --script "${{ needs.preflight.outputs.validator_script }}"
+          --output .runtime-box-ci/scientific-result.json
+
+      - name: Publish immutable objects and verify their public hashes
+        run: >-
+          npm run runtime-box -- publish "${{ steps.build.outputs.release_path }}"
+          --bucket "${{ vars.LIATIR_RUNTIME_BOX_BUCKET }}"
+          --prefix "${{ vars.LIATIR_RUNTIME_BOX_PREFIX }}"
+          --registry "${{ vars.LIATIR_RUNTIME_BOX_REGISTRY }}"
+          --public-key runtime-boxes/trust/production-public.json
+          --receipt .runtime-box-ci/publish-receipt.json
+
+      # Run 36239768655 published UCE, then its product lifecycle refused to install it: 19.9 GB
+      # needed, 16.1 GB free, with the ~11 GB extracted build prefix still on the same disk.
+      - name: Free the build scratch before the product lifecycle
+        run: npm run runtime-box:ci -- release-build-scratch
+
+      # The frontend build packages the single-cell showcase with the CLI's own builder, so the CLI's
+      # dependencies are installed here as in every other workflow that builds the frontend. Run
+      # 40621392871 published OpenMM and then stopped at this build on a missing `jszip`.
+      - name: Install the CLI package the frontend build compiles
+        run: npm ci --prefix packages/liatir-cli
+
+      - name: Build the real Liatir product test binary
+        env:
+          # This binary is never distributed. It exposes only the exact release candidate so the
+          # product lifecycle can run before the normal catalog is allowed to advertise it.
+          VITE_LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: ${{ inputs.model_id }}
+        run: npm run test:tauri:prepare
+
+      - name: Run the macOS candidate through the component's product lifecycle spec
+        if: startsWith(inputs.target_id, 'macos-')
+        env:
+          LIATIR_RUNTIME_BOX_REGISTRY_BASE_URL: http://127.0.0.1:8790/v1
+          LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_MODEL_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_TARGET_ID: ${{ inputs.target_id }}
+          LIATIR_RUNTIME_BOX_EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
+          LIATIR_RUNTIME_BOX_PRODUCT_EVIDENCE: .runtime-box-ci/product-lifecycle.json
+          LIATIR_E2E_REPORT: .runtime-box-ci/product-lifecycle-e2e.json
+        run: npm run runtime-box:product-lifecycle
+
+      - name: Run the Linux candidate through the model's product lifecycle spec
+        if: startsWith(inputs.target_id, 'linux-')
+        env:
+          LIATIR_RUNTIME_BOX_REGISTRY_BASE_URL: http://127.0.0.1:8790/v1
+          LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_MODEL_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_TARGET_ID: ${{ inputs.target_id }}
+          LIATIR_RUNTIME_BOX_EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
+          LIATIR_RUNTIME_BOX_PRODUCT_EVIDENCE: .runtime-box-ci/product-lifecycle.json
+          LIATIR_E2E_REPORT: .runtime-box-ci/product-lifecycle-e2e.json
+        run: >-
+          xvfb-run --auto-servernum
+          npm run runtime-box:product-lifecycle
+
+      - name: Run the Windows candidate through the model's product lifecycle spec
+        if: startsWith(inputs.target_id, 'windows-')
+        env:
+          LIATIR_RUNTIME_BOX_REGISTRY_BASE_URL: http://127.0.0.1:8790/v1
+          LIATIR_RUNTIME_BOX_RELEASE_CANDIDATE_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_MODEL_ID: ${{ inputs.model_id }}
+          LIATIR_RUNTIME_BOX_TARGET_ID: ${{ inputs.target_id }}
+          LIATIR_RUNTIME_BOX_EXPECTED_VERSION: ${{ needs.preflight.outputs.version }}
+          LIATIR_RUNTIME_BOX_PRODUCT_EVIDENCE: .runtime-box-ci/product-lifecycle.json
+          LIATIR_E2E_REPORT: .runtime-box-ci/product-lifecycle-e2e.json
+        run: npm run runtime-box:product-lifecycle
+
+      - name: Promote beta only after immutable publication and product lifecycle succeed
+        run: >-
+          npm run runtime-box -- promote "${{ needs.preflight.outputs.channel_path }}"
+          --registry "${{ vars.LIATIR_RUNTIME_BOX_REGISTRY }}"
+          --receipt .runtime-box-ci/promotion-receipt.json
+
+      - name: Write complete signed release evidence
+        if: always()
+        run: >-
+          npm run runtime-box:ci -- write-release-evidence
+          --status "${{ job.status }}"
+          --model "${{ inputs.model_id }}"
+          --recipe "${{ needs.preflight.outputs.recipe_id }}"
+          --target "${{ inputs.target_id }}"
+          --mode native-lifecycle
+          --environment runtime-box-production
+          --release "${{ steps.build.outputs.release_path || '__not_built__' }}"
+          --channel "${{ needs.preflight.outputs.channel_path }}"
+          --host .runtime-box-ci/host.json
+          --metrics .runtime-box-ci/build-metrics.json
+          --verification .runtime-box-ci/verification.json
+          --scientific .runtime-box-ci/scientific-result.json
+          --publish-receipt .runtime-box-ci/publish-receipt.json
+          --promotion-receipt .runtime-box-ci/promotion-receipt.json
+          --product-lifecycle .runtime-box-ci/product-lifecycle.json
+          --output .runtime-box-ci/release-evidence.json
+
+      - name: Upload compact release and product evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-box-release-${{ inputs.model_id }}-${{ inputs.target_id }}-${{ github.run_attempt }}
+          path: |
+            .runtime-box-ci/release-evidence.json
+            .runtime-box-ci/product-lifecycle.json
+            .runtime-box-ci/product-lifecycle-e2e.json
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload bounded product lifecycle failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-box-release-diagnostics-${{ inputs.model_id }}-${{ inputs.target_id }}-${{ github.run_attempt }}
+          path: |
+            tests/.artifacts/screenshots/
+            tests/.artifacts/tauri-logs/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Clean Runtime Box build state
+        if: always()
+        run: npm run runtime-box:ci -- clean

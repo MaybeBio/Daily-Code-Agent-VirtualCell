@@ -1,0 +1,201 @@
+# Manuscript configuration: CosMx lung-cancer section, scGPT, stored layer `layer_1.norm2`
+# (display "Layer 2"). Every parameter is the one used for the manuscript (Methods and
+# Supplementary Table S1); the run starts from the cached activation store and the cached
+# SAE checkpoint, so no model and no GPU are needed.
+#
+# Paths are given through ${NAME} placeholders; set them in the environment or in a
+# KEY=VALUE file (copy configs/paper/paths.env.example to configs/paper/paths.env, which
+# git ignores) and run
+#   interpretfm run configs/paper/cosmx_scgpt_layer2.yaml --env-file configs/paper/paths.env
+# The expected layout under each variable is described in docs/reproducing.md.
+
+run:
+  name: cosmx_scgpt_layer2
+  out_dir: ${INTERPRETFM_RUNS}/cosmx_scgpt_layer2
+  seed: 0
+
+dataset:
+  h5ad: ${INTERPRETFM_DATA}/cosmx_human_lung_sec8.h5ad   # 81,236 cells x 960 genes, X = raw counts
+  counts_layer: null
+  gene_id: {column: index, kind: ensembl}                 # var_names are Ensembl ids; symbols in var["feature_name"]
+  labels: {column: author_cell_type, groups: cosmx_author_groups.csv}   # author types -> the manuscript's 16 interface groups
+  spatial: {obsm: spatial, um_per_unit: 0.18}             # CosMx pixel coordinates, 0.18 um per pixel
+  qc: {min_transcripts: 0, min_genes: 0}                  # no cell filtering in the manuscript
+
+model:
+  name: scgpt
+  checkpoint: ${INTERPRETFM_MODELS}/scGPT/whole-human-pretrain
+  env: {}                                                 # not used: the activation store is cached
+  layers: [layer_1.norm2]
+  cell_pooling: {kind: token, token: "60695"}             # scGPT <cls> token id
+  special_tokens: ["60694", "60695"]                      # <pad>, <cls>
+  representative_layer: layer_1.norm2
+
+stages:
+  # Cached activation store written by the manuscript's extraction (952 shards, 20,156,416 rows).
+  extract: {store_root: "${INTERPRETFM_STORES}/acts_extraction_scgpt_cosmx"}
+
+  # TIS: 800 trials, 32 reference cells per pool, quartile pools, log1p CP10k judge, seed 42;
+  # controls: independently permuted dimensions (TIS gain) and the activations rotated to
+  # their principal components.
+  tis: {trials: 800, k_ref: 32, quantiles: [0.25, 0.75], judge: log1p_cp10k,
+        controls: [shuffle, pca], pca_of: activations, seed: 42, keep_cell_matrix: true}
+
+  # SAE: 8x width (4096 features), 8000 steps, lr 1e-4, 1000 warm-up steps, resampling every
+  # 2000 steps, batch 1024, seed 0; lambda chosen among {0.1, 0.3, 1, 3, 10} by the fixed rule
+  # (L0 <= 2 % of features per token, dead-feature rate <= 0.25, then lowest FVU) -> lambda = 1.
+  # Only the selected checkpoint (lambda = 1) is kept in the cache, so the grid here holds that
+  # value; the reproduction test applies the rule to the cached QC of all five lambdas.
+  # The untrained baseline is the published architecture at its seed-0 initialization.
+  sae:
+    width_multiplier: 8
+    lambda: {grid: [1.0], rule: {l0_max: 0.02, dead_max: 0.25}}
+    steps: 8000
+    lr: 1.0e-4
+    warmup: 1000
+    resample_every: 2000
+    batch_size: 1024
+    seed: 0
+    device: cpu
+    exclude_special_tokens: false                         # the published SAEs saw every stored row
+    untrained_baseline: true
+    qc: {max_shards: 300, rows_per_shard: 512}            # 153,600 evaluation rows
+    checkpoints:
+      layer_1.norm2:
+        "1.0": ${INTERPRETFM_PAPER_CACHE}/sae_v2/cosmx/scgpt/layer_1_norm2/sae/v2biased__steps_8000__lam_1/sae_layer_1.norm2_best.pt
+
+  # Concept universe: the g:Profiler enrichment of the panel used for the manuscript
+  # (GO:BP, GO:MF, GO:CC, Reactome, KEGG; FDR 0.05; >= 2 panel genes per term), loaded from
+  # the cached gene x concept table so that the universe is identical (5,650 concepts).
+  concepts:
+    sources: [GO:BP, GO:MF, GO:CC, REAC, KEGG]
+    fdr: 0.05
+    min_overlap: 2
+    organism: hsapiens
+    query_key: ensembl
+    gene_keys: {symbol_column: feature_name}
+    offline_matrix: ${INTERPRETFM_PAPER_CACHE}/f1heldout_gene_token_row_cosmx_all_layers_l1_1e-3/gprofiler/gprofiler_binary_gene_by_term.csv
+    offline_terms: ${INTERPRETFM_PAPER_CACHE}/f1heldout_gene_token_row_cosmx_all_layers_l1_1e-3/gprofiler/gprofiler_terms.tsv
+
+  # Held-out concept alignment: thresholds 0 / 0.15 / 0.3 / 0.6; 70/20/10 train/valid/test;
+  # row split (hash of seed, shard, row, token; seed 0) and whole-gene split; sparse SAE,
+  # rectified raw dimensions and the untrained SAE; concept F1 = mean test F1 of the best
+  # validation feature at tau 0.15 over concepts with 5-100 panel genes.
+  concept_eval:
+    thresholds: [0.0, 0.15, 0.3, 0.6]
+    split: {valid: 0.2, test: 0.1}
+    units: [row, gene]
+    representations: [sae, raw, untrained]
+    summary: {tau: 0.15, concept_size: [5, 100]}
+    dedup_cells: auto
+    seed: 0
+    top_m: 200
+    batch_size: 8192
+    device: cpu
+    n_jobs: 6              # the six evaluations in separate processes (wall time only; not part of the stage hash)
+    token_vocab: ${INTERPRETFM_MODELS}/scGPT/whole-human-pretrain/vocab.json
+
+  # Gene-level readout: five whole-gene splits (10 % test genes), L2 logistic probe with C = 1
+  # and balanced classes, standardized (pre-specified) and center-only (post hoc) inputs,
+  # concepts with 5-100 panel genes; controls: random vectors, co-expression profile and its
+  # 50 PCs, cell-type profile (types with >= 50 cells), mean expression + detection rate.
+  gene_readout:
+    n_splits: 5
+    C: 1.0
+    scaling: [standardize, center]
+    controls: [random, coexpression, coexpression_pc50, celltype, trivial]
+    concept_size: [5, 100]
+    split: {valid: 0.2, test: 0.1}
+    max_cells: 100000
+    min_type_cells: 50
+    n_pcs: 50
+    seed: 0
+    dedup_cells: true
+    device: cpu
+    token_vocab: ${INTERPRETFM_MODELS}/scGPT/whole-human-pretrain/vocab.json
+
+  # Cell level: retention (validation F1 >= 0.40 at tau 0.15, concepts with 5-100 panel genes),
+  # projection to cells, GSI excess / MHR@100 on every stored cell (n_cells above the dataset size
+  # reads all shards; the manuscript run read 75,745 cells), populations >= 30 cells, 5 label
+  # shuffles, seed 0.
+  cells:
+    retain: {tau: 0.15, min_valid_f1: 0.40, concept_size: [5, 100], min_features: 10, unit: row}
+    projection: {dedup_cells: true, batch_size: 8192}
+    specificity: {min_pop: 30, n_shuffles: 5, mhr_k: 100, n_leading: 3, n_assoc: 50, n_null: 50, n_cells: 100000,
+                  representations: [sae, raw, genes], exclude_qc_flagged: false, seed: 0}
+    device: cpu
+
+  # Niches: radii 100 / 120 / 150 CosMx pixels = 18 / 21.6 / 27 um (0.18 um per pixel), k 3-5,
+  # k-means and full-covariance GMM, neighbourhood mean (m) or cell + neighbourhood (xm), seeds 0-2,
+  # clusters of at least 150 cells, PCA 50, tile-shuffle null with 10 draws over 4 x radius tiles;
+  # score 1.5 ARI_seed + 0.1 clip(z, 10) + separability. Baselines: 50 truncated-SVD components of
+  # log-normalized expression through the same sweep and at the selected configuration; label
+  # composition at the manuscript's 120 px / k = 3 (PCA 15, k-means with 20 initialisations) and at
+  # the selected configuration. Concept labels: top 25 by effect per niche.
+  niches:
+    radii_um: [18.0, 21.6, 27.0]
+    k: [3, 4, 5]
+    methods: [kmeans, gmm]
+    spaces: [m, xm]
+    seeds: [0, 1, 2]
+    min_cluster: 150
+    n_pcs: 50
+    kernel: uniform
+    tile_mult: 4.0
+    n_null: 10
+    null_seed: 0
+    score: {ari: 1.5, purity_z: 0.1, sep: 1.0, purity_z_clip: 10.0}
+    baselines: [expression_svd50, label_composition]
+    expression: {n_components: 50, seed: 0}
+    label_composition: {radius_um: 21.6, k: 3, n_pcs: 15, n_init: 20, seed: 0}
+    expression_variants: {enabled: false, seeds: [0, 1, 2]}
+    seed_stability: {k: [4, 5]}
+    concepts: {top_k: 25, active_threshold: 0.0, min_cells: 20, rank_by: effect}
+    fixed_configs: [{radius_um: 18.0, space: xm, method: kmeans, k: 3}]   # the manuscript's selected configuration, validated whatever the sweep picks
+
+  # Interfaces: the manuscript's strict crosstalk test on the author labels grouped as in the paper
+  # (dataset.labels.groups): edge radius and stratum block 120 px = 21.6 um (the block is kept at the paper's
+  # value although it holds few cells per stratum), legacy tile 400 px = 72 um, smooth-field length scales
+  # 60 / 150 / 400 px; 100 permutations, calibration 50 permutations x 2 fields per scale, legacy 20;
+  # covariates: log counts, log genes, log bounding-box area (Width x Height); niches of the manuscript's
+  # configuration. Fired-on genes from the first 40 store shards (the manuscript's row budget for this model).
+  interfaces:
+    edge_radius_um: 21.6
+    block_um: 21.6
+    legacy_tile_um: 72.0
+    length_scales_um: [10.8, 27.0, 72.0]
+    n_perm: 100
+    calib_perm: 50
+    calib_reps: 2
+    legacy_perm: 20
+    min_edges: 50
+    clip_quantile: 0.995
+    exclude_groups: [low_quality, unresolved]
+    covariates: {area: {product: [Width, Height]}}
+    niche: {config: "r18um/xm/kmeans/k3"}
+    markers: {enabled: true, top_n: 10}
+    fired_on: {enabled: true, max_shards: 40, threshold: 0.15, rate: 0.2, mass: 0.8}
+    token_vocab: ${INTERPRETFM_MODELS}/scGPT/whole-human-pretrain/vocab.json
+
+  # Ligand–receptor co-localization screen (model-free: counts, coordinates and author labels only): CellChatDB human
+  # pairs with every gene on the panel (complexes resolved), radius 100 px = 18 um, positivity >= 1 (primary) and >= 3
+  # transcripts, >= 100 positive cells per side, within-type null with 100 permutations (seed 7), BH per threshold,
+  # hit = q < 0.05 and fold >= 1.2. `match_neighbors_to: 286.67` (the Xenium section's mean count at 100 um) instead of
+  # radius_um gives the matched radius 652.8 px = 117.5 um (grid 0.5 px, rounded to 0.1 px); placement of the hits on
+  # the manuscript's niche configuration.
+  lr_screen:
+    radius_um: 18.0
+    thresholds: [1, 3]
+    n_perm: 100
+    seed: 7
+    min_positive: 100
+    q_max: 0.05
+    fold_min: 1.2
+    match_grid_step: 0.5                                  # native units (px), used only with match_neighbors_to
+    match_round_decimals: 1
+    niche: {config: "r18um/xm/kmeans/k3"}
+
+output:
+  html: true
+  json: true
+  keep_store: true

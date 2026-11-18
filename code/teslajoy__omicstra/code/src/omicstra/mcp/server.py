@@ -1,0 +1,1300 @@
+"""omicstra MCP server - read path, zero compute.
+
+first component: the EDA gate. a cohort is admissible only if its eda_summary.json
+satisfies configs/eda_contract.json, and this is the tool that says so.
+
+no data access, no R, no GPU, no network. reads two committed JSON files.
+
+the cohort is selected at launch via OMICSTRA_PROJECT_DIR (or the in-repo
+registry default). that directory is the security boundary: a tool call passing
+a different project_id cannot reach outside it.
+
+note: mcp 2.0 renamed FastMCP -> MCPServer (mcp.server.fastmcp no longer exists).
+"""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+from mcp.server import MCPServer
+from mcp.types import LATEST_PROTOCOL_VERSION
+
+from omicstra.contracts.project import ProjectConfig
+from omicstra.eda import load_contract, load_summary, run_gate
+from omicstra.labels import HandleArm, Route
+from omicstra.settings import settings
+
+srv = MCPServer("omicstra")
+
+
+# --- tools: model-invoked, do work ----------------------------------------
+@srv.tool(description=(
+    "Run the EDA admissibility gate for a cohort. Returns a verdict "
+    "(proceed | proceed_with_caution | stop), per-check results, blocking "
+    "violations, cautions, and advisories for checks the contract expects but "
+    "the cohort summary cannot answer. Every check carries an authority: "
+    "universal criteria are applied silently, cohort_calibrated criteria were "
+    "derived on some cohort and escalate rather than being inherited by a new "
+    "one, and advisory checks are reported but never change a verdict. Reads "
+    "committed artifacts only."))
+def check_eda_gate(project_id: str | None = None) -> dict:
+    # an unrun gate is an ANSWER, not an error. raising sent a client a ToolError
+    # carrying a good message through the wrong channel: a model driving this gets
+    # a failure it cannot act on instead of a verdict it can.
+    try:
+        r = run_gate(project_id)
+    except (FileNotFoundError, ValueError) as e:
+        return {"project_id": _bound_id(project_id), "verdict": "not_run",
+                "declared_verdict": None, "agrees_with_declared": None,
+                "summary": {"passed": 0, "failed": 0, "not_run": 0,
+                            "not_applicable": 0, "escalated": 0},
+                "checks": [], "violations": [], "cautions": [], "advisories": [],
+                "escalations": [],
+                "why": str(e),
+                "next": ("run the EDA chain for this cohort - `omicstra eda` - then "
+                         "ask again. nothing downstream may run past an unrun gate, "
+                         "which is this project's first constraint.")}
+    return {
+        "project_id": r.project_id,
+        "verdict": r.verdict,
+        "declared_verdict": r.declared_verdict,
+        "agrees_with_declared": r.agrees_with_declared,
+        "summary": {
+            "passed": sum(c.status == "pass" for c in r.checks),
+            "failed": sum(c.status == "fail" for c in r.checks),
+            "not_run": sum(c.status == "not_run" for c in r.checks),
+            "not_applicable": sum(c.status == "not_applicable" for c in r.checks),
+            "escalated": sum(c.status == "escalate" for c in r.checks),
+        },
+        "checks": [c.model_dump() for c in r.checks],
+        "violations": r.violations,
+        "cautions": r.cautions,
+        "advisories": r.advisories,
+        "escalations": r.escalations,
+    }
+
+
+@srv.tool(description=(
+    "Whether this cohort's data is the kind of data its declared encoders were "
+    "built on. For each encoder: the unit it was trained for, the unit each of "
+    "this cohort's platforms supplies, and how far apart they are - a footprint "
+    "ratio where the units are the same kind, or an out-of-class verdict where "
+    "no tolerance applies. Decides nothing: the encoder_compatibility gate "
+    "decides, by probe. Answers 'can these encoders legitimately run on my "
+    "data', which is the first question a cohort that is not the seed one has."))
+def describe_encoder_fit(project_id: str | None = None) -> dict:
+    """read path. declarations plus package metadata, no compute, no model load.
+
+    a platform is a property of a SAMPLE, so the answer is per platform rather
+    than per cohort - and a cohort carrying several can have one encoder both in
+    and out of distribution at once, which a single verdict would hide.
+    """
+    import json
+
+    from omicstra.models.fit import encoder_fit
+
+    cfg = ProjectConfig.load(project_id)
+    decl = json.loads((cfg.project_dir / "platform.json").read_text())
+    return encoder_fit(cfg, decl.get("platforms", {}), decl.get("samples"))
+
+
+@srv.tool(description=(
+    "Describe a cohort's data structure: platform, encoders and their "
+    "dimensions, atomic unit, split protocol, and the supervision/label roles "
+    "that must never enter a feature vector."))
+def describe_data_structure(project_id: str | None = None) -> dict:
+    cfg = ProjectConfig.load(project_id)
+    # the summary supplies two extras. it used to be read unconditionally, so
+    # "what is this data, as declared" - the first question a new cohort owner
+    # asks - failed outright on a cohort whose EDA gate had never run, for two
+    # fields that are not declarations.
+    try:
+        s = load_summary(project_id)
+    except (FileNotFoundError, ValueError):
+        s = {}
+    return {
+        "project_id": cfg.project_id,
+        "project_dir": str(cfg.project_dir),
+        "platform": cfg.platform,
+        "atomic_unit": f"niche = centre spot + {cfg.k_neighbors} neighbours",
+        "split": cfg.split,
+        "seed": cfg.seed,
+        "encoders": [e.model_dump() for e in cfg.encoders],
+        "supervision_only": cfg.supervision,
+        "h2_label": cfg.h2_label,
+        "headline_view": cfg.headline_view,
+        "counts_are_raw": s.get("counts_are_raw"),
+        "encoder_input_decision": s.get("encoder_input_decision"),
+        "gpath2vec_sha256": cfg.gpath2vec_sha256,
+    }
+
+
+# --- routing: which method can answer which biological question -----------
+@srv.tool(description=(
+    "List the biological question types this cohort's evaluation can route. Call "
+    "this FIRST when asked what the system can answer, or before routing, to pick "
+    "the task_id. Each family states the level of biological abstraction it lives "
+    "at - measurement, structure, cohort or program - because the same words can "
+    "sit at two levels and they route to different methods. If a question could "
+    "belong to two families, ask the user which they mean rather than guessing; "
+    "this server will not guess for you."))
+def list_task_families(project_id: str | None = None) -> dict:
+    from omicstra.routing import list_task_families as _list
+    return _list(project_id=project_id)
+
+
+@srv.tool(description=(
+    "Route one biological question to the method this cohort's evidence supports, "
+    "and say why. You choose the task_id from list_task_families; everything after "
+    "that is resolved by rule from recorded measurements - no judgement of yours "
+    "enters it.\n\n"
+    "Returns a selection record whose `resolution` field is one of five, and they "
+    "are not interchangeable: `recommend` - one method leads on every declared "
+    "axis; `tie` - the measurement does not order the candidates, so the system "
+    "declines to pick; `escalate` - the rules cannot resolve it at all, because "
+    "the declared axes disagree or this cohort has no evidence; `refuse` - the "
+    "evidence contraindicates the method the user named; `override_ack` - the "
+    "user was refused and chose to proceed, recorded as dissent.\n\n"
+    "A tie is a statement about the measurement; an escalation is a statement "
+    "about the rules. Report them differently.\n\n"
+    "WHEN REPORTING THIS TO THE USER: state the scope sentence from `caveats` "
+    "BEFORE the recommendation, and reproduce `why` in full including any "
+    "shortfall it opens with. The `why` field sometimes leads with a comparison "
+    "against the raw un-aligned modality - that sentence is the finding, not a "
+    "hedge, and must not be moved to the end or summarised away. Report a tie as "
+    "a tie; do not pick a winner the evidence declined to pick.\n\n"
+    "Set proposed_method when the user names a method themselves. Set "
+    "override_refusal only when the user has seen a refusal and asked to proceed "
+    "anyway - that is recorded as dissent against the evidence."))
+def route(task_id: str, question: str = "", proposed_method: str | None = None,
+          override_refusal: bool = False, project_id: str | None = None) -> dict:
+    from omicstra.routing import resolve
+    r = resolve(task_id, question=question, proposed_method=proposed_method,
+                override=override_refusal, project_id=project_id)
+    d = r.model_dump()
+    d["resolution"] = ("override_ack" if (r.contraindicated and r.actor == "human")
+                       else "refuse" if r.contraindicated
+                       else "escalate" if r.escalated
+                       else "tie" if r.tie else "recommend")
+    d["headline"] = r.headline()
+    return d
+
+
+@srv.tool(description=(
+    "Summarise the decision ledger for this cohort: how many routing decisions "
+    "were taken, how they resolved, and what each rested on. Use when asked what "
+    "the system has decided, how reproducible it is, or how much was rule-resolved "
+    "versus escalated to a human. Note the boundary it reports: mapping a question "
+    "onto a task_id happens in the calling model and is NOT counted here - only "
+    "task_id to route is."))
+def decision_record(project_id: str | None = None) -> dict:
+    from omicstra.routing import decision_record as _rec
+    return _rec(project_id=project_id)
+
+
+@srv.tool(description=(
+    "Show the evidence behind a routing decision as a chart. Use when the user "
+    "asks to see the evidence, the numbers, the intervals, or why a task tied or "
+    "escalated. Renders the candidates for one task_id with their confidence "
+    "intervals, the floor and reference drawn as lines, and any contraindicated "
+    "method greyed out and labelled.\n\n"
+    "The chart is drawn from the same evidence file the route resolves against, "
+    "so it cannot disagree with what `route` returned. A task with two axes gets "
+    "two panels - that is what makes an escalation visible: you can see the axes "
+    "name different leaders."))
+def plot_evidence(task_id: str, project_id: str | None = None) -> list:
+    import base64
+
+    from mcp.types import ImageContent, TextContent
+
+    from omicstra.figures import evidence_plot
+    try:
+        path, caption = evidence_plot(task_id, project_id=project_id)
+    except KeyError as e:
+        return [TextContent(type="text", text=str(e))]
+    return [ImageContent(type="image", mimeType="image/png",
+                         data=base64.b64encode(path.read_bytes()).decode()),
+            TextContent(type="text", text=caption)]
+
+
+# --- compute-lite: run a real EDA step on cached data ---------------------
+@srv.tool(description=(
+    "Run a real exploratory-data-analysis step on this cohort's actual measurements "
+    "and return the scientific finding: the method used, the scope it ran on, what "
+    "was observed, the criterion it was judged against, the result, and the decision "
+    "that follows. Steps: count_statistics (depth, detection, and whether values are "
+    "genuinely integer counts), marker_expression (are expected markers present and "
+    "unexpected ones absent), spatial_autocorrelation (is expression spatially "
+    "structured - this routes the molecular encoder), batch_structure (does technical "
+    "origin explain more variation than biology). This computes; it does not read a "
+    "stored verdict."))
+def run_eda_step(step: str, n_perm: int = 199) -> dict:
+    import anndata as ad
+
+    from omicstra import measures as st
+    from omicstra.eda import load_summary
+
+    cache = settings.resolve(settings.data_dir) / "embeddings/_eda_cache/cohort_sample.h5ad"
+    if not cache.exists():
+        return {"error": f"no cached cohort at {cache}. build it with the adapter first."}
+    a = ad.read_h5ad(cache)
+    s = load_summary()
+
+    if step == "count_statistics":
+        r = st.count_statistics(a, sample_key="sample")
+    elif step == "marker_expression":
+        r = st.marker_expression(
+            a,
+            positive={g: v["expected"] for g, v in s.get("positive_markers", {}).items()},
+            negative={g: v["expected"] for g, v in s.get("negative_markers", {}).items()})
+    elif step == "spatial_autocorrelation":
+        genes = list(s.get("morans_i_summary", {}).get("results", {}))
+        r = st.spatial_autocorrelation(a, markers=genes, sample_key="sample",
+                                       n_perm=int(n_perm))
+    elif step == "batch_structure":
+        meta = {smp: {"slide": smp.split("_")[0]} for smp in a.obs["sample"].unique()}
+        r = st.batch_structure(a, sample_key="sample", sample_meta=meta,
+                               technical=["slide"], biological=[])
+    else:
+        return {"error": f"unknown step {step!r}",
+                "available": ["count_statistics", "marker_expression",
+                              "spatial_autocorrelation", "batch_structure"]}
+
+    d = r.model_dump()
+    d["headline"] = r.headline()
+
+    # the cache is a convenience subset, not the cohort. a subset must not be
+    # allowed to state a cohort-level decision - that is how a routing choice
+    # ends up resting on unrepresentative data.
+    n_samples = int(a.obs["sample"].nunique())
+    n_subjects = len({s.split("_")[0] for s in a.obs["sample"].unique()})
+    total = s.get("samples_with_counts") or s.get("samples")
+    d["scope_warning"] = (
+        f"computed on a cached subset: {n_samples} samples from {n_subjects} "
+        f"subject group(s)" + (f", of {total} in the cohort" if total else "")
+        + ". Not representative. Treat `decision` as illustrative of the method, "
+          "not as a cohort-level finding."
+    )
+    d["decision_authority"] = "subset - illustrative only"
+    return d
+
+
+# --- a picture of the caveat ----------------------------------------------
+@srv.tool(description=(
+    "Plot Moran's I spatial autocorrelation for this cohort's marker genes, comparing "
+    "the single subarray the recorded EDA measured against the median across every "
+    "sample in the cohort. Use this when asked how well a spatial-signal result "
+    "generalises, whether a check rested on one sample, or to see the evidence behind "
+    "the spatial_autocorrelation gate check. Returns a chart plus the counts above "
+    "threshold for each scope."))
+def plot_spatial_autocorrelation(project_id: str | None = None) -> list:
+    import base64
+    import io
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from mcp.types import ImageContent, TextContent
+
+    s = load_summary(project_id)
+    single = (s.get("morans_i_summary") or {})
+    recorded = single.get("results") or {}
+    cache = (settings.resolve(settings.data_dir)
+             / "embeddings/_eda_cache/spatial_autocorrelation_cohort.json")
+    if not recorded:
+        return [TextContent(type="text", text="no morans_i_summary recorded for this cohort")]
+    cohort = json.loads(cache.read_text())["observed"] if cache.exists() else {}
+
+    thr = 0.3
+    genes = sorted(recorded, key=lambda g: -(cohort.get(g, {}).get("median_I")
+                                             if cohort.get(g) else recorded[g]["I"]))
+    sns.set_theme(style="ticks", palette="Set2", context="notebook")
+    fig, ax = plt.subplots(figsize=(7.2, 0.42 * len(genes) + 1.5))
+    y = range(len(genes))
+
+    for i, g in enumerate(genes):
+        c = cohort.get(g)
+        if c:
+            ax.plot([c["q25"], c["q75"]], [i, i], lw=7, color="#6FA3B8", alpha=.45,
+                    solid_capstyle="butt", zorder=1)
+            ax.plot(c["median_I"], i, "o", ms=8, color="#4A5D7E", zorder=3,
+                    label="cohort median (281 samples)" if i == 0 else None)
+        ax.plot(recorded[g]["I"], i, "D", ms=7, color="#C97B84", zorder=4,
+                label=f"{single.get('subarray', 'single subarray')} only (n=1)" if i == 0 else None)
+
+    ax.axvline(thr, color="#B5544F", ls="--", lw=1.4, zorder=2)
+    ax.text(thr, len(genes) - .3, f"  threshold {thr}", color="#B5544F", fontsize=9, va="top")
+    ax.set_yticks(list(y)); ax.set_yticklabels(genes)
+    ax.set_xlabel("Moran's I"); ax.invert_yaxis()
+    ax.set_title("the check that gates the molecular encoder\n"
+                 "recorded on one subarray, recomputed across the cohort", fontsize=11)
+    ax.legend(fontsize=9, frameon=False, loc="lower right")
+    sns.despine(ax=ax)
+    fig.tight_layout()
+    buf = io.BytesIO(); fig.savefig(buf, format="png", dpi=130); plt.close(fig)
+
+    # the criterion is "top 5 markers" ranked WITHIN a scope, so each scope ranks
+    # by its own values. ranking both by the cohort would silently restate the
+    # recorded result on a different marker set.
+    top_single = sorted(recorded, key=lambda g: -recorded[g]["I"])[:5]
+    n_single = sum(1 for g in top_single if recorded[g]["I"] > thr)
+    msg = (f"Top 5 markers above I > {thr}: "
+           f"{n_single} of 5 on {single.get('subarray', 'the recorded subarray')} alone")
+    if cohort:
+        top_cohort = sorted(cohort, key=lambda g: -cohort[g]["median_I"])[:5]
+        n_cohort = sum(1 for g in top_cohort if cohort[g]["median_I"] > thr)
+        msg += f", {n_cohort} of 5 across all {cohort[top_cohort[0]]['n_samples']} samples."
+    else:
+        n_cohort = None
+        msg += ". No cohort-wide recomputation is cached."
+    if cohort and n_cohort is not None and n_cohort < n_single:
+        msg += (" The recorded value rests on one sample and does not hold cohort-wide - "
+                "the criterion behind it is calibrated, not universal.")
+    return [ImageContent(type="image", data=base64.b64encode(buf.getvalue()).decode(),
+                         mimeType="image/png"),
+            TextContent(type="text", text=msg)]
+
+
+# --- resources: URI-addressed data, not model-invoked ---------------------
+@srv.resource("omicstra://eda-contract", mime_type="application/json",
+              description="the generalizable EDA gate contract - thresholds and "
+                          "verdict logic, no cohort measurements")
+def eda_contract() -> str:
+    return json.dumps(load_contract(), indent=2)
+
+
+@srv.resource("omicstra://routing-contract", mime_type="application/json",
+              description="the generalizable routing contract - task taxonomy, "
+                          "outcome vocabulary and decision rules, no cohort numbers")
+def routing_contract() -> str:
+    from omicstra.routing import load_routing_contract
+    return json.dumps(load_routing_contract(), indent=2)
+
+
+@srv.resource("omicstra://project/{project_id}/routing-evidence",
+              mime_type="application/json",
+              description="the selected cohort's measured routing evidence - the "
+                          "numbers a route resolves against")
+def routing_evidence(project_id: str) -> str:
+    from omicstra.routing import load_routing_evidence
+    return json.dumps(load_routing_evidence(project_id), indent=2)
+
+
+@srv.resource("omicstra://project/{project_id}/eda-summary",
+              mime_type="application/json",
+              description="the selected cohort's measured EDA summary")
+def eda_summary(project_id: str) -> str:
+    # project_id is advisory; the boundary is settings.project_dir
+    return json.dumps(load_summary(project_id), indent=2)
+
+
+# --- transport --------------------------------------------------------------
+# stdio and http are the SAME server. the transport is a deployment choice, not
+# an architectural one - no tool, contract or record changes between them.
+#
+# on the protocol revision: this SDK's LATEST_PROTOCOL_VERSION is 2026-07-28,
+# which is NOT backward compatible with 2025-03-26 - a client on one cannot
+# talk to a server on the other. the SDK negotiates and will fall back, so the
+# default here is permissive. set REQUIRE_PROTOCOL_2026=1 to refuse anything
+# older, which is what a deployment behind an authorization server wants: the
+# july revision is where mcp servers became oauth 2.1 resource servers, and
+# accepting an older client silently means accepting one that cannot present
+# an audience-bound token.
+REQUIRE_PROTOCOL_2026 = os.environ.get("REQUIRE_PROTOCOL_2026", "0") == "1"
+
+
+def negotiated_protocol_version(meta: dict | None) -> str | None:
+    """the version the client declared, read off `_meta`.
+
+    the july revision removed the initialize handshake: version and capabilities
+    travel in `_meta` on every request instead. so this is per-request, not
+    per-session, and it belongs on the record - a run is only reproducible if
+    you know which protocol produced it.
+    """
+    from mcp.types import PROTOCOL_VERSION_META_KEY
+    return (meta or {}).get(PROTOCOL_VERSION_META_KEY)
+
+
+def request_protocol_version() -> str | None:
+    """the version of the CURRENT request, validated.
+
+    called from the tool path rather than a handshake, because the july
+    revision removed the handshake. every tool that stamps a record calls this,
+    so strict mode refuses at the door AND the version lands on the record.
+    """
+    try:
+        from mcp.server import context
+        ctx = context.request_ctx.get()
+        meta = getattr(ctx, "meta", None)
+        meta = meta if isinstance(meta, dict) else (meta.model_dump() if meta else None)
+    except Exception:
+        meta = None                       # stdio, or outside a request
+    return check_protocol(meta)
+
+
+def check_protocol(meta: dict | None) -> str | None:
+    v = negotiated_protocol_version(meta)
+    if REQUIRE_PROTOCOL_2026 and v != LATEST_PROTOCOL_VERSION:
+        raise ValueError(
+            f"REQUIRE_PROTOCOL_2026=1 and this request declares {v!r}. the "
+            f"{LATEST_PROTOCOL_VERSION} revision is required: older clients "
+            "cannot present audience-bound tokens.")
+    return v
+
+
+def serve(mode: str = "stdio", mount: str = "/mcp", host: str = "127.0.0.1",
+          port: int = 8000) -> None:
+    """the one entry point. `mode` is the only thing that differs.
+
+    http is STATELESS by design - any instance handles any request, so n
+    servers sit behind one address with no session affinity. omicstra's own
+    handle is `run_id`, minted by a tool and passed back as an ordinary
+    parameter, so nothing needs a sticky session to resume.
+    """
+    if mode == "stdio":
+        srv.run()
+        return
+    if mode != "http":
+        raise ValueError(f"mode must be stdio or http, not {mode!r}")
+    import uvicorn
+    app = srv.streamable_http_app(streamable_http_path=mount, stateless_http=True,
+                                  host=host)
+    uvicorn.run(app, host=host, port=port)
+
+
+def main() -> None:
+    serve(mode=os.environ.get("OMICSTRA_TRANSPORT", "stdio"),
+          mount=os.environ.get("OMICSTRA_HTTP_MOUNT", "/mcp"),
+          host=os.environ.get("OMICSTRA_HTTP_HOST", "127.0.0.1"),
+          port=int(os.environ.get("OMICSTRA_HTTP_PORT", "8000")))
+
+
+def _unit_counts(project_id: str | None) -> tuple[dict[str, int], dict]:
+    """per-sample unit counts, and an honest statement of what they cover.
+
+    the inventory is the declared source, and it records only the samples it was
+    run over - on a partial run that is a handful. the canonical ingest record
+    covers every converted sample, so it is preferred when it reaches further,
+    and the returned coverage says which was used and how many units it saw.
+
+    this matters because the platform_floor gate decides from these. reading two
+    samples where the cohort has 280 makes the gate silent rather than wrong,
+    and a silent gate is indistinguishable from a passing one.
+    """
+    from omicstra.graph import unit_counts_from_records
+
+    root = settings.project_root(project_id)
+    inv_counts: dict[str, int] = {}
+    inv = root / "inventory.json"
+    if inv.is_file():
+        rec = json.loads(inv.read_text())
+        inv_counts = unit_counts_from_records(
+            [rec[k] for k in rec if isinstance(rec[k], dict)])
+
+    ing_counts: dict[str, int] = {}
+    ing = root / "data" / "canonical" / "ingest.json"
+    if ing.is_file():
+        src = (json.loads(ing.read_text()) or {}).get("sources", {})
+        ing_counts = {k: int(v["n_spots"]) for k, v in src.items()
+                      if isinstance(v, dict) and "n_spots" in v}
+
+    if len(ing_counts) > len(inv_counts):
+        return ing_counts, {"source": "data/canonical/ingest.json",
+                            "n_samples": len(ing_counts),
+                            "note": ("preferred over inventory.json, which covers "
+                                     f"{len(inv_counts)} sample(s) - it was run over "
+                                     "fewer than the cohort holds")}
+    return inv_counts, {"source": "inventory.json", "n_samples": len(inv_counts),
+                        "note": "the declared source" if inv_counts else
+                                "no counts available - unit-floor gates cannot decide"}
+
+
+def _bound_id(project_id: str | None) -> str:
+    """the cohort's declared id. authoritative from project.json, never inferred
+    from the directory name - a scaffolded cohort may be anywhere."""
+    try:
+        return ProjectConfig.load(project_id).project_id
+    except (OSError, ValueError, KeyError):
+        # a scaffolded cohort may have no readable project.json yet; falling back
+        # to the caller's id is better than failing a read-only tool.
+        return project_id or ""
+
+
+# --- the compute path, made visible ----------------------------------------
+#
+# these two READ. there is deliberately no tool that runs an extraction, and the
+# reason is the protocol rather than caution: MCP is request/response, and a full
+# H&E extraction is ~5.8 hours on a laptop. a blocking tool for that would time
+# out on every real cohort, so submission belongs to the dispatcher and the
+# entry point belongs to the CLI. what a client needs from here is to SEE the
+# compute path - what it would ask, what it would do, and what already exists -
+# because until now a client could not tell that one existed at all.
+
+def _device_here(project_id: str | None) -> str | None:
+    """what the plan should be priced against: declared first, probed second.
+
+    the package never probes - planning has to work on a machine that could not
+    run the encoder, so `preflight` and `capacity_plan` take a device rather than
+    asking for one. a SERVER is the other case: it runs where the work would run,
+    so it may look. it looks last, it looks in a try, and a missing tensor
+    library returns None rather than raising - an unpriced plan is a worse answer
+    than a priced one and a better answer than a traceback.
+    """
+    from omicstra.graph import _load_cohort
+    from omicstra.protocols.encode import pool_resources
+
+    try:
+        declared, _ = pool_resources(_load_cohort(project_id))
+    except Exception:                                   # noqa: BLE001 - a malformed
+        return None                                     # pool is reported by the gate
+    if declared and declared.get("device"):
+        return str(declared["device"])
+    try:
+        from omicstra.protocols.encode import pick_device
+
+        return str(pick_device())
+    except Exception:                                   # noqa: BLE001 - no torch here
+        return None
+
+
+@srv.tool(description=(
+    "Report the preflight gates on the compute path for one encoder: which are "
+    "resolved from this cohort's declarations, which are still open, and what "
+    "accepting each one forecloses. A cohort that declares every answer runs "
+    "unattended; an open gate means a person has to decide before accelerated "
+    "compute starts, and the system does not pick a default. Reads declarations "
+    "and the inventory record only - it measures nothing and starts nothing."))
+def check_compute_gates(encoder: str | None = None,
+                        project_id: str | None = None) -> dict:
+    from omicstra.graph import _load_cohort, _primary_encoder
+    from omicstra.protocols.encode import gate_record, preflight
+
+    enc = encoder or _primary_encoder(project_id) or "virchow2"
+    cohort = _load_cohort(project_id)
+
+    counts, coverage = _unit_counts(project_id)
+    reqs = preflight(cohort, enc, unit_counts=counts or None)
+    rec = gate_record(reqs, enc)
+    return {
+        "project_id": _bound_id(project_id),
+        "encoder": enc,
+        "unattended": not any(r.open for r in reqs),
+        "n_gates": len(reqs),
+        "n_open": sum(r.open for r in reqs),
+        # a gate decides from these counts, so how many units they cover is part
+        # of the answer. a floor gate that stays silent because it only saw two
+        # samples is worse than one that fires wrongly - it looks like a pass.
+        "unit_counts_cover": coverage,
+        "gates": [{"id": r.id, "question": r.question, "options": list(r.options),
+                   "answer": r.answer, "answered_from": r.source,
+                   "pre_answerable_by": r.pre_answerable_by,
+                   "forecloses": r.forecloses, "open": r.open,
+                   "observed": r.observed} for r in reqs],
+        "verdict": rec.decision,
+        "note": ("an open gate is a decision, not an error. the declaration named in "
+                 "pre_answerable_by answers it in advance and is recorded with "
+                 "actor=human either way."),
+    }
+
+
+@srv.tool(description=(
+    "Describe what a compute run would do on this cohort without running it: "
+    "how many units are declared, how many shards the work splits into, which "
+    "outputs already exist and would therefore be skipped, and what is missing. "
+    "Resume is decided by the output file, so an interrupted run restarts from "
+    "what landed. Reads the filesystem only."))
+def describe_compute_plan(encoder: str | None = None,
+                          project_id: str | None = None) -> dict:
+    from omicstra.adapters.canonical import CanonicalMissing, list_samples
+    from omicstra.graph import _load_cohort, _primary_encoder
+
+    enc = encoder or _primary_encoder(project_id) or "virchow2"
+    root = settings.project_root(project_id)
+    try:
+        samples = list_samples(root)
+    except (CanonicalMissing, FileNotFoundError) as e:
+        return {"project_id": _bound_id(project_id), "encoder": enc, "runnable": False,
+                "why_not": str(e),
+                "note": ("the cohort has not been converted to the package's input "
+                         "contract - .h5ad plus a coordinates table - so there is "
+                         "nothing to plan over yet.")}
+
+    with_image = [s for s in samples if s.image]
+
+    # the ORACLE is read, never written. it is what the ports are diffed
+    # against, so a plan that named it as an output directory - which this did -
+    # invites a run that contaminates the thing the verification depends on.
+    oracle = settings.resolve(Path("data/embeddings")) / f"{enc}_niche"
+    out_dir = root / "runs" / "encode" / enc
+    in_oracle = {q.stem for q in oracle.glob("*.npy")} if oracle.is_dir() else set()
+    done = {q.stem for q in out_dir.glob("*.npy")} if out_dir.is_dir() else set()
+    todo = [s.sample_id for s in with_image if s.sample_id not in done]
+
+    # how long, how much disk, how much memory - from measurements, or a refusal.
+    # the units are the ENCODER's units (tiles here, not samples), taken from the
+    # inventory record rather than re-counted, and only for what is LEFT to run.
+    from omicstra.protocols.encode import capacity_plan
+
+    n_units, coverage = _unit_counts(project_id)
+    remaining = {sid: n for sid, n in (n_units or {}).items() if sid in set(todo)}
+    cost = capacity_plan(_load_cohort(project_id), enc, unit_counts=remaining,
+                         device=_device_here(project_id), at=out_dir) if remaining else {
+        "estimated": False, "why_not": "nothing left to run", "verdict": "unknown"}
+    cost["units_from"] = coverage
+
+    return {
+        "project_id": _bound_id(project_id),
+        "encoder": enc,
+        "runnable": bool(with_image),
+        "cost": cost,
+        "n_samples": len(samples),
+        "n_with_image": len(with_image),
+        "n_shards": len(with_image),
+        "already_done": len(done & {s.sample_id for s in with_image}),
+        "remaining": len(todo),
+        "remaining_examples": sorted(todo)[:5],
+        "output_dir": str(out_dir),
+        "oracle": {
+            "path": str(oracle),
+            "n_present": len(in_oracle),
+            "role": "read-only. the artifacts the published grid was built from",
+            "note": ("a run writes to output_dir and diffs against this. the "
+                     "dispatcher refuses a shard whose output lands inside a path "
+                     "the cohort declares read-only, so a plan cannot become a "
+                     "contamination by accident."),
+        },
+        "unit_of_retry": "one shard per sample; three attempts, then recorded failed "
+                         "and the run continues",
+        "resume": "decided by the output file, not a ledger - the file is what the next "
+                  "stage reads, so its existence is the only honest evidence",
+        "note": ("samples without an image cannot enter the morphology arm and are "
+                 "excluded from the shard list rather than failing inside it."),
+    }
+
+
+# --- the H&E agent, reachable by a client -----------------------------------
+#
+# the graph IS the agent. these tools drive graphs/encode.py; they do not call
+# protocols/encode.py, because a tool that called the chain directly would turn
+# the gates back into a function's arguments and the agent back into a function.
+#
+# a run handle is an ordinary parameter, not a session - which is only true if
+# the run's state outlives the process. so these use the DURABLE checkpointer,
+# and a server started with the in-memory one says so rather than handing out a
+# handle it cannot honour.
+def _runner(arm: str = "he"):
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from omicstra.graph import make_checkpointer
+    saver, spec = make_checkpointer()
+    if isinstance(saver, InMemorySaver):
+        raise ValueError(
+            "run handles need a durable checkpointer. set "
+            "OMICSTRA_CHECKPOINT=sqlite:<path> - with the in-memory saver a run "
+            "cannot be resumed by a later request, which is what a run_id is for.")
+    return _app_for(ARMS[arm], saver), spec
+
+
+# the two arms, by the name a run records. one tool per arm was a deliberate
+# choice - the gate sets genuinely differ - so the resume path has to know which
+# one a handle belongs to, and it reads that from the checkpoint rather than from
+# the shape of the run_id.
+ARMS = {HandleArm.HE: "omicstra.graphs.encode:build_encode_graph",
+        HandleArm.ST: "omicstra.graphs.st:build_st_graph",
+        HandleArm.ALIGN: "omicstra.graphs.align:build_align_graph",
+        HandleArm.EVALUATE: "omicstra.graphs.evaluate:build_evaluate_graph"}
+
+
+def _app_for(target: str, saver):
+    import importlib
+
+    mod, fn = target.split(":")
+    return getattr(importlib.import_module(mod), fn)(checkpointer=saver)
+
+
+class NotAnArmHandle(ValueError):
+    """the thread exists and is not one of the arms'.
+
+    `arm` is shared by name with LEVEL 0, where it means ask | compute | refuse
+    rather than he | st | align | evaluate - two meanings, one key, published on
+    both sides. so a level-0 thread id handed to a resume carries `compute` in
+    the field this function reads, and the old `ARMS.get(arm, ARMS["he"])` would
+    have re-entered the H&E graph: a tile geometry resolved for a cohort nobody
+    asked about one, under someone else's handle. a refusal names it instead.
+    """
+
+
+def _runner_for(run_id: str):
+    """the graph a handle actually belongs to, plus its state.
+
+    the arms share `EncodeState`, so any compiled graph can READ the checkpoint;
+    only the gates and the compute node differ. so: read with a default, find
+    the arm the run recorded, and rebuild if it is another one. resuming an ST
+    run into the H&E node would re-enter a node that resolves a tile geometry
+    for a cohort that was never asked for one.
+    """
+    app, spec = _runner()
+    snap = app.get_state({"configurable": {"thread_id": run_id}})
+    values = (snap.values if snap else None) or {}
+    # NO default. `values.get("arm", HandleArm.HE)` defeated the refusal three
+    # lines below it: a LEVEL 0 thread carries no handle arm, so it resolved to
+    # `he` and this returned the encode graph holding a level-0 snapshot - the
+    # exact case the error message says is refused. `graphs/align.py:38` records
+    # the same default biting from the other side, where omitting the key made a
+    # resume re-enter the encode graph.
+    raw = values.get("arm")
+    # an EMPTY checkpoint is a different statement from a checkpoint that is not
+    # an arm's: "never heard of this thread" against "this thread exists and
+    # belongs to level 0". the callers report the first as `unknown` and name the
+    # checkpointer, so it must not be refused here - removing the old
+    # `HandleArm.HE` default collapsed the two and made a nonexistent run_id
+    # read as `refused`, which is a false claim about a thread that is not there.
+    if not values:
+        return app, spec, snap, None
+    try:
+        arm = HandleArm(raw)
+    except ValueError:
+        # the message names BOTH vocabularies, because the useful question on an
+        # unrecognised value is which of the two producers wrote it. this is the
+        # guard that kept the `arm` collision from ever silently serving the
+        # wrong graph, and it is the pattern `labels.parse` generalises.
+        raise NotAnArmHandle(
+            f"{run_id!r} records arm {raw!r}, which is not one of "
+            f"{sorted(m.value for m in HandleArm)}. a run handle belongs to one "
+            "modality or stage arm; a level-0 thread records a ROUTING decision "
+            f"({sorted(m.value for m in Route)}) under `route` and carries no "
+            "handle arm at all, and it is resumed through the chain rather than "
+            "through an arm.") from None
+    if arm is not HandleArm.HE:
+        from omicstra.graph import make_checkpointer
+
+        saver, spec = make_checkpointer()
+        app = _app_for(ARMS[arm], saver)
+        snap = app.get_state({"configurable": {"thread_id": run_id}})
+    return app, spec, snap, arm
+
+
+def _persist(out: dict) -> int:
+    """the arms' records reach the cohort's ONE ledger. returns what landed.
+
+    there were two stores. the routing path appended to a file-backed
+    `RecordStore` at `runs/{id}/records/decisions.jsonl`; every gate arm wrote
+    plain dicts into the langgraph checkpoint, readable only through
+    `runs_record(run_id)` and only if you had the handle. so a cohort's ledger
+    said "N routing decisions" while the gates, the dispatches and the pins were
+    somewhere else, and the report - which takes a pack and a ledger - could
+    reach neither.
+
+    it is called from `_handle`, which is the one place every arm and every
+    resume passes through. appending is idempotent on `record_id`: the arms carry
+    their whole record list forward in state, so a resume hands over everything
+    the run has ever decided.
+    """
+    from omicstra.contracts.routing import ledger
+
+    recs = out.get("records") or []
+    if not recs:
+        return 0
+    return len(ledger(out.get("project_id")).append_new(recs))
+
+
+def _handle(app, run_id: str, out: dict) -> dict:
+    """what a client gets back: the handle, and either a gate or a result."""
+    n_new = _persist(out)
+    gates = [g for g in (out.get("gates") or []) if g.get("open")]
+    interrupts = out.get("__interrupt__") or []
+    if interrupts:
+        v = interrupts[0].value
+        return {"run_id": run_id, "status": "awaiting_answer", "gate": v,
+                "recorded": n_new,
+                "resume_with": "runs_resume(run_id, answers={<gate id>: <option>})"}
+    return {"run_id": run_id, "status": out.get("report", {}).get("status", "unknown"),
+            "report": out.get("report", {}), "open_gates": [g["id"] for g in gates],
+            "recorded": n_new, "halted": bool(out.get("halted"))}
+
+
+@srv.tool(description=(
+    "Run the H&E morphology agent on a cohort. Fires its preflight gates as "
+    "interrupts a client answers, then dispatches one shard per section. "
+    "Returns a run handle. compute=false (the default) resolves the shard list "
+    "and reports what would run without encoding anything."))
+def he_encode(project_id: str | None = None, platform: str | None = None,
+              samples: list[str] | None = None, compute: bool = False,
+              encoder: str = "virchow2", run_id: str | None = None) -> dict:
+    import uuid
+
+    from omicstra.graph import _load_cohort
+    from omicstra.tracing import assert_may_trace
+
+    app, spec = _runner("he")
+    rid = run_id or f"he-{uuid.uuid4().hex[:12]}"
+    cohort = _load_cohort(project_id)
+    # BEFORE the graph runs: external tracing sends node inputs to a third
+    # party, and node inputs are cohort content.
+    assert_may_trace(cohort, project_id)
+    cfg = {"configurable": {"thread_id": rid}}
+    # the counts the INVENTORY recorded. without them the floor gate sees no
+    # samples and stays silent, which reads as a pass - the failure
+    # check_compute_gates already warns about in its own comment. the seed cohort
+    # hid it by declaring an answer, so the gate never needed to measure.
+    counts, coverage = _unit_counts(project_id)
+    out = app.invoke({"project_id": project_id, "encoder": encoder, "arm": HandleArm.HE,
+                      "cohort": cohort, "platform": platform,
+                      "unit_counts": counts or None,
+                      "samples": samples, "compute": compute}, cfg)
+    return {**_handle(app, rid, out), "checkpointer": spec,
+            "unit_counts_cover": coverage}
+
+
+@srv.tool(description=(
+    "Run the spatial-transcriptomics agent on a cohort. Its own agent, not a "
+    "mode of the H&E one: it asks whether each section clears the encoder's "
+    "prototype floor, and it REFUSES rather than asking when the platform's edge "
+    "scale or the cohort's gene axis is undeclared - neither is a question with "
+    "options, and both have defaults that would silently produce vectors that "
+    "are not this cohort's. Fires its preflight gates as interrupts a client "
+    "answers, then dispatches one shard per section. Returns a run handle. "
+    "compute=false (the default) resolves the shard list and reports what would "
+    "run, including the edge scale and the gene-axis route, without embedding "
+    "anything."))
+def st_encode(project_id: str | None = None, platform: str | None = None,
+              samples: list[str] | None = None, compute: bool = False,
+              encoder: str = "novae", run_id: str | None = None) -> dict:
+    import uuid
+
+    from omicstra.graph import _load_cohort
+    from omicstra.tracing import assert_may_trace
+
+    app, spec = _runner("st")
+    rid = run_id or f"st-{uuid.uuid4().hex[:12]}"
+    cohort = _load_cohort(project_id)
+    # BEFORE the graph runs: external tracing sends node inputs to a third
+    # party, and node inputs are cohort content.
+    assert_may_trace(cohort, project_id)
+    cfg = {"configurable": {"thread_id": rid}}
+    # the counts the INVENTORY recorded. without them the floor gate sees no
+    # samples and stays silent, which reads as a pass - the failure
+    # check_compute_gates already warns about in its own comment. the seed cohort
+    # hid it by declaring an answer, so the gate never needed to measure.
+    counts, coverage = _unit_counts(project_id)
+    out = app.invoke({"project_id": project_id, "encoder": encoder, "arm": HandleArm.ST,
+                      "cohort": cohort, "platform": platform,
+                      "unit_counts": counts or None,
+                      "samples": samples, "compute": compute}, cfg)
+    return {**_handle(app, rid, out), "checkpointer": spec,
+            "unit_counts_cover": coverage}
+
+
+@srv.tool(description=(
+    "RESOLVE a cohort's alignment grid from its recorded artifacts, behind a run "
+    "handle. compute=true trains contrastive runs through the five-step LCEL chain "
+    "(load_data, split, train, embed_test, evaluate_and_save) and dispatches "
+    "classical baselines to their scripts. What "
+    "this adds is the gate in front of it. Its first gate is the cohort's own EDA "
+    "verdict: this project's opening constraint is that no alignment, retrieval "
+    "or evaluation happens until that gate is satisfied, and this is where that "
+    "sentence is enforced rather than kept. A cohort with no recorded verdict is "
+    "REFUSED, not asked - there is nothing to accept and no option list to offer. "
+    "It also surfaces a computed verdict that disagrees with the one the cohort "
+    "declares, and records which arms of the grid are in scope. Returns a run "
+    "handle. compute=false (the default) resolves the grid from recorded "
+    "artifacts and reports it without training. Hypothesis verdicts are NOT "
+    "here - evaluate_run is the stage with the gates for them."))
+def align_run(project_id: str | None = None, compute: bool = False,
+              run_id: str | None = None) -> dict:
+    import uuid
+
+    from omicstra.graph import _load_cohort
+    from omicstra.tracing import assert_may_trace
+
+    app, spec = _runner("align")
+    rid = run_id or f"align-{uuid.uuid4().hex[:12]}"
+    cohort = _load_cohort(project_id)
+    # BEFORE the graph runs: external tracing sends node inputs to a third
+    # party, and node inputs are cohort content.
+    assert_may_trace(cohort, project_id)
+    cfg = {"configurable": {"thread_id": rid}}
+    # no `hypotheses`. it was accepted here and silently ignored: the align graph
+    # resolves a grid and scores nothing, so naming a hypothesis changed no
+    # behaviour while implying the stage returned a verdict over it. the gates a
+    # verdict needs - scope, the bytes, what a failed guard does to the claim -
+    # are evaluate_run's.
+    out = app.invoke({"project_id": project_id, "arm": HandleArm.ALIGN,
+                      "cohort": cohort,
+                      "compute": compute}, cfg)
+    return {**_handle(app, rid, out), "checkpointer": spec}
+
+
+@srv.tool(description=(
+    "Return a VERDICT on H1 / H2 / H3 for a cohort, behind a run handle. Reads "
+    "the artifacts the cohort's evidence declaration names, runs the guards the "
+    "routing contract requires for each task family, and states per hypothesis "
+    "whether its numbers are biological, diagnostic, unguarded or not_run. It "
+    "recomputes no published number and calls no model. Three gates fire: which "
+    "hypotheses are in scope, the sha256 of every artifact read (a declared pin "
+    "that does not match is REFUSED, not asked), and what a required guard that "
+    "ran and failed does to the claim - demote to diagnostic, or halt. A cohort "
+    "with no curated evidence pack is refused: the pack records which metric "
+    "answers which task family, and generating that would invent the judgement "
+    "it exists to attribute."))
+def evaluate_run(project_id: str | None = None,
+                 hypotheses: list[str] | None = None,
+                 run_id: str | None = None) -> dict:
+    import uuid
+
+    from omicstra.graph import _load_cohort
+    from omicstra.tracing import assert_may_trace
+
+    app, spec = _runner("evaluate")
+    rid = run_id or f"eval-{uuid.uuid4().hex[:12]}"
+    cohort = _load_cohort(project_id)
+    # BEFORE the graph runs: external tracing sends node inputs to a third
+    # party, and node inputs are cohort content.
+    assert_may_trace(cohort, project_id)
+    cfg = {"configurable": {"thread_id": rid}}
+    out = app.invoke({"project_id": project_id, "arm": HandleArm.EVALUATE,
+                      "cohort": cohort,
+                      # absent means every hypothesis the contract declares a
+                      # family for. a named subset is recorded as the request,
+                      # because that is what the server observed.
+                      "hypotheses": list(hypotheses or [])}, cfg)
+    return {**_handle(app, rid, out), "checkpointer": spec}
+
+
+@srv.tool(description=(
+    "COMPUTE a verdict on H1 / H2 / H3 from a cohort's own arrays, rather than "
+    "reading one from a curated evidence pack. This is the other half of "
+    "evaluate_run and answers a different question: evaluate_run states what a "
+    "pack's numbers may claim, and this measures what one fitted run actually "
+    "shows. A cohort with no pack is the case it exists for. It assembles the "
+    "views, the label and the confounder axis from the fields the cohort's "
+    "project.json declares - niches_dir, runs_dir, h2_label, headline_view, "
+    "supervision, seed - and refuses by FIELD NAME when one is absent rather "
+    "than defaulting to the seed cohort's value. Every threshold is the "
+    "cohort's evaluate_params: the permutation counts, the FDR level, the "
+    "aliasing bar and the by-subject split. It runs the guards the pack arm "
+    "cannot - the within-subject comparison, the permutation null over the "
+    "clustering score, and the off-diagonal cosine between association axes - "
+    "and states biological, diagnostic, unguarded or not_run per hypothesis. "
+    "Minutes, not milliseconds, and it calls no model."))
+def evaluate_measure(run: str, project_id: str | None = None,
+                     paired_view: str | None = None,
+                     signals: list[str] | None = None,
+                     include_pathway_scores: bool = False,
+                     run_id: str | None = None) -> dict:
+    import uuid
+
+    from omicstra.graph import _load_cohort
+    from omicstra.tracing import assert_may_trace
+
+    app, spec = _runner("evaluate")
+    rid = run_id or f"measure-{uuid.uuid4().hex[:12]}"
+    cohort = _load_cohort(project_id)
+    # BEFORE the graph runs, for the same reason evaluate_run does it: node
+    # inputs are cohort content, and this arm's inputs are the arrays themselves.
+    assert_may_trace(cohort, project_id)
+    cfg = {"configurable": {"thread_id": rid}}
+    out = app.invoke({"project_id": project_id, "arm": HandleArm.EVALUATE,
+                      "cohort": cohort, "compute": True, "run": run,
+                      "paired_view": paired_view,
+                      "include_pathway_scores": include_pathway_scores,
+                      "signals": list(signals or [])}, cfg)
+    return {**_handle(app, rid, out), "checkpointer": spec}
+
+
+@srv.tool(description=(
+    "Answer the open gate on a run and continue it, or - on a run with no open "
+    "gate whose shards are incomplete - re-dispatch the ones still missing. "
+    "The run handle is an ordinary parameter, so a run started by one request "
+    "is resumable by another, including after the server restarts."))
+def runs_resume(run_id: str, answers: dict | None = None,
+                approve: bool = True) -> dict:
+    from langgraph.types import Command
+
+    # a refusal, not a traceback: every tool on this surface answers. two
+    # read-path tools once raised through to a ToolError on a cohort whose gate
+    # had never run, and a handle from the wrong layer is the same shape of
+    # mistake on the caller's side.
+    try:
+        app, spec, snap, arm = _runner_for(run_id)
+    except NotAnArmHandle as e:
+        return {"run_id": run_id, "status": "refused", "arm": None, "why": str(e)}
+
+    # an ABSENT checkpoint is refused here as it is by the three read tools,
+    # which all check this immediately after resolving. this one did not: it
+    # fell through to `Command(resume=...)` on a thread it had never seen, and
+    # reported whatever arm `_runner_for` had defaulted to. the handle is only
+    # meaningful against the store that holds it.
+    if not snap or not snap.values:
+        return {"run_id": run_id, "status": "unknown", "arm": None,
+                "checkpointer": spec,
+                "why": ("no checkpoint under this handle in "
+                        f"{spec} - a run_id is only meaningful against the "
+                        "store that holds it, and resuming one this "
+                        "checkpointer has never seen would start a new run "
+                        "under an old name")}
+    cfg = {"configurable": {"thread_id": run_id}}
+
+    # a run past its gates whose thread died has no interrupt to resume. the
+    # shards are idempotent, so re-entering the graph re-dispatches exactly
+    # what is missing - which is what "the files survive, the thread does not"
+    # means in practice, and it is recorded rather than silent.
+    if snap and snap.values and not (snap.next or ()):
+        v = snap.values
+        shards = v.get("shards") or []
+        missing = [d for d in shards
+                   if not (Path(d["output"]).exists()
+                           and Path(d["output"]).stat().st_size > 0)]
+        if missing:
+            # the ledger's copy, written as part of the re-entry rather than
+            # beside it. the response says what happened to the caller; the
+            # record says it to whoever reads the checkpoint next, which after
+            # two restarts is the only account of how the run got finished.
+            #
+            # it goes in the INPUT and not through update_state: `records` has no
+            # reducer, so the invoke's own input would overwrite a separate write
+            # and the resume would leave no trace.
+            recs = [*(v.get("records") or []),
+                    {"step_id": "encode_resume", "kind": "dispatch", "status": "pass",
+                     "actor": "system", "resumed_by": "re-dispatch",
+                     "re_dispatched": [d["sample"] for d in missing],
+                     "executor": (v.get("report") or {}).get("executor")}]
+            out = app.invoke({**v, "records": recs, "compute": True}, cfg)
+            r = _handle(app, run_id, out)
+            r["resumed_by"] = "re-dispatch"
+            r["re_dispatched"] = [d["sample"] for d in missing]
+            return {**r, "checkpointer": spec, "arm": arm}
+
+    out = app.invoke(Command(resume=answers if answers else approve), cfg)
+    return {**_handle(app, run_id, out), "resumed_by": "gate_answer",
+            "checkpointer": spec, "arm": arm}
+
+
+@srv.tool(description=(
+    "What a run is doing: shards done, still missing, what it answered. "
+    "Progress is counted from the output files rather than held in memory, so "
+    "this is true from any process and after a restart."))
+def runs_status(run_id: str) -> dict:
+    try:
+        _, spec, snap, arm = _runner_for(run_id)
+    except NotAnArmHandle as e:
+        return {"run_id": run_id, "status": "refused", "arm": None, "why": str(e)}
+    if not snap or not snap.values:
+        return {"run_id": run_id, "status": "unknown", "arm": None,
+                "why": "no checkpoint under this handle. a run_id from a server "
+                       "using a different checkpointer is not resolvable here."}
+    v = snap.values
+    rep = v.get("report") or {}
+    # progress is COUNTED, not remembered. the shards are idempotent on their
+    # output file, so the files are the truth - which is what makes this correct
+    # after a restart that lost the thread doing the work.
+    shards = v.get("shards") or []
+    done = [d for d in shards if Path(d["output"]).exists()
+            and Path(d["output"]).stat().st_size > 0]
+    missing = [d["sample"] for d in shards if d not in done]
+    status = rep.get("status", "in_progress")
+    failed = {}
+    if rep.get("out_dir"):
+        fp = Path(rep["out_dir"]) / "_failed.json"
+        if fp.is_file():
+            try:
+                failed = json.loads(fp.read_text())
+            except ValueError:
+                failed = {"unreadable": str(fp)}
+    if shards and status == "submitted":
+        # an absent output file means "not yet" OR "never" and cannot tell them
+        # apart on its own. a recorded failure is what makes the difference
+        # reportable - without it a dead run reads as a slow one indefinitely.
+        status = ("complete" if not missing
+                  else "failed" if failed else "running")
+    return {"run_id": run_id, "checkpointer": spec, "arm": arm,
+            "executor": rep.get("executor"), "failed": failed or None,
+            "n_shards": len(shards), "n_done": len(done),
+            "missing": missing,
+            "status": status,
+            "next": list(snap.next or []),
+            "answers": v.get("answers") or {},
+            "open_gates": [g["id"] for g in (v.get("gates") or []) if g.get("open")],
+            "seconds": rep.get("seconds"), "skipped": rep.get("skipped"),
+            "out_dir": rep.get("out_dir"), "geometry": rep.get("geometry")}
+
+
+@srv.tool(description=(
+    "The TIMELINE of a run: every step in the order it happened, how long it "
+    "took, and which actor decided it. Answers 'where did this run spend its "
+    "time' and 'what has not finished', which the decision record does not - it "
+    "says what was decided, not what it cost. Reads the run's checkpoint and the "
+    "cohort's ledger; computes nothing and starts nothing."))
+def runs_trace(run_id: str, limit: int = 100) -> dict:
+    try:
+        _, spec, snap, arm = _runner_for(run_id)
+    except NotAnArmHandle as e:
+        return {"run_id": run_id, "steps": [], "arm": None, "why": str(e)}
+    v = (snap.values if snap else None) or {}
+    if not v:
+        return {"run_id": run_id, "steps": [], "arm": None,
+                "why": "no checkpoint under this handle"}
+
+    steps = [{"step_id": r.get("step_id"), "kind": r.get("kind"),
+              "status": r.get("status"), "actor": r.get("actor"),
+              "started_at": r.get("started_at"), "seconds": r.get("duration_s")}
+             for r in (v.get("records") or [])]
+    # `started_at` has always been on every record, so an ORDER was always
+    # available; `duration_s` is what says where the time went, and a step
+    # missing one is reported as missing rather than as zero.
+    steps.sort(key=lambda d: (d["started_at"] or "", d["step_id"] or ""))
+    timed = [d for d in steps if d["seconds"] is not None]
+    return {"run_id": run_id, "arm": arm, "checkpointer": spec,
+            "n_steps": len(steps), "n_timed": len(timed),
+            "seconds_total": round(sum(d["seconds"] for d in timed), 3),
+            "slowest": sorted(timed, key=lambda d: -d["seconds"])[:5],
+            "untimed": [d["step_id"] for d in steps if d["seconds"] is None],
+            "steps": steps[-limit:],
+            "note": ("the run's own timeline. the cohort's whole ledger is a "
+                     "different question - see runs_record for where it lives.")}
+
+
+@srv.tool(description=(
+    "The decision record for ONE run: every gate answered, by whom, and the "
+    "declaration it resolved from, read from that run's checkpoint. The cohort's "
+    "whole ledger is a different question and a different file - every arm "
+    "appends to runs/{project_id}/records/decisions.jsonl, which is what the "
+    "report reads; `ledger` below names it."))
+def runs_record(run_id: str) -> dict:
+    try:
+        _, spec, snap, arm = _runner_for(run_id)
+    except NotAnArmHandle as e:
+        return {"run_id": run_id, "records": [], "arm": None, "why": str(e)}
+    if not snap or not snap.values:
+        return {"run_id": run_id, "records": [], "arm": None,
+                "why": "no checkpoint under this handle"}
+    v = snap.values
+    # the checkpoint is the RUN's state; the file is the cohort's record. they are
+    # two views and not two stores - every record here was appended there as it
+    # arrived, which is why the report can read a ledger without a handle.
+    from omicstra.contracts.routing import ledger
+
+    led = ledger(v.get("project_id"))
+    return {"run_id": run_id, "checkpointer": spec, "arm": arm,
+            "records": v.get("records") or [],
+            "gates": v.get("gates") or [],
+            "answers": v.get("answers") or {},
+            "ledger": str(led.path) if led.path else None,
+            "cohort_decisions": len(led.all()),
+            "encoder": v.get("encoder"), "platform": v.get("platform")}
+
+
+@srv.tool(description=(
+    "Write one ANALYSIS UNIT as a rerunnable notebook plus a markdown trace, "
+    "and return both paths. The unit is the key, not the run: a run id is an "
+    "execution artifact, so a cohort carries one current record per unit - eda, "
+    "inventory, join, evaluate - regenerated to the latest state, with the run "
+    "that produced the numbers named in the header. The source is the cohort's "
+    "own decision ledger, never an external trace: a Record carries the "
+    "CRITERION a number was judged against, which is what re-deriving the "
+    "science needs, and the ledger is local and always on while external "
+    "tracing is refused on a cohort the contract says may not leave the host. "
+    "Each notebook cell calls the same step function that ran, with the "
+    "parameters that run recorded, and checks the numbers it gets back - so a "
+    "clean rerun is the reproduction proof. The pair lands under the cohort's "
+    "work root beside its ledger and figures, because a generated notebook is a "
+    "result and not part of the package. A unit with no records in the ledger is "
+    "refused rather than rendered empty, and a unit with no declared context "
+    "loader is refused by name. Not runs_trace, which answers where ONE run "
+    "spent its time as JSON; this writes a unit's reproducible record as two "
+    "files a reader opens."))
+def unit_notebook(unit: str, project_id: str | None = None,
+                  run: str | None = None, sample: str | None = None,
+                  run_id: str | None = None) -> dict:
+    from omicstra.contracts.routing import ledger
+    from omicstra.notebook import UNITS, from_ledger, write
+
+    generable = sorted(u for u, v in UNITS.items() if v.context)
+    try:
+        b = from_ledger(unit, project_id, run=run, sample=sample, run_id=run_id)
+    except ValueError as e:
+        return {"status": "refused", "why": str(e), "units": generable}
+
+    led = ledger(project_id)
+    if not b["records"]:
+        return {"status": "refused", "unit": unit,
+                "why": (f"the ledger holds no {unit} step for this cohort, so "
+                        "there is nothing to re-derive. a chain run outside the "
+                        "graph writes no records."),
+                "ledger": str(led.path) if led.path else None}
+
+    nb, tr = write(b, project_id)
+    return {"status": "written", "unit": unit,
+            "asks": UNITS[unit].asks,
+            "notebook": str(nb), "trace": str(tr),
+            "steps": [r["step_id"] for r in b["records"]],
+            "produced_by_run": b.get("run_id"),
+            "ledger": str(led.path) if led.path else None}
+
+
+@srv.tool(description=(
+    "Execute a biological analysis from structured parameters the client model "
+    "has already interpreted. The client (Claude Desktop, Claude Code, or any "
+    "MCP client) reads the question, decides the task_id and run from "
+    "list_task_families, and passes them here. This tool calls no model - it "
+    "validates the request against project declarations, invokes the existing "
+    "evaluation graph and LCEL chain, generates a notebook, and returns "
+    "computed results with linked provenance.\n\n"
+    "Call list_task_families first to see what this cohort can answer, then "
+    "choose the task_id and run. Pass the researcher's original question in "
+    "`question` for provenance.\n\n"
+    "Use evaluate_measure directly when you already know every parameter and "
+    "do not need interpretation provenance or notebook generation."))
+def ask(question: str, task_id: str, run: str,
+        objective: str = "",
+        paired_view: str | None = None,
+        signals: list[str] | None = None,
+        include_pathway_scores: bool = False,
+        interpretation_model: str = "",
+        notes: list[str] | None = None,
+        project_id: str | None = None) -> dict:
+    from omicstra.question import ValidationError, execute, validate
+
+    pid = project_id or _bound_id(project_id)
+
+    raw = {
+        "question": question,
+        "objective": objective,
+        "task_id": task_id,
+        "run": run,
+        "project_id": pid,
+        "paired_view": paired_view,
+        "signals": list(signals or []),
+        "include_pathway_scores": include_pathway_scores,
+        "interpretation_model": interpretation_model,
+        "notes": list(notes or []),
+    }
+
+    try:
+        request = validate(raw, project_id=pid)
+    except ValidationError as e:
+        return {"status": "validation_failed", "problems": e.problems,
+                "interpreted_as": raw, "question": question}
+
+    try:
+        result = execute(request)
+    except Exception as e:
+        return {"status": "execution_failed", "why": str(e),
+                "request": raw, "question": question}
+
+    return {
+        "status": result.report.get("status", "unknown"),
+        **result.summary(),
+    }
+
+
+# LAST in the file, and that is load-bearing. it sat above `_resources` and the
+# nine compute tools, so `python -m omicstra.mcp.server` called main() before
+# those decorators had run and served 9 of 18 tools - a client discovering half
+# a server, with nothing saying so. the README's documented command happened to
+# use `python -c "... serve()"`, which imports the whole module first and was
+# therefore correct by accident.
+if __name__ == "__main__":
+    main()

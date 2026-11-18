@@ -1,0 +1,111 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Format Selection Guide
+
+Choose the right output format for your research needs.
+
+## Decision Tree
+
+```
+Is this comparing multiple options?
+  ├─ YES → Use Comparison Format
+  └─ NO ↓
+
+Is this time-sensitive or simple?
+  ├─ YES → Use Quick Brief
+  └─ NO ↓
+
+Does this require formal/extensive documentation?
+  ├─ YES → Use Comprehensive Report
+  └─ NO → Use Research Summary (default)
+```
+
+## Format Overview
+
+| Format | Length | When to Use | Template |
+|--------|--------|-------------|----------|
+| [Research Summary](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/research-summary-format.md) | 500-1000 words | Most research requests (default) | [Template](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/research-summary-template.md) |
+| [Comprehensive Report](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/comprehensive-report-format.md) | 1500+ words | Formal docs, strategic decisions | [Template](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/comprehensive-report-template.md) |
+| [Quick Brief](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/quick-brief-format.md) | 200-400 words | Time-sensitive, simple topics | [Template](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/quick-brief-template.md) |
+| [Comparison](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/comparison-format.md) | 800-1200 words | Evaluating options | [Template](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-skills/notion-research-documentation/reference/comparison-template.md) |
+
+## Formatting Guidelines
+
+### Headings
+- Use `#` for title
+- Use `##` for major sections
+- Use `###` for subsections
+- Keep heading hierarchy consistent
+
+### Lists
+- Use `-` for bullet points
+- Use `1.` for numbered lists
+- Keep list items parallel in structure
+
+### Emphasis
+- Use `**bold**` for key terms and section labels
+- Use `*italic*` for emphasis
+- Use sparingly for maximum impact
+
+### Citations
+- Always use `<mention-page url="...">Page Title</mention-page>` for source pages
+- Include citation immediately after referenced information
+- Group all sources in a "Sources" section at the end
+
+### Tables
+- Use for structured data comparison
+- Keep columns to 3-5 for readability
+- Include header row
+- Align content appropriately
+
+### Code Blocks
+Use when including:
+- Technical specifications
+- Configuration examples
+- Command examples
+
+```
+Example code or configuration here
+```
+
+## Content Guidelines
+
+### Executive Summaries
+- Lead with the most important finding
+- Include 1-2 key implications
+- Make it standalone (reader gets value without reading further)
+- Target 2-3 sentences for summaries, 1 paragraph for reports
+
+### Key Findings
+- Start with a clear headline
+- Support with specific evidence
+- Include relevant data points or quotes
+- Cite source immediately
+- Focus on actionable insights
+
+### Recommendations
+- Make them specific and actionable
+- Explain the "why" behind each recommendation
+- Prioritize clearly (Priority 1, 2, 3 or High/Medium/Low)
+- Include implementation hints when relevant
+
+### Source Citations
+- Link to original pages using mentions
+- Note if information is outdated (check last-edited dates)
+- Credit specific sections when quoting
+- Group related sources together
+
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

@@ -1,0 +1,695 @@
+# Publish Multi-Package Suite to PyPI
+#
+# Kraken Distribution Infrastructure (Phase 10)
+# ==============================================================================
+# This workflow replaces the old publish-pypi.yml sync-and-build pipeline.
+#
+# Architecture:
+# - Direct publishing from uv workspace packages
+# - 12 Python distributions plus 4 platform wheels from publish-tui.yml
+# - TestPyPI builds artifacts; production promotes the successful test run's bytes
+# - Complete release verification includes stable and experimental distributions
+# - OIDC Trusted Publishing with per-package environments (monorepo pattern)
+# - Tag-based triggers: v*.*.* for PyPI, v*.*.*-test for TestPyPI
+# - Manual dispatch for re-publishing (e.g., after adding new publishers)
+#
+# Trusted Publisher Configuration:
+# Each package requires its own Trusted Publisher on PyPI/TestPyPI:
+# - Owner: the-omics-os
+# - Repository: lobster
+# - Workflow: publish-packages.yml
+# - Environment: pypi-{package-name} or testpypi-{package-name}
+#
+# ==============================================================================
+
+name: Publish Packages to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'       # Production PyPI: v1.0.0, v1.0.1, v2.0.0
+      - 'v*.*.*-test'  # TestPyPI: v1.0.0-test, v1.0.1-test
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0). Must match lobster/version.py.'
+        required: true
+        type: string
+      target:
+        description: 'Target registry'
+        required: true
+        type: choice
+        options:
+          - pypi
+          - testpypi
+        default: testpypi
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # Step 1: Validate Version and Determine Target
+  # ===========================================================================
+  validate-version:
+    name: Validate Version
+    if: github.repository == 'the-omics-os/lobster'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_test: ${{ steps.version.outputs.is_test }}
+      test_run_id: ${{ steps.version.outputs.test_run_id }}
+      tui_test_run_id: ${{ steps.version.outputs.tui_test_run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Extract and validate version
+        id: version
+        env:
+          REQUEST_VERSION: ${{ inputs.version }}
+          REQUEST_TARGET: ${{ inputs.target }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$REQUEST_VERSION"
+            [[ "$REQUEST_TARGET" == testpypi || "$REQUEST_TARGET" == pypi ]] || exit 1
+            IS_TEST=$([[ "$REQUEST_TARGET" == testpypi ]] && echo true || echo false)
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            IS_TEST=false
+            if [[ "$VERSION" == *-test ]]; then
+              VERSION="${VERSION%-test}"
+              IS_TEST=true
+            fi
+          fi
+          python scripts/verify_release_artifacts.py source "$VERSION"
+          TAG="v$VERSION"
+          if [[ "$IS_TEST" == true ]]; then TAG="$TAG-test"; fi
+          [[ "$GITHUB_REF" == "refs/tags/$TAG" ]] || exit 1
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_test=$IS_TEST" >> "$GITHUB_OUTPUT"
+          if [[ "$IS_TEST" == false ]]; then
+            git fetch origin "refs/tags/v$VERSION-test:refs/tags/v$VERSION-test"
+            [[ "$(git rev-parse "v$VERSION-test^{commit}")" == "$GITHUB_SHA" ]] || exit 1
+            for workflow in publish-packages publish-tui; do
+              RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow.yml" \
+                --branch "v$VERSION-test" --commit "$GITHUB_SHA" --status success \
+                --json databaseId --jq '.[0].databaseId // empty')
+              [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+              KEY=test_run_id
+              if [[ "$workflow" == publish-tui ]]; then KEY=tui_test_run_id; fi
+              echo "$KEY=$RUN_ID" >> "$GITHUB_OUTPUT"
+            done
+          fi
+
+  # ===========================================================================
+  # Step 2: Build All Packages (PyPI + TestPyPI)
+  # ===========================================================================
+  # All packages are tracked in git and always buildable.
+  # Stable: lobster-ai, transcriptomics, research, visualization, proteomics, genomics, metabolomics
+  # Experimental: metadata, ml, structural-viz, drug-discovery
+  build:
+    name: Build ${{ matrix.package.name }}
+    needs: validate-version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - name: lobster-ai
+            path: "."
+          - name: lobster-transcriptomics
+            path: "packages/lobster-transcriptomics"
+          - name: lobster-research
+            path: "packages/lobster-research"
+          - name: lobster-visualization
+            path: "packages/lobster-visualization"
+          - name: lobster-vector
+            path: "packages/lobster-vector"
+          - name: lobster-proteomics
+            path: "packages/lobster-proteomics"
+          - name: lobster-genomics
+            path: "packages/lobster-genomics"
+          - name: lobster-metabolomics
+            path: "packages/lobster-metabolomics"
+          - name: lobster-metadata
+            path: "packages/lobster-metadata"
+          - name: lobster-ml
+            path: "packages/lobster-ml"
+          - name: lobster-structural-viz
+            path: "packages/lobster-structural-viz"
+          - name: lobster-drug-discovery
+            path: "packages/lobster-drug-discovery"
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.6.0"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Build TestPyPI package
+        if: needs.validate-version.outputs.is_test == 'true'
+        working-directory: ${{ matrix.package.path }}
+        run: uv build --out-dir dist/
+
+      - name: Promote verified TestPyPI artifacts without rebuilding
+        if: needs.validate-version.outputs.is_test == 'false'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-${{ matrix.package.name }}
+          path: ${{ matrix.package.path }}/dist/
+          run-id: ${{ needs.validate-version.outputs.test_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify actual distribution identity and integrity
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          PACKAGE: ${{ matrix.package.name }}
+          DIST: ${{ matrix.package.path }}/dist/
+        run: |
+          python scripts/verify_release_artifacts.py artifacts "$VERSION" "$PACKAGE" "$DIST"
+          uvx twine check "$DIST"*
+
+      - name: Confirm promoted artifacts equal TestPyPI bytes
+        if: needs.validate-version.outputs.is_test == 'false'
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          PACKAGE: ${{ matrix.package.name }}
+          DIST: ${{ matrix.package.path }}/dist/
+        run: python scripts/verify_release_artifacts.py registry "$VERSION" "$PACKAGE" "$DIST" --index testpypi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist-${{ matrix.package.name }}
+          path: ${{ matrix.package.path }}/dist/
+          retention-days: 30
+
+  # ===========================================================================
+  # Step 3: Publish Each Package (Per-Package Environments for OIDC)
+  # ===========================================================================
+  # PyPI requires unique (owner, repo, workflow, environment) for each Trusted Publisher.
+  # For monorepos, we use per-package environments: pypi-{package-name}
+  #
+  # All listed distributions publish to the selected registry. Experimental
+  # status is a product label, not permission to declare a partial release complete.
+
+  # --- Wait for TUI wheels (published by publish-tui.yml) ---
+  wait-for-tui:
+    name: Wait for lobster-ai-tui
+    needs: [validate-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Require all four TUI wheels
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          INDEX: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi' || 'pypi' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if python scripts/verify_release_artifacts.py tui-available "$VERSION" --index "$INDEX" &&
+               [[ $(gh run list --repo "$GITHUB_REPOSITORY" --workflow publish-tui.yml \
+                 --branch "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" --status success \
+                 --json databaseId --jq 'length') -gt 0 ]]; then
+              exit 0
+            fi
+            echo "Attempt $attempt/30: complete TUI wheel inventory unavailable"
+            sleep 30
+          done
+          echo 'ERROR: missing or invalid TUI wheel inventory; refusing to publish core.'
+          exit 1
+
+  # --- Core Package (public) ---
+  publish-lobster-ai:
+    name: Publish lobster-ai
+    needs: [validate-version, build, wait-for-tui]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-ai' || 'pypi-lobster-ai' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-ai/' || 'https://pypi.org/project/lobster-ai/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-ai
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  # --- Public Agent Packages (PyPI + TestPyPI) ---
+  publish-lobster-transcriptomics:
+    name: Publish lobster-transcriptomics
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-transcriptomics' || 'pypi-lobster-transcriptomics' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-transcriptomics/' || 'https://pypi.org/project/lobster-transcriptomics/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-transcriptomics
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-research:
+    name: Publish lobster-research
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-research' || 'pypi-lobster-research' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-research/' || 'https://pypi.org/project/lobster-research/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-research
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-visualization:
+    name: Publish lobster-visualization
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-visualization' || 'pypi-lobster-visualization' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-visualization/' || 'https://pypi.org/project/lobster-visualization/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-visualization
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-vector:
+    name: Publish lobster-vector
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-vector' || 'pypi-lobster-vector' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-vector/' || 'https://pypi.org/project/lobster-vector/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-vector
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-proteomics:
+    name: Publish lobster-proteomics
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-proteomics' || 'pypi-lobster-proteomics' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-proteomics/' || 'https://pypi.org/project/lobster-proteomics/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-proteomics
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-genomics:
+    name: Publish lobster-genomics
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-genomics' || 'pypi-lobster-genomics' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-genomics/' || 'https://pypi.org/project/lobster-genomics/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-genomics
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  # --- Metabolomics (public, was missing from workflow) ---
+  publish-lobster-metabolomics:
+    name: Publish lobster-metabolomics
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-metabolomics' || 'pypi-lobster-metabolomics' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-metabolomics/' || 'https://pypi.org/project/lobster-metabolomics/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-metabolomics
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  # --- Experimental Agent Packages (PyPI + TestPyPI) ---
+  # Experimental labeling is unchanged. A complete release requires all intended
+  # distributions to publish and pass exact-version installation verification.
+
+  publish-lobster-metadata:
+    name: Publish lobster-metadata (experimental)
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-metadata' || 'pypi-lobster-metadata' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-metadata/' || 'https://pypi.org/project/lobster-metadata/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-metadata
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-ml:
+    name: Publish lobster-ml (experimental)
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-ml' || 'pypi-lobster-ml' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-ml/' || 'https://pypi.org/project/lobster-ml/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-ml
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-structural-viz:
+    name: Publish lobster-structural-viz (experimental)
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-structural-viz' || 'pypi-lobster-structural-viz' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-structural-viz/' || 'https://pypi.org/project/lobster-structural-viz/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-structural-viz
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  publish-lobster-drug-discovery:
+    name: Publish lobster-drug-discovery (experimental)
+    needs: [validate-version, build, publish-lobster-ai]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi-lobster-drug-discovery' || 'pypi-lobster-drug-discovery' }}
+      url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-drug-discovery/' || 'https://pypi.org/project/lobster-drug-discovery/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist-lobster-drug-discovery
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate-version.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: dist/
+          skip-existing: true
+          verbose: true
+
+  # ===========================================================================
+  # Step 4: Verify Exact Installation and Published Bytes (both registries)
+  # ===========================================================================
+  verify-installation:
+    name: Verify Installation
+    needs:
+      - validate-version
+      - publish-lobster-ai
+      - publish-lobster-transcriptomics
+      - publish-lobster-research
+      - publish-lobster-visualization
+      - publish-lobster-vector
+      - publish-lobster-proteomics
+      - publish-lobster-genomics
+      - publish-lobster-metabolomics
+      - publish-lobster-metadata
+      - publish-lobster-ml
+      - publish-lobster-structural-viz
+      - publish-lobster-drug-discovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Download the actual published artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: dist-*
+          path: artifacts/
+
+      - name: Wait for packages to be indexed
+        run: sleep 60
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential python3-dev
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+
+      - name: Verify registry hashes and install exact first-party wheels
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          INDEX: ${{ needs.validate-version.outputs.is_test == 'true' && 'testpypi' || 'pypi' }}
+          PYTHON_DOTENV_DISABLED: '1'
+        run: |
+          set -euo pipefail
+          for directory in artifacts/dist-*; do
+            package="${directory#artifacts/dist-}"
+            python scripts/verify_release_artifacts.py registry "$VERSION" "$package" "$directory" --index "$INDEX"
+          done
+          python scripts/verify_release_artifacts.py requirements "$VERSION" --index "$INDEX" --output release-requirements.txt
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -r release-requirements.txt
+          uv pip check --python .venv/bin/python
+          ROOT="$PWD"
+          cd "$(mktemp -d)"
+          "$ROOT/.venv/bin/python" "$ROOT/scripts/verify_release_artifacts.py" installed "$VERSION"
+          "$ROOT/.venv/bin/lobster" --help
+
+      - name: Verify Go TUI binary discovery and execution
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          PYTHON_DOTENV_DISABLED: '1'
+        run: |
+          ROOT="$PWD"
+          cd "$(mktemp -d)"
+          "$ROOT/.venv/bin/python" - <<'PY'
+          import os
+          import subprocess
+          from lobster_ai_tui import get_binary_path
+          from lobster.cli_internal.go_tui_launcher import find_tui_binary_fast
+          binary = get_binary_path()
+          assert binary.is_file() and os.access(binary, os.X_OK)
+          assert find_tui_binary_fast() == str(binary)
+          output = subprocess.check_output([str(binary), 'version'], text=True)
+          print(output)
+          assert os.environ['VERSION'] in output.split(), output
+          PY
+
+      - name: Verify agent discovery from installed distributions
+        env:
+          PYTHON_DOTENV_DISABLED: '1'
+        run: |
+          ROOT="$PWD"
+          cd "$(mktemp -d)"
+          "$ROOT/.venv/bin/python" - <<'PY'
+          from importlib.metadata import entry_points
+          from lobster.core.component_registry import component_registry
+          expected = {ep.name for ep in entry_points(group='lobster.agents')}
+          actual = set(component_registry.list_agents())
+          print(f'Expected agents: {sorted(expected)}')
+          print(f'Discovered agents: {sorted(actual)}')
+          assert expected and expected <= actual, expected - actual
+          PY
+
+      - name: Retain exact registry installation pins
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-requirements-${{ github.run_attempt }}
+          path: release-requirements.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  # ===========================================================================
+  # Step 5: Release Summary
+  # ===========================================================================
+  github-release:
+    name: Create verified GitHub release
+    needs: [validate-version, verify-installation]
+    if: needs.validate-version.outputs.is_test == 'false'
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/public-release.yml
+    with:
+      version: ${{ needs.validate-version.outputs.version }}
+      tui-test-run-id: ${{ needs.validate-version.outputs.tui_test_run_id }}
+
+  summary:
+    name: Release Summary
+    needs:
+      - validate-version
+      - build
+      - publish-lobster-ai
+      - publish-lobster-transcriptomics
+      - publish-lobster-research
+      - publish-lobster-visualization
+      - publish-lobster-vector
+      - publish-lobster-proteomics
+      - publish-lobster-genomics
+      - publish-lobster-metabolomics
+      - publish-lobster-metadata
+      - publish-lobster-ml
+      - publish-lobster-structural-viz
+      - publish-lobster-drug-discovery
+      - wait-for-tui
+      - verify-installation
+      - github-release
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate truthful release summary
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          VERSION: ${{ needs.validate-version.outputs.version }}
+          IS_TEST: ${{ needs.validate-version.outputs.is_test }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          needs = json.loads(os.environ['NEEDS_JSON'])
+          test = os.environ['IS_TEST'] == 'true'
+          failed = []
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              target = 'TestPyPI' if test else 'PyPI'
+              summary.write(f"## {target} release {os.environ['VERSION']}\n\n")
+              summary.write('| Job | Result |\n|---|---|\n')
+              for job, outcome in needs.items():
+                  result = outcome['result']
+                  summary.write(f'| {job} | {result} |\n')
+                  expected = 'skipped' if test and job == 'github-release' else 'success'
+                  if result != expected:
+                      failed.append(job)
+              summary.write('\nExperimental labels remain unchanged; all intended artifacts must verify.\n')
+          if failed:
+              raise SystemExit(f'Release incomplete: {failed}')
+          PY
+
+  # Step 6 (removed): publishing packages does not trigger any downstream
+  # deployment. Do not add cross-repository deploy triggers here.

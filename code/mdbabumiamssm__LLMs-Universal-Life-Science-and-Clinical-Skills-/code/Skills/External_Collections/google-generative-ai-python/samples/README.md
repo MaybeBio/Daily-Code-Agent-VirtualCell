@@ -1,0 +1,42 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Gemini API Python SDK sample code
+
+This directory contains sample code for key features of the SDK, organised by high level feature.
+
+These samples are embedded in parts of the [documentation](https://ai.google.dev), most notably in the [API reference](https://ai.google.dev/api).
+
+Each file is structured as a runnable test case, ensuring that samples are executable and functional. Each test demonstrates a single concept, and contains region tags that are used to demarcate the test scaffolding from the spotlight code. If you are contributing, code within region tags should follow sample code best practices - being clear, complete and concise.
+
+## Contents
+
+| File                                                     | Description |
+|----------------------------------------------------------| ----------- |
+| [cache.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/cache.py)                                   | Context caching |
+| [chat.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/chat.py)                                     | Multi-turn chat conversations |
+| [code_execution.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/code_execution.py)                 | Executing code |
+| [configure_model_parameters.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/configure_model_parameters.py) | Setting model parameters |
+| [controlled_generation.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/controlled_generation.py)   | Generating content with output constraints (e.g. JSON mode) |
+| [count_tokens.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/count_tokens.py)                     | Counting input and output tokens |
+| [embed.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/embed.py)                                   | Generating embeddings |
+| [files.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/files.py)                                   | Managing files with the File API |
+| [function_calling.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/function_calling.py)             | Using function calling |
+| [models.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/models.py)                                 | Listing models and model metadata |
+| [safety_settings.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/safety_settings.py)               | Setting and using safety controls |
+| [system_instruction.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/system_instruction.py)         | Setting system instructions |
+| [text_generation.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/text_generation.py)               | Generating text |
+| [tuned_models.py](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/google-generative-ai-python/samples/tuned_models.py)                     | Creating and managing tuned models |
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

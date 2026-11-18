@@ -1,0 +1,5 @@
+# Apple silicon. Note: several ops fall back to CPU and fp16 autocast is not
+# used here; expect modest speedups over CPU for small models only.
+device: mps
+strategy: single
+precision: fp32

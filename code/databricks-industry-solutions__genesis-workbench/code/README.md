@@ -1,0 +1,494 @@
+# Genesis Workbench
+### **A Blueprint for a Life Sciences application on Databricks**
+
+## $${\color{orange}Opportunity}$$
+<img src="https://github.com/databricks-industry-solutions/genesis-workbench/blob/main/docs/images/opportunity.png" alt="Generative AI reshaping life sciences" width="800"/>
+
+Generative AI is reshaping the life sciences. Foundation models trained on genomics, protein structures, molecular interactions, and cellular behaviors are unlocking capabilities that weren't possible a few years ago:
+
+- **Foundation models across every domain** — From DNA to proteins to single cells to small molecules, there's now a pretrained model for almost every biological modality. Teams can start from these and fine-tune on their own data instead of training from scratch.
+- **Drug discovery acceleration** — Generative AI compresses months of wet-lab iteration into hours of in-silico screening, candidate ranking, and hypothesis generation. Lead time on early-stage discovery drops by an order of magnitude.
+- **Higher-accuracy structure prediction** — Tools like AlphaFold, ESMFold, and Boltz predict 3D structure from sequence with previously unattainable accuracy, opening up targets that were structurally inaccessible.
+- **Personalized medicine** — Patient-specific modeling of therapeutic responses is moving from research curiosity to clinical reality, enabling precision treatment decisions at the individual level.
+- **Knowledge synthesis at scale** — LLMs specialized in biomedical literature surface insights buried in millions of papers, accelerating hypothesis generation and reducing duplicated work.
+
+## $${\color{orange}Challenges}$$
+
+Despite the breakthroughs, the experts who can apply these models — biologists, geneticists, biochemists — spend most of their time on tasks far outside their training:
+
+- **GPU and CUDA infrastructure** — Days spent configuring drivers, toolkits, and CUDA-compatible PyTorch builds before a single inference can run.
+- **Workflow orchestration** — Stitching together data prep, training, evaluation, and serving pipelines requires software-engineering skills the biology curriculum doesn't cover.
+- **Data engineering and governance** — Collecting, cleaning, and integrating heterogeneous biological datasets under privacy and reproducibility constraints is a full-time job in itself.
+- **Model serving and lifecycle** — Even after training, productionizing a model — registry, endpoints, monitoring, retraining — is yet another discipline the scientist has to pick up.
+- **Time stolen from the science** — Every hour spent on infrastructure is an hour not spent on biology. The slower the loop, the slower the innovation.
+
+## $${\color{orange}Genesis}$$ $${\color{orange}Workbench}$$
+
+<img src="https://github.com/databricks-industry-solutions/genesis-workbench/blob/main/docs/diagrams/genesis_workbench.png" alt="Genesis Workbench: Blueprint for life sciences application on Databricks" width="800"/>
+
+Genesis Workbench is an open-source, Databricks-native blueprint that packages biological foundation models behind an intuitive UI — so scientists can run them without managing GPU infrastructure, CUDA, model registries, or serving endpoints.
+
+### AI-Assisted Workflow Generation
+
+**Use the workbench declaratively — describe the science you want and get a runnable pipeline, no wiring or boilerplate.** This lowers the barrier from "I know how to build this" to "I know what I want", so more scientists can turn ideas into experiments and innovate faster. **Vortex** is the visual canvas that makes it happen.
+
+- **Compose visually** — wire deployed endpoints, prebuilt workflows, transforms, and data IO into one pipeline; each input is editable inline or fed from an upstream node.
+- **Generate from a goal** — an Agent drafts the workflow and streams its reasoning, then **self-reviews and repairs** its own draft (dangling nodes, dead-end outputs, type-mismatched wiring, pipelines that miss the goal).
+- **Wire deterministically** — every port publishes its value *shape*, so extraction paths are derived (not guessed); when a value can't be produced directly, the one bridging node is auto-inserted or the run is rejected at submit with a clear reason.
+- **Validate before running** — a live checklist flags every unconnected input or bad value; Run stays gated until the graph is runnable.
+- **Track, inspect & re-run** — **Past Vortex Runs** shows each run's workflow·inputs·outputs and elapsed time; re-run with edited inputs from a side drawer; failed runs get an AI root-cause/fix + data-vs-system verdict beside the real stack trace.
+- **Fail loudly on bad data** — a step that resolves to null fails the run instead of producing a meaningless result.
+
+### MCP Support
+
+**Genesis Workbench becomes a work horse for the broader AI ecosystem** — its models and workflows become tools any agent or MCP client can call, so the platform powers your assistants and pipelines instead of living in a silo. A companion **Model Context Protocol (MCP) server** (`mcp-genesis-workbench`) exposes it to the Databricks AI Playground, Claude, Cursor, or your own agents; deployed automatically with `core`.
+
+- **Endpoints & workflows as tools** — `endpoint_<name>` runs synchronously and returns predictions; `workflow_<name>` dispatches a job and returns a run id to poll.
+- **Discoverable** — `list_capabilities` and `get_workflow_run_status` round out the surface; streamable HTTP at `/mcp`.
+- **Same core as Vortex** — reuses the shared capability/executor code, so an MCP call runs the identical path as the UI.
+- **Governed** — runs as its own service principal, so every call stays attributable.
+
+### Components
+
+**Get started fast with prepackaged models and workflows — and clear patterns to customize and extend them with your own.**
+
+- **Pre-packaged biological models** ready to deploy: ESMFold, AlphaFold2, ProteinMPNN, RFDiffusion, scGPT, SCimilarity, Scanpy, rapids-singlecell (part of scverse), ChemProp, DiffDock, Boltz, NVIDIA Parabricks, NVIDIA BioNeMo and more.
+- **Tailored workflows** across protein design, drug discovery, single-cell analysis, and variant analysis — including **Antibody (VHH) Design**, **Vaccine Immunogen Design**, and guided **Enzyme** & **Molecule** optimization — each a UI tab with sane defaults.
+- **Built on Databricks primitives**: Asset Bundles, Workflows, Model Serving, MLflow, Unity Catalog, and Databricks Apps — so everything you run is governed, reproducible, and traceable.
+- **Modular and extensible**: each capability is an independent module that can be deployed and destroyed independently.
+
+<img src="https://github.com/databricks-industry-solutions/genesis-workbench/blob/main/docs/images/happy_scientists.png" alt="Scientists free to focus on the science with Genesis Workbench" width="800"/>
+
+## $${\color{orange}Modules}$$
+
+Each module is independently deployable with `./deploy.sh <module> <cloud>`. Click through to the workflow deep-dives for inputs, outputs, models, and example runs.
+
+### Single Cell
+Single-cell RNA-seq at scale. Run end-to-end pipelines on millions of cells with Scanpy or GPU-accelerated rapids-singlecell (part of scverse). Annotate cell types per cluster against SCimilarity's 23M-cell reference database, search published studies for similar cells, and predict the effect of gene knockouts or overexpression with scGPT. The interactive results viewer offers UMAP exploration, differential expression, pathway enrichment, and trajectory analysis on the same run.
+
+**Models bundled:** scGPT, SCimilarity, Scanpy, rapids-singlecell (part of scverse), Merck TEDDY-G 400M (joint cell-type + disease annotation)
+
+📖 [Single Cell Analysis](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/single_cell_analysis.md) · [Cell Type Annotation](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/cell_type_annotation.md) · [Cell Similarity Search](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/cell_similarity.md) · [Gene Perturbation Prediction](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/perturbation_prediction.md)
+
+### Large Molecule
+Protein structure prediction, design, and engineering. Fold proteins in seconds with **ESMFold** or at high accuracy with **AlphaFold2**; design backbones with **RFDiffusion** + **ProteinMPNN**; redesign sequences for a fixed backbone (inverse folding) and validate by re-folding; and run BLAST-like search across 150M+ sequences with **ESM-2** embeddings. The **Guided Enzyme Optimization** workflow chains Proteina-Complexa, ProteinMPNN, ESMFold, Boltz, NetSolP, PLTNUM, DeepSTABp, and MHCflurry into a reward-weighted scaffold-and-score loop, ranking variants on motif fidelity, fold confidence, optional substrate complex, and four developability axes (solubility, half-life, melting temperature, immunogenicity). The NVIDIA×Baker **RFD4-Proteina** flow-matching model — served on an H100 endpoint via Express env_pack — generates backbones de novo and powers two in-process design workflows: **Antibody (VHH) Design**, single-domain nanobodies optimized against an antigen epitope for binding, fold confidence, and developability; and **Vaccine Immunogen Design**, conserved epitopes grafted onto de-novo scaffolds and optimized for epitope presentation (motif RMSD), fold confidence, and manufacturability.
+
+**Models bundled:** ESMFold, ESM-2 Embeddings, AlphaFold2, ProteinMPNN, RFDiffusion, Boltz, RFD4-Proteina
+
+📖 [Protein Structure Prediction](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/protein_structure_prediction.md) · [Protein Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/protein_design.md) · [Inverse Folding](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/inverse_folding.md) · [Sequence Similarity Search](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/sequence_search.md) · [RFD4-Proteina Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/rfd4_proteina_design.md) · [Antibody Design (VHH)](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/antibody_design.md) · [Vaccine Immunogen Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/vaccine_immunogen.md) · [Guided Enzyme Optimization](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/enzyme_optimization.md)
+
+### Small Molecule
+Drug-discovery essentials. Generate candidate molecules from a seed scaffold or binding motif with **GenMol** in a hard-constraint generate→score→reseed loop (**Guided Molecule Design**); profile them for drug-likeness and toxicity with **ChemProp**; predict protein–ligand poses with **DiffDock**; design protein binders for a target protein or small molecule with **Proteina-Complexa**; and transplant functional motifs onto new scaffolds. Fine-tune **KERMT** (NVIDIA-BioNeMo's Kinetic GROVER Multi-Task GNN) on your own ADMET/tox assay and serve it beside ChemProp. Score each candidate for developability via **NetSolP** (solubility), **PLTNUM-ESM2** (half-life), **DeepSTABp** (melting temperature), **MHCflurry** (MHC-I), and **HLAIIPred** (MHC-II / anti-drug-antibody).
+
+**Models bundled:** GenMol, KERMT, ChemProp, DiffDock, Proteina-Complexa, NetSolP-1.0, PLTNUM-ESM2, DeepSTABp, MHCflurry 2.x, HLAIIPred
+
+📖 [Guided Molecule Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/guided_molecule_design.md) · [Molecular Docking](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/molecular_docking.md) · [Protein Binder Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/protein_binder_design.md) · [Ligand Binder Design](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/ligand_binder_design.md) · [Motif Scaffolding](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/motif_scaffolding.md) · [ADMET & Safety](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/admet_safety.md)
+
+### Genomics
+Variant analysis at population scale. Call germline variants from FASTQ files with GPU-accelerated NVIDIA Parabricks, ingest VCFs into Delta tables for fast SQL/Spark queries, run genome-wide association studies (GWAS) using Glow, and annotate variants with ClinVar clinical-significance data. Inline interactive charts in the UI break down findings by gene, ACMG category, clinical significance, and zygosity.
+
+**Components:** NVIDIA Parabricks variant calling, Glow GWAS, Spark VCF→Delta ingestion, ClinVar annotation
+
+📖 [Variant Calling](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/variant_calling.md) · [VCF Ingestion](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/vcf_ingestion.md) · [GWAS Analysis](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/gwas_analysis.md) · [Variant Annotation](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/variant_annotation.md)
+
+### NVIDIA BioNeMo
+NVIDIA's generative AI framework for digital biology. The optional BioNeMo module ships container definitions and workflows that expose pre-trained BioNeMo models, starting with ESM-2 fine-tuning and inference. It also hosts the **KERMT** fine-tune workflow (Kinetic GROVER Multi-Task — a small-molecule ADMET GNN), whose served endpoint is compared side-by-side with ChemProp in the Small Molecule ADMET tab. Containers are optimized for NVIDIA hardware and integrated into Genesis Workbench's job system, MLflow registry, and model-serving infrastructure.
+
+📖 [ESM2 Fine-tuning & Inference](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/bionemo_esm2.md) · [KERMT (ADMET fine-tune)](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/kermt_admet.md)
+
+📚 **Full workflow catalog:** [documentation index](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/backend/documentation/index.md)
+
+## $${\color{orange}Architecture}$$ $${\color{orange}Diagram}$$
+
+<img src="https://github.com/databricks-industry-solutions/genesis-workbench/blob/main/docs/images/architecture.png" alt="Architecture" width="700"/>
+
+## $${\color{orange}Important}$$ $${\color{orange}Disclaimer}$$
+
+**NVIDIA, the NVIDIA logo, and NVIDIA BioNeMo are trademarks or registered trademarks of NVIDIA Corporation in the United States and other countries. All other product names, trademarks, and registered trademarks are the property of their respective owners.**
+
+**References to third-party products or services, including NVIDIA BioNeMo, are for informational purposes only and do not constitute an endorsement or affiliation. This material is not sponsored or endorsed by NVIDIA Corporation. The information provided here is for general informational purposes and should not be interpreted as specific advice or a warranty of suitability for any particular use.**
+
+**Use of NVIDIA BioNeMo and related technologies should comply with all relevant licensing terms, trademarks, and applicable regulations.**
+
+## $${\color{orange}Installation}$$
+
+Full step-by-step setup is in the [Installation Guide](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/Installation.md). Quick path (assumes Databricks CLI authenticated to the target workspace as DEFAULT profile):
+
+```bash
+# 1. Deploy core first (UI, infrastructure, settings tables)
+./deploy.sh core <aws|azure|gcp>
+
+# 2. Deploy each module — one at a time, wait for jobs to finish before the next
+./deploy.sh large_molecule  <aws|azure|gcp>
+./deploy.sh single_cell     <aws|azure|gcp>
+./deploy.sh small_molecule  <aws|azure|gcp>
+./deploy.sh genomics        <aws|azure|gcp>
+./deploy.sh bionemo         <aws|azure|gcp>   # optional, requires BioNeMo container build
+```
+
+> **RFD4-Proteina (large_molecule)** needs no credentials — its code and HuggingFace weights are public. Optionally set a Hugging Face token (`hf_token=…`) in `modules/large_molecule/module.env` to stay future-proof for gated weights or a private fork; `deploy.sh` stores it in the `dbx_genesis_workbench/hf_token` secret. See the [Installation Guide](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/Installation.md).
+
+For UI-only redeploys after the initial install (preserves all settings tables — never use `deploy.sh core` on a populated install):
+
+```bash
+cd modules/core
+./update.sh <cloud> --ui-only   # rebuilds frontend, redeploys app, skips secret refresh / grants / UC volume copy
+```
+
+## $${\color{orange}What's}$$ $${\color{orange}Included}$$
+
+Genesis Workbench ships open models and open datasets across all modules. Models are registered as Databricks Model Serving endpoints (or run as batch jobs); datasets are downloaded/ingested once into Unity Catalog so the app has **no runtime external-API dependency**.
+
+### Models
+
+| Model | Module / submodule | Source | Task |
+|---|---|---|---|
+| AlphaFold2 | large_molecule / alphafold | DeepMind AlphaFold2 v2.3.2 | Protein 3D structure prediction (MSA + templates) |
+| ESMFold | large_molecule / esmfold | `facebook/esmfold_v1` | Fast single-sequence structure prediction (no MSA) |
+| Boltz-2 | large_molecule / boltz | jwohlwend/boltz (Boltz-2, `boltz==2.2.1`) | Structure / co-folding prediction + protein–ligand binding-affinity head |
+| ESM-2 Embeddings | large_molecule / esm2_embeddings | `facebook/esm2_t33_650M_UR50D` | 650M mean-pooled protein embeddings (1280-dim) for similarity search |
+| RFdiffusion | large_molecule / rfdiffusion | RosettaCommons/RFdiffusion | De novo protein backbone design |
+| ProteinMPNN | large_molecule / protein_mpnn | dauparas/ProteinMPNN | Sequence design for a given backbone |
+| RFD4-Proteina | large_molecule / rfd4_proteina | RosettaCommons/RFD4-Proteina (NVIDIA×Baker, BSD-3-Clause) | Flow-matching de novo protein backbone + sequence design (first-draft binder/motif conditioning; LoRA fine-tunable), served on H100 via Express |
+| DiffDock | small_molecule / diffdock | gcorso/DiffDock v1.1.3 | Protein–ligand blind docking (diffusion) |
+| GenMol | small_molecule / genmol | `nvidia/NV-GenMol-89M-v2` | Generative small-molecule design (SAFE masked diffusion) |
+| Chemprop (BBBP / ClinTox / ADMET) | small_molecule / chemprop | `chemprop==2.2.3` | Blood-brain barrier, clinical toxicity, 10-property ADMET |
+| KERMT (Kinetic GROVER Multi-Task) | small_molecule / kermt | [NVIDIA-BioNeMo/KERMT](https://github.com/NVIDIA-BioNeMo/KERMT) (GROVERbase, Apache-2.0) | Fine-tunable GNN for small-molecule ADMET/tox property prediction (served side-by-side with ChemProp) |
+| NetSolP-1.0 | small_molecule / netsolp | tvinet/NetSolP-1.0 | Protein solubility prediction |
+| PLTNUM-ESM2 | small_molecule / pltnum | `sagawa/PLTNUM-ESM2-NIH3T3` | Protein half-life / stability |
+| DeepSTABp | small_molecule / deepstabp | CSBiology/deepStabP (ProtT5-XL) | Protein melting temperature (Tm) |
+| MHCflurry 2.x | small_molecule / mhcflurry | openvax/mhcflurry | MHC-I peptide presentation / immunogenicity (CD8) |
+| HLAIIPred | small_molecule / hlaiipred | [pfizer-opensource/HLAIIPred](https://github.com/pfizer-opensource/HLAIIPred) (Apache-2.0) | MHC-II peptide presentation / immunogenicity (CD4 / anti-drug-antibody) |
+| Proteina-Complexa (Binder / Ligand / AME) | small_molecule / proteina_complexa | NVIDIA-Digital-Bio/Proteina-Complexa | Flow-matching binder design + motif scaffolding |
+| scGPT (+ Perturbation) | single_cell / scgpt | bowang-lab/scGPT | Single-cell foundation model; gene-perturbation prediction |
+| TEDDY | single_cell / teddy | `Merck/TEDDY` | Single-cell embedding foundation model |
+| SCimilarity | single_cell / scimilarity | `scimilarity==0.4.0` | Single-cell embeddings + nearest-cell search |
+| Rapids-SingleCell / Scanpy | single_cell / rapidssinglecell, scanpy | RAPIDS, Scanpy | GPU/CPU single-cell QC, clustering, UMAP, DE, enrichment |
+| BioNeMo ESM-2 (fine-tune / inference) | bionemo | NVIDIA BioNeMo | ESM-2 fine-tuning + inference on custom assays |
+
+### Datasets
+
+All datasets below are open/public (UniProt CC-BY 4.0, PDB/ClinVar/1000G public domain, CC-BY 4.0 cell atlases, etc.).
+
+| Dataset | Use | is Vector Index |
+|---|---|---|
+| SwissProt reviewed human proteins (UniProt) → `gene_sequences` | core — gene symbol → canonical sequence (Target Resolver) **and** human protein similarity search | **Yes** — `gene_sequence_embedding_index` (1280-dim, ESM-2) |
+| UniRef90 FASTA (UniProt) → `sequence_db` | large_molecule / sequence_search — protein similarity-search corpus | **Yes** — `sequence_embedding_index` (1280-dim, ESM-2) |
+| CellxGene Census scRNA-seq reference | single_cell / scimilarity — cell-type semantic search corpus (~23M cells) | **Yes** — `scimilarity_cell_index` (128-dim) |
+| ChEMBL target binders | small_molecule / genmol — per-target active compounds (SMILES + pChEMBL) for target-aware generation → `target_binders` | No |
+| Broad Drug Repurposing Hub | small_molecule / genmol — approved/clinical drugs (MoA, target, phase) → `repurposing_hub` | No |
+| ClinVar GRCh38 VCF (NCBI) | genomics — clinical variant annotation → `clinvar_variants` | No |
+| ACMG SF v3.2 gene panel | genomics — 81 medically-actionable genes for pathogenic-variant flagging | No |
+| GRCh38 reference genome (1000 Genomes/EBI) | genomics — alignment + variant normalization | No |
+| 1000 Genomes sample VCF (chr6) | genomics — GWAS demo input | No |
+| MSK SPECTRUM HGSOC scRNA-seq (CellxGene) | single_cell — ovarian-cancer demo dataset | No |
+| Adams et al. 2020 lung scRNA-seq (Zenodo) | single_cell / scimilarity — IPF/healthy lung query sample | No |
+| Ensembl gene reference (BioMart) | single_cell — Ensembl ID ↔ gene-symbol mapping | No |
+| Enrichr gene-set libraries (GMT) | single_cell / scanpy — pathway enrichment | No |
+| AlphaFold genetic DBs — UniRef90, UniRef30, MGnify, small BFD, PDB70, PDB mmCIF, pdb_seqres, UniProt | large_molecule / alphafold — MSA + template search for folding | No |
+
+> The three vector indexes are served from Databricks Vector Search: `gene_sequence_embedding_index` and `sequence_embedding_index` (protein similarity) plus `scimilarity_cell_index` (cell similarity). Protein search queries the human and UniRef indexes together so a single query returns both human and broad-organism hits.
+
+## $${\color{orange}Changelog}$$
+See [CHANGELOG.md](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/CHANGELOG.md) for deployment fixes, known issues, and configuration notes.
+
+## $${\color{orange}Troubleshooting}$$
+The repo ships [Claude Code skills](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/claude_skills) covering installation, deployment, troubleshooting, workflows, and development. These are designed to be loaded into Claude Code; they also serve as the canonical reference for common deployment failures and fixes.
+
+## $${\color{orange}License}$$
+Please see LICENSE for the details of the license.
+
+Some packages, tools, and code used inside individual tutorials are under their own licenses as described therein. Please ensure you read the details and licensing of individual tools. Other third party packages are used in tutorials within this accelerator and have their own licensing, as laid out in the table below.
+
+We are adding a script to build your own Databricks compatible container for NVIDIA BioNeMo. If you want to use NVIDIA BioNeMo in Genesis Workbench, please follow the instructions to build the container and push the image to your container repository.
+
+NVIDIA GPUs and cudatoolkit may be used in multiple places so you should consider the NVIDIA EULA(link) when using code in this package.
+
+> **Note on `mlflow` / `databricks-sdk` versions:** models migrated to Express serving (`env_pack`) — diffdock, esm2_embeddings, esmfold, proteinmpnn, rfdiffusion, scgpt, proteina_complexa, teddy, deepstabp, boltz, kermt, chemprop, rfd4_proteina — register and serve with **`mlflow>=3.12`** + **`databricks-sdk>=0.150.0`**. Where a row below still shows an older `mlflow` / `databricks-sdk` pin for one of these modules, that reflects its pre-migration standard-serving environment.
+
+Module | Package | License | Source
+-------- | ------- | ------- | --------
+core | fastapi==0.115.5 | MIT | https://github.com/tiangolo/fastapi
+core | uvicorn[standard]==0.32.1 | BSD-3 | https://github.com/encode/uvicorn
+core | react==19.x | MIT | https://github.com/facebook/react
+core | vite | MIT | https://github.com/vitejs/vite
+core | tailwindcss | MIT | https://github.com/tailwindlabs/tailwindcss
+core | tanstack/react-query | MIT | https://github.com/tanstack/query
+core | tanstack/react-table | MIT | https://github.com/tanstack/table
+core | zustand | MIT | https://github.com/pmndrs/zustand
+core | molstar | MIT | https://github.com/molstar/molstar
+core | plotly.js | MIT | https://github.com/plotly/plotly.js
+core | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+core | databricks-sql-connector | Apache2.0 | https://github.com/databricks/databricks-sql-python
+core | py3Dmol==2.4.0 | MIT | TOBEREMOVED (https://pypi.org/project/py3Dmol/)
+core | biopython |	[BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+core | Mlflow	| Apache2.0 | https://github.com/mlflow/mlflow
+core | plotly | MIT | https://github.com/plotly/plotly.py
+core | openai | MIT | https://github.com/openai/openai-python
+core | parasail | BSD | https://github.com/jeffdaily/parasail-python
+core | requests | Apache2.0 | https://github.com/psf/requests
+core | pandas | BSD-3 | https://github.com/pandas-dev/pandas
+core | numpy | BSD-3 | https://github.com/numpy/numpy
+core | rdkit | BSD-3 | https://github.com/rdkit/rdkit
+scGPT | numpy==1.26.4 | BSD-3-Clause | https://github.com/numpy/numpy
+scGPT | gdown==5.2.0 | MIT | https://github.com/wkentaro/gdown
+scGPT | wget==3.2 | MIT / Public Domain | https://pypi.org/project/wget/
+scGPT | ipython==8.15.0 | BSD | https://github.com/ipython/ipython
+scGPT | cloudpickle==2.2.1 | BSD-3-Clause | https://github.com/cloudpipe/cloudpickle
+scGPT | torch==2.0.1+cu118 | BSD | https://github.com/pytorch/pytorch
+scGPT | torchvision==0.15.2+cu118 | BSD | https://github.com/pytorch/vision
+scGPT | flash-attn==2.5.8 | Apache-2.0 | https://github.com/Dao-AILab/flash-attention
+scGPT | scgpt==0.2.4 | MIT | https://github.com/bowang-lab/scGPT
+scGPT | wandb==0.19.11 | MIT | https://github.com/wandb/wandb
+SCimilarity | SCimilarity v0.4.0 |	Apache2.0 | https://github.com/Genentech/scimilarity
+SCimilarity | Mlflow	| Apache2.0 | https://github.com/mlflow/mlflow
+SCimilarity | 'torch' / PyTorch | BSD-3-Clause | https://pypi.org/project/torch/2.7.1/
+SCimilarity | scanpy |	BSD 3-Clause | https://github.com/scverse/scanpy
+SCimilarity | numcodecs |	MIT | https://github.com/zarr-developers/numcodecs
+SCimilarity | tbb	| Apache2.0 | https://github.com/uxlfoundation/oneTBB
+SCimilarity | typing_extensions	| PSF | https://github.com/python/typing_extensions
+SCimilarity | numpy  |	BSD | https://github.com/numpy/numpy
+SCimilarity | pandas | BSD 3-Clause | https://github.com/pandas-dev/pandas
+SCimilarity | uv | Apache2.0 | https://github.com/astral-sh/uv
+SCimilarity | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+RFDiffusion | RFDiffusion |	BSD-3 | https://github.com/RosettaCommons/RFdiffusion
+RFDiffusion | Hydra	| MIT | https://github.com/facebookresearch/hydra
+RFDiffusion | OmegaConf |	BSD-3 | https://github.com/omry/omegaconf
+RFDiffusion | Biopython |	[BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+RFDiffusion | DGL	| Apache2.0 | https://github.com/dmlc/dgl
+RFDiffusion | pyrsistent |	MIT | https://github.com/tobgu/pyrsistent
+RFDiffusion | e3nn	| MIT | https://github.com/e3nn/e3nn
+RFDiffusion | Wandb |	MIT | https://github.com/wandb/wandb
+RFDiffusion | Pynvml	| BSD-3 | https://github.com/gpuopenanalytics/pynvml
+RFDiffusion | Decorator	| BSD-2 | https://github.com/micheles/decorator
+RFDiffusion | Torch |	BSD-3 | https://github.com/pytorch/pytorch
+RFDiffusion | Torchvision |	BSD-3 | https://github.com/pytorch/vision
+RFDiffusion | torchaudio==0.11.0 |	BSD-2 | https://github.com/pytorch/audio
+RFDiffusion | cloudpickle==2.2.1	| BSD-3 | https://github.com/cloudpipe/cloudpickle
+RFDiffusion | dllogger 	| Apache2.0 | https://github.com/NVIDIA/dllogger
+RFDiffusion | SE3Transformer |	MIT | https://github.com/RosettaCommons/RFdiffusion/tree/main/env/SE3Transformer
+RFDiffusion | mlflow==2.15.1 | Apache2.0 | https://github.com/mlflow/mlflow
+RFDiffusion | MODEL WEIGHTS |	BSD | https://github.com/RosettaCommons/RFdiffusion
+ProteinMPNN | ProteinMPNN 	| MIT | https://github.com/dauparas/ProteinMPNN
+ProteinMPNN | Numpy |	BSD-3 | https://github.com/numpy/numpy
+ProteinMPNN | torch==1.11.0+cu113 |	BSD-3 | https://github.com/pytorch/pytorch
+ProteinMPNN | torchvision==0.12.0+cu113 |	BSD-3 |  https://github.com/pytorch/vision
+ProteinMPNN | torchaudio==0.11.0 | BSD-2 | https://github.com/pytorch/audio
+ProteinMPNN | mlflow==2.15.1 | Apache2.0 | https://github.com/mlflow/mlflow
+ProteinMPNN | cloudpickle==2.2.1 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+ProteinMPNN | biopython==1.79 | [BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) |  https://github.com/biopython/biopython
+ProteinMPNN | MODEL WEIGHTS | MIT | https://github.com/dauparas/ProteinMPNN
+Alphafold | AlphaFold (2.3.2) | Apache2.0 | https://github.com/google-deepmind/alphafold
+Alphafold | other dependencies | we provide a file of requirements per alphafold's own [repo](https://github.com/google-deepmind/alphafold), see [yml file](https://github.com/databricks-industry-solutions/genesis-workbench/blob/main/modules/large_molecule/alphafold/alphafold_v2.3.2/envs/alphafold_env.yml) for further details |
+Alphafold | MODEL WEIGHTS | CC BY 4.0
+ESMfold | ESMFold |	MIT | https://github.com/facebookresearch/esm
+ESMfold | torch | BSD-3 | https://github.com/pytorch/pytorch
+ESMfold | transformers | Apache2.0 | https://github.com/huggingface/transformers
+ESMfold | accelerate | Apache2.0 | https://github.com/huggingface/transformers
+ESMfold | hf_transfer==0.1.9 | Apache2.0 | https://github.com/huggingface/hf_transfer
+ESMfold | MODEL WEIGHTS | MIT
+Boltz-2 | Boltz-2 (boltz==2.2.1 — structure, co-folding, and protein–ligand binding-affinity head) | MIT | https://github.com/jwohlwend/boltz
+Boltz-2 | rdkit | BSD-3 | https://github.com/rdkit/rdkit
+Boltz-2 | absl-py | Apache2.0 | https://github.com/abseil/abseil-py
+Boltz-2 | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+Boltz-2 | cloudpickle==3.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+Boltz-2 | torch / numpy / pandas / requests / cuequivariance (pulled transitively by boltz 2.2.1 on the serverless-GPU AI runtime) | respective upstream licenses | https://github.com/jwohlwend/boltz
+Boltz-2 | MODEL WEIGHTS (Boltz-2, packaged with the pip install) | MIT | https://github.com/jwohlwend/boltz
+Scanpy | scanpy==1.11.4 | BSD-3 | https://github.com/scverse/scanpy
+Scanpy | anndata | BSD-3 | https://github.com/scverse/anndata
+Scanpy | scikit-network | BSD-3 | https://github.com/sknetwork-team/scikit-network
+Scanpy | pybiomart | BSD-3 | https://github.com/jrderuiter/pybiomart
+Scanpy | Numpy | BSD-3 | https://github.com/numpy/numpy
+Scanpy | pandas | BSD-3 | https://github.com/pandas-dev/pandas
+Scanpy | scipy | BSD-3 | https://github.com/scipy/scipy
+rapids-singlecell (part of scverse) | rapids-singlecell | MIT | https://github.com/scverse/rapids_singlecell
+rapids-singlecell (part of scverse) | cudf-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cuml-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cugraph-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cucim-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | dask-cudf-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | nx-cugraph-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cuxfilter-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | pylibraft-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | raft-dask-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cuvs-cu12==25.10.* | Apache-2.0 | https://rapids.ai/
+rapids-singlecell (part of scverse) | cupy-cuda12x | MIT | https://github.com/cupy/cupy/
+rapids-singlecell (part of scverse) | scikit-learn==1.5.* | BSD-3 | https://github.com/scikit-learn/scikit-learn
+rapids-singlecell (part of scverse) | rmm (RAPIDS Memory Manager) | Apache-2.0 | https://github.com/rapidsai/rmm
+Chemprop | chemprop>=2.0.0 | MIT | https://github.com/chemprop/chemprop
+Chemprop | lightning | Apache2.0 | https://github.com/Lightning-AI/pytorch-lightning
+Chemprop | scikit-learn>=1.3 | BSD-3 | https://github.com/scikit-learn/scikit-learn
+Chemprop | PyTDC | MIT | https://github.com/mims-harvard/TDC
+Chemprop | torch>=2.0 | BSD-3 | https://github.com/pytorch/pytorch
+Chemprop | rdkit | BSD-3 | https://github.com/rdkit/rdkit
+Chemprop | mlflow>=2.15 | Apache2.0 | https://github.com/mlflow/mlflow
+Chemprop | cloudpickle | BSD-3 | https://github.com/cloudpipe/cloudpickle
+DiffDock | DiffDock | MIT | https://github.com/gcorso/DiffDock
+DiffDock | pyyaml==6.0.1 | MIT | https://github.com/yaml/pyyaml
+DiffDock | scipy==1.7.3 | BSD-3 | https://github.com/scipy/scipy
+DiffDock | networkx==2.6.3 | BSD-3 | https://github.com/networkx/networkx
+DiffDock | biopython==1.79 | [BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+DiffDock | rdkit-pypi==2022.03.5 | BSD-3 | https://github.com/rdkit/rdkit
+DiffDock | e3nn==0.5.1 | MIT | https://github.com/e3nn/e3nn
+DiffDock | spyrmsd==0.5.2 | MIT | https://github.com/RMeli/spyrmsd
+DiffDock | biopandas==0.4.1 | BSD-3 | https://github.com/BioPandas/biopandas
+DiffDock | prody==2.6.1 | MIT | https://github.com/prody/ProDy
+DiffDock | fair-esm==2.0.0 | MIT | https://github.com/facebookresearch/esm
+DiffDock | torch-geometric==2.2.0 | MIT | https://github.com/pyg-team/pytorch_geometric
+DiffDock | torch-scatter==2.1.1 | MIT | https://github.com/rusty1s/pytorch_scatter
+DiffDock | torch-sparse==0.6.17 | MIT | https://github.com/rusty1s/pytorch_sparse
+DiffDock | torch-cluster==1.6.1 | MIT | https://github.com/rusty1s/pytorch_cluster
+DiffDock | pandas==1.5.3 | BSD-3 | https://github.com/pandas-dev/pandas
+Proteina-Complexa | Proteina-Complexa | MIT | https://github.com/NVIDIA-Digital-Bio/Proteina-Complexa
+Proteina-Complexa | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+Proteina-Complexa | lightning==2.6.1 | Apache2.0 | https://github.com/Lightning-AI/pytorch-lightning
+Proteina-Complexa | hydra-core==1.3.1 | MIT | https://github.com/facebookresearch/hydra
+Proteina-Complexa | omegaconf==2.3.0 | BSD-3 | https://github.com/omry/omegaconf
+Proteina-Complexa | torch_geometric==2.7.0 | MIT | https://github.com/pyg-team/pytorch_geometric
+Proteina-Complexa | torch_scatter==2.1.2 | MIT | https://github.com/rusty1s/pytorch_scatter
+Proteina-Complexa | torch_sparse==0.6.18 | MIT | https://github.com/rusty1s/pytorch_sparse
+Proteina-Complexa | torch_cluster==1.6.3 | MIT | https://github.com/rusty1s/pytorch_cluster
+Proteina-Complexa | biotite==1.6.0 | BSD-3 | https://github.com/biotite-dev/biotite
+Proteina-Complexa | loralib==0.1.2 | MIT | https://github.com/microsoft/LoRA
+Proteina-Complexa | einops==0.8.2 | MIT | https://github.com/arogozhnikov/einops
+Proteina-Complexa | transformers==5.5.0 | Apache2.0 | https://github.com/huggingface/transformers
+Proteina-Complexa | jaxtyping | MIT | https://github.com/patrick-kidger/jaxtyping
+NetSolP | NetSolP-1.0 | BSD-3-Clause | https://github.com/tvinet/NetSolP-1.0
+NetSolP | onnxruntime==1.20.1 | MIT | https://github.com/microsoft/onnxruntime
+NetSolP | fair-esm==2.0.0 | MIT | https://github.com/facebookresearch/esm
+NetSolP | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+NetSolP | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+NetSolP | pandas==1.5.3 | BSD-3 | https://github.com/pandas-dev/pandas
+NetSolP | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+NetSolP | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+NetSolP | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+NetSolP | databricks-sql-connector==4.0.2 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+NetSolP | MODEL WEIGHTS — Solubility_ESM12_0_quantized.onnx (~85 MB, split 0 of the upstream 5-fold ESM-12 ensemble) + ESM12_alphabet.pkl, committed under modules/small_molecule/netsolp/netsolp_v1/weights/ | BSD-3-Clause | https://services.healthtech.dtu.dk/services/NetSolP-1.0/
+PLTNUM | PLTNUM (vendored PLTNUM_PreTrainedModel class) | MIT | https://github.com/sagawatatsuya/PLTNUM
+PLTNUM | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+PLTNUM | transformers==4.46.3 | Apache2.0 | https://github.com/huggingface/transformers
+PLTNUM | safetensors==0.4.5 | Apache2.0 | https://github.com/huggingface/safetensors
+PLTNUM | huggingface-hub==0.26.2 | Apache2.0 | https://github.com/huggingface/huggingface_hub
+PLTNUM | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+PLTNUM | pandas==1.5.3 | BSD-3 | https://github.com/pandas-dev/pandas
+PLTNUM | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+PLTNUM | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+PLTNUM | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+PLTNUM | databricks-sql-connector==4.0.2 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+PLTNUM | MODEL WEIGHTS (HuggingFace sagawa/PLTNUM-ESM2-NIH3T3) | MIT | https://huggingface.co/sagawa/PLTNUM-ESM2-NIH3T3
+PLTNUM | ESM-2 650M backbone (facebook/esm2_t33_650M_UR50D) | MIT | https://github.com/facebookresearch/esm
+DeepSTABp | DeepSTABp (vendored deepSTAPpMLP class) | MIT | https://github.com/CSBiology/deepStabP
+DeepSTABp | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+DeepSTABp | transformers==4.46.3 | Apache2.0 | https://github.com/huggingface/transformers
+DeepSTABp | safetensors==0.4.5 | Apache2.0 | https://github.com/huggingface/safetensors
+DeepSTABp | huggingface-hub==0.26.2 | Apache2.0 | https://github.com/huggingface/huggingface_hub
+DeepSTABp | pytorch-lightning==2.5.5 | Apache2.0 | https://github.com/Lightning-AI/pytorch-lightning
+DeepSTABp | sentencepiece==0.2.0 | Apache2.0 | https://github.com/google/sentencepiece
+DeepSTABp | biopython==1.84 | [BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+DeepSTABp | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+DeepSTABp | pandas==1.5.3 | BSD-3 | https://github.com/pandas-dev/pandas
+DeepSTABp | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+DeepSTABp | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+DeepSTABp | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+DeepSTABp | databricks-sql-connector==4.0.2 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+DeepSTABp | MODEL WEIGHTS — MLP head (~80 MB, fetched from upstream raw URL at registration time) | MIT | https://github.com/CSBiology/deepStabP/raw/main/src/Api/trained_model/b25_sampled_10k_tuned_2_d01/checkpoints/
+DeepSTABp | ProtT5-XL backbone (Rostlab/prot_t5_xl_uniref50) | MIT (verified at parent ProtTrans repo) | https://github.com/agemagician/ProtTrans
+MHCflurry | mhcflurry==2.2.1 | Apache2.0 | https://github.com/openvax/mhcflurry
+MHCflurry | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+MHCflurry | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+MHCflurry | pandas==2.2.3 | BSD-3 | https://github.com/pandas-dev/pandas
+MHCflurry | scikit-learn==1.5.2 | BSD-3 | https://github.com/scikit-learn/scikit-learn
+MHCflurry | biopython==1.84 | [BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+MHCflurry | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+MHCflurry | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+MHCflurry | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+MHCflurry | databricks-sql-connector==4.0.2 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+MHCflurry | MODEL WEIGHTS (auto-fetched via `mhcflurry-downloads fetch models_class1_presentation`, ~150 MB) | Apache2.0 | https://github.com/openvax/mhcflurry
+HLAIIPred | hlapred (cloned + shipped via code_paths) | Apache2.0 | https://github.com/pfizer-opensource/HLAIIPred
+HLAIIPred | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+HLAIIPred | scipy==1.13.1 | BSD-3 | https://github.com/scipy/scipy
+HLAIIPred | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+HLAIIPred | pandas==2.2.3 | BSD-3 | https://github.com/pandas-dev/pandas
+HLAIIPred | tqdm==4.66.5 | MPL-2.0/MIT | https://github.com/tqdm/tqdm
+HLAIIPred | pyyaml==6.0.2 | MIT | https://github.com/yaml/pyyaml
+HLAIIPred | biopython==1.84 | [BioPython License Agreement](https://github.com/biopython/biopython/blob/master/LICENSE.rst) | https://github.com/biopython/biopython
+HLAIIPred | mlflow==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+HLAIIPred | cloudpickle==2.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+HLAIIPred | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+HLAIIPred | databricks-sql-connector==4.0.2 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+HLAIIPred | MODEL WEIGHTS (models/epT_{0,1}.pt + mhcII/ pseudosequences, ~9 MB, cloned from the repo and shipped via artifacts) | Apache2.0 | https://github.com/pfizer-opensource/HLAIIPred
+Genomics | glow | Apache2.0 | https://github.com/projectglow/glow
+Genomics | pyspark | Apache2.0 | https://github.com/apache/spark
+BioNeMo | six==1.16.0 | MIT | https://github.com/benjaminp/six
+BioNeMo | numpy==1.26.4 | BSD-3 | https://github.com/numpy/numpy
+BioNeMo | pandas==2.2.3 | BSD-3 | https://github.com/pandas-dev/pandas
+BioNeMo | pyarrow>=14.0.0 | Apache2.0 | https://github.com/apache/arrow
+BioNeMo | matplotlib>=3.8.0 | PSF/BSD | https://github.com/matplotlib/matplotlib
+BioNeMo | Jinja2>=3.1.2 | BSD-3 | https://github.com/pallets/jinja
+BioNeMo | protobuf>=4.23.3 | BSD-3 | https://github.com/protocolbuffers/protobuf
+BioNeMo | grpcio>=1.59.0 | Apache2.0 | https://github.com/grpc/grpc
+BioNeMo | grpcio-status>=1.59.0 | Apache2.0 | https://github.com/grpc/grpc
+BioNeMo | databricks-sdk>=0.1.6 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+BioNeMo | psutil | BSD-2 | https://github.com/giampaolo/psutil
+BioNeMo | pynvml | BSD-3 | https://github.com/gpuopenanalytics/pynvml
+Parabricks | see BioNeMo (same docker base dependencies) | |
+ESM2 Embeddings | torch==2.3.1 | BSD-3 | https://github.com/pytorch/pytorch
+ESM2 Embeddings | transformers==4.41.2 | Apache2.0 | https://github.com/huggingface/transformers
+RFD4-Proteina | rfd4-proteina (pip-installed at runtime from the public RosettaCommons RFD4-Proteina repo, tag v0.0.1) | BSD-3 | https://github.com/RosettaCommons/RFD4-Proteina
+RFD4-Proteina | torch==2.14.1+cu132 | BSD-3 | https://github.com/pytorch/pytorch
+RFD4-Proteina | biotite==1.6.0 | BSD-3 | https://github.com/biotite-dev/biotite
+RFD4-Proteina | mlflow>=3.12 | Apache2.0 | https://github.com/mlflow/mlflow
+RFD4-Proteina | databricks-sdk>=0.150.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+RFD4-Proteina | cloudpickle | BSD-3 | https://github.com/cloudpipe/cloudpickle
+RFD4-Proteina | numpy | BSD-3 | https://github.com/numpy/numpy
+RFD4-Proteina | pandas | BSD-3 | https://github.com/pandas-dev/pandas
+RFD4-Proteina | MODEL WEIGHTS (flow + autoencoder checkpoints; served on H100 via Express env_pack) | BSD-3 | https://huggingface.co/nvidia/RFD4-Proteina
+KERMT | kermt (NVIDIA-BioNeMo/KERMT, GROVERbase) | Apache2.0 | https://github.com/NVIDIA-BioNeMo/KERMT
+KERMT | rdkit==2025.3.6 | BSD-3 | https://github.com/rdkit/rdkit
+KERMT | descriptastorus==2.8.0 | MIT | https://github.com/bp-kelley/descriptastorus
+KERMT | scikit-learn==1.5.2 | BSD-3 | https://github.com/scikit-learn/scikit-learn
+KERMT | tqdm==4.67.1 | MPL-2.0/MIT | https://github.com/tqdm/tqdm
+KERMT | torch (unpinned; serving runtime 2.7.1) | BSD-3 | https://github.com/pytorch/pytorch
+KERMT | numpy (unpinned) | BSD-3 | https://github.com/numpy/numpy
+KERMT | pandas (unpinned) | BSD-3 | https://github.com/pandas-dev/pandas
+KERMT | mlflow[databricks]>=3.12 | Apache2.0 | https://github.com/mlflow/mlflow
+KERMT | databricks-sdk>=0.150.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+KERMT | databricks-sql-connector==4.0.3 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+KERMT | MODEL WEIGHTS (fine-tuned ADMET checkpoint in a UC volume) | Apache2.0 | https://github.com/NVIDIA-BioNeMo/KERMT
+TEDDY | teddy (Merck TEDDY-G) | Apache2.0 | https://huggingface.co/Merck/TEDDY
+TEDDY | torch==2.7.1 | BSD-3 | https://github.com/pytorch/pytorch
+TEDDY | transformers==4.44.2 | Apache2.0 | https://github.com/huggingface/transformers
+TEDDY | huggingface_hub==0.25.2 | Apache2.0 | https://github.com/huggingface/huggingface_hub
+TEDDY | hf_transfer==0.1.9 | Apache2.0 | https://github.com/huggingface/hf_transfer
+TEDDY | safetensors==0.4.5 | Apache2.0 | https://github.com/huggingface/safetensors
+TEDDY | anndata==0.10.9 | BSD-3 | https://github.com/scverse/anndata
+TEDDY | scanpy==1.10.3 | BSD-3 | https://github.com/scverse/scanpy
+TEDDY | pandas==2.2.3 | BSD-3 | https://github.com/pandas-dev/pandas
+TEDDY | scipy==1.13.1 | BSD-3 | https://github.com/scipy/scipy
+TEDDY | scikit-learn==1.5.2 | BSD-3 | https://github.com/scikit-learn/scikit-learn
+TEDDY | tqdm==4.66.5 | MPL-2.0/MIT | https://github.com/tqdm/tqdm
+TEDDY | pyyaml==6.0.2 | MIT | https://github.com/yaml/pyyaml
+TEDDY | cloudpickle==3.0.0 | BSD-3 | https://github.com/cloudpipe/cloudpickle
+TEDDY | mlflow>=3.12 | Apache2.0 | https://github.com/mlflow/mlflow
+TEDDY | databricks-sdk>=0.150.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+TEDDY | MODEL WEIGHTS (TEDDY-G 70M/160M/400M; pre-staged to a UC volume) | Apache2.0 | https://huggingface.co/Merck/TEDDY
+GenMol | genmol (NVIDIA-Digital-Bio) | Apache2.0 | https://github.com/NVIDIA-Digital-Bio/GenMol
+GenMol | torch==2.6.0 | BSD-3 | https://github.com/pytorch/pytorch
+GenMol | transformers==4.52.4 | Apache2.0 | https://github.com/huggingface/transformers
+GenMol | pandas==2.1.0 | BSD-3 | https://github.com/pandas-dev/pandas
+GenMol | rdkit==2025.3.6 | BSD-3 | https://github.com/rdkit/rdkit
+GenMol | sentry-sdk<2.0.0 | BSD-3 | https://github.com/getsentry/sentry-python
+GenMol | setuptools<80 | MIT | https://github.com/pypa/setuptools
+GenMol | mlflow[databricks]==2.22.0 | Apache2.0 | https://github.com/mlflow/mlflow
+GenMol | databricks-sdk==0.50.0 | Apache2.0 | https://pypi.org/project/databricks-sdk/
+GenMol | databricks-sql-connector==4.0.3 | Apache2.0 | https://github.com/databricks/databricks-sql-python
+GenMol | MODEL WEIGHTS (NV-GenMol-89M-v2) | NVIDIA Open Model License | https://huggingface.co/nvidia/NV-GenMol-89M-v2
+Antibody Design | batch workflow on RFD4-Proteina — reuses the esmfold / proteinmpnn / boltz / netsolp / deepstabp / mhcflurry / hlaiipred serving endpoints listed above | |
+Antibody Design | rfd4-proteina (in-process on H100) | BSD-3 | https://github.com/RosettaCommons/RFD4-Proteina
+Antibody Design | anarcii (VHH / antibody numbering) | BSD-3 | https://github.com/oxpig/ANARCII
+Antibody Design | biotite==1.6.0 | BSD-3 | https://github.com/biotite-dev/biotite
+Antibody Design | torch==2.14.1+cu132 | BSD-3 | https://github.com/pytorch/pytorch
+Vaccine Immunogen | batch workflow on RFD4-Proteina motif-scaffolding — reuses existing serving endpoints as above | |
+Vaccine Immunogen | rfd4-proteina (in-process on H100) | BSD-3 | https://github.com/RosettaCommons/RFD4-Proteina
+Vaccine Immunogen | biotite==1.6.0 | BSD-3 | https://github.com/biotite-dev/biotite
+Vaccine Immunogen | torch==2.14.1+cu132 | BSD-3 | https://github.com/pytorch/pytorch

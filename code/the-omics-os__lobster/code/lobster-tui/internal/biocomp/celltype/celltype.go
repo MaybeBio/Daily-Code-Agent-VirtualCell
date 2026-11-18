@@ -1,0 +1,345 @@
+// Package celltype implements the BioComp cell type annotation selector.
+//
+// This component lets users assign cell type labels to scRNA-seq clusters
+// using marker gene context. It is the showcase domain-specific BioCharm
+// component for Lobster AI's Go TUI.
+package celltype
+
+import (
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/the-omics-os/lobster-tui/internal/biocomp"
+	"github.com/the-omics-os/lobster-tui/internal/i18n"
+)
+
+func init() {
+	biocomp.Register("cell_type_selector", func() biocomp.BioComponent {
+		return &CellTypeSelectorComponent{}
+	})
+}
+
+// CellTypeSelectorComponent displays a scrollable list of scRNA-seq clusters
+// with marker genes, allowing the user to type a cell type label for each.
+type CellTypeSelectorComponent struct {
+	clusters     []ClusterInfo
+	inputs       []textinput.Model
+	cursor       int // currently highlighted cluster row
+	editingIndex int // which cluster's textinput is focused (-1 = none)
+	offset       int // scroll offset for long cluster lists
+}
+
+func (c *CellTypeSelectorComponent) Init(data json.RawMessage) error {
+	var d CellTypeSelectorData
+	if err := json.Unmarshal(data, &d); err != nil {
+		return fmt.Errorf("cell_type_selector: invalid data: %w", err)
+	}
+	if len(d.Clusters) == 0 {
+		return fmt.Errorf("cell_type_selector: at least one cluster is required")
+	}
+
+	c.clusters = d.Clusters
+	c.inputs = make([]textinput.Model, len(d.Clusters))
+	for i, cl := range d.Clusters {
+		ti := textinput.New()
+		ti.Placeholder = i18n.P("cell type...")
+		ti.CharLimit = 128
+		ti.SetWidth(30)
+		if cl.Label != "" {
+			ti.SetValue(cl.Label)
+		}
+		c.inputs[i] = ti
+	}
+	c.cursor = 0
+	c.editingIndex = -1
+	c.offset = 0
+
+	return nil
+}
+
+func (c *CellTypeSelectorComponent) HandleMsg(msg tea.Msg) (*biocomp.ComponentResult, tea.Cmd) {
+	km, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		// Forward non-key messages to active textinput if editing.
+		if c.editingIndex >= 0 && c.editingIndex < len(c.inputs) {
+			var cmd tea.Cmd
+			c.inputs[c.editingIndex], cmd = c.inputs[c.editingIndex].Update(msg)
+			return nil, cmd
+		}
+		return nil, nil
+	}
+
+	// When editing a textinput, most keys go to the input.
+	if c.editingIndex >= 0 {
+		return c.handleEditMode(km)
+	}
+	return c.handleNavMode(km)
+}
+
+// handleNavMode processes keys when not editing any textinput.
+func (c *CellTypeSelectorComponent) handleNavMode(km tea.KeyPressMsg) (*biocomp.ComponentResult, tea.Cmd) {
+	switch km.String() {
+	case "up", "k":
+		c.moveUp()
+		return nil, nil
+	case "down", "j":
+		c.moveDown()
+		return nil, nil
+	case "enter":
+		cmd := c.enterEditMode()
+		return nil, cmd
+	case "esc":
+		return &biocomp.ComponentResult{
+			Action: "cancel",
+			Data:   map[string]any{},
+		}, nil
+	case "ctrl+s":
+		return c.submitAll(), nil
+	}
+	return nil, nil
+}
+
+// handleEditMode processes keys when a textinput is focused.
+func (c *CellTypeSelectorComponent) handleEditMode(km tea.KeyPressMsg) (*biocomp.ComponentResult, tea.Cmd) {
+	switch km.String() {
+	case "esc":
+		// Exit edit mode, keep text.
+		c.exitEditMode()
+		return nil, nil
+	case "tab":
+		// Accept current input and move to next cluster.
+		c.exitEditMode()
+		if c.cursor < len(c.clusters)-1 {
+			c.cursor++
+			c.adjustOffset()
+		}
+		cmd := c.enterEditMode()
+		return nil, cmd
+	case "ctrl+s":
+		c.exitEditMode()
+		return c.submitAll(), nil
+	case "enter":
+		// Accept current input. On the last cluster, auto-submit.
+		// On non-last clusters, move to the next one (like tab).
+		c.exitEditMode()
+		if c.cursor >= len(c.clusters)-1 {
+			return c.submitAll(), nil
+		}
+		c.cursor++
+		c.adjustOffset()
+		cmd := c.enterEditMode()
+		return nil, cmd
+	default:
+		// Forward to the active textinput.
+		var cmd tea.Cmd
+		c.inputs[c.editingIndex], cmd = c.inputs[c.editingIndex].Update(km)
+		return nil, cmd
+	}
+}
+
+func (c *CellTypeSelectorComponent) enterEditMode() tea.Cmd {
+	if c.cursor >= 0 && c.cursor < len(c.inputs) {
+		c.editingIndex = c.cursor
+		return c.inputs[c.editingIndex].Focus()
+	}
+	return nil
+}
+
+func (c *CellTypeSelectorComponent) exitEditMode() {
+	if c.editingIndex >= 0 && c.editingIndex < len(c.inputs) {
+		c.inputs[c.editingIndex].Blur()
+	}
+	c.editingIndex = -1
+}
+
+func (c *CellTypeSelectorComponent) moveUp() {
+	if c.cursor > 0 {
+		c.cursor--
+		if c.cursor < c.offset {
+			c.offset = c.cursor
+		}
+	}
+}
+
+func (c *CellTypeSelectorComponent) moveDown() {
+	if c.cursor < len(c.clusters)-1 {
+		c.cursor++
+	}
+}
+
+func (c *CellTypeSelectorComponent) adjustOffset() {
+	// Called after cursor changes to ensure visibility.
+	// The actual offset adjustment happens in View based on available height.
+}
+
+func (c *CellTypeSelectorComponent) submitAll() *biocomp.ComponentResult {
+	assignments := make(map[string]any)
+	for i, inp := range c.inputs {
+		val := inp.Value()
+		if val != "" {
+			assignments[strconv.Itoa(c.clusters[i].ID)] = val
+		}
+	}
+	return &biocomp.ComponentResult{
+		Action: "submit",
+		Data:   map[string]any{"assignments": assignments},
+	}
+}
+
+// labeledCount returns the number of clusters with non-empty labels.
+func (c *CellTypeSelectorComponent) labeledCount() int {
+	count := 0
+	for _, inp := range c.inputs {
+		if inp.Value() != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func (c *CellTypeSelectorComponent) View(width, height int) string {
+	// Styles.
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63"))
+
+	markerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	selectedStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63"))
+
+	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	dimStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	// Each cluster row takes 3 lines: header, markers, label input.
+	const linesPerCluster = 3
+
+	// Calculate visible clusters based on available height.
+	// Reserve 2 lines for the status/help bar at the bottom.
+	contentH := height - 2
+	if contentH < linesPerCluster {
+		contentH = linesPerCluster
+	}
+	visibleClusters := contentH / linesPerCluster
+	if visibleClusters < 1 {
+		visibleClusters = 1
+	}
+	if visibleClusters > len(c.clusters) {
+		visibleClusters = len(c.clusters)
+	}
+
+	// Adjust offset so cursor is always visible.
+	if c.cursor >= c.offset+visibleClusters {
+		c.offset = c.cursor - visibleClusters + 1
+	}
+	if c.cursor < c.offset {
+		c.offset = c.cursor
+	}
+
+	end := c.offset + visibleClusters
+	if end > len(c.clusters) {
+		end = len(c.clusters)
+	}
+
+	// Adjust textinput widths.
+	inputW := width - 12 // "  Label: " prefix + padding
+	if inputW < 10 {
+		inputW = 10
+	}
+	for i := range c.inputs {
+		c.inputs[i].SetWidth(inputW)
+	}
+
+	var rows []string
+	for i := c.offset; i < end; i++ {
+		cl := c.clusters[i]
+		isCursor := i == c.cursor
+		isEditing := i == c.editingIndex
+
+		// Cluster header line.
+		prefix := "  "
+		hStyle := normalStyle
+		if isCursor {
+			prefix = "> "
+			hStyle = selectedStyle
+		}
+		header := hStyle.Render(fmt.Sprintf(
+			i18n.P("%sCluster %d (%d cells)"),
+			prefix, cl.ID, cl.Size,
+		))
+
+		// Markers line.
+		markersStr := markerStyle.Render(
+			fmt.Sprintf(i18n.P("  Markers: %s"), strings.Join(cl.Markers, ", ")),
+		)
+
+		// Label input line.
+		var labelLine string
+		if isEditing {
+			labelLine = headerStyle.Render("  "+i18n.P("Label:")+" ") + c.inputs[i].View()
+		} else {
+			val := c.inputs[i].Value()
+			if val == "" {
+				labelLine = dimStyle.Render("  " + i18n.P("Label:") + " " + i18n.P("[empty]"))
+			} else {
+				labelLine = dimStyle.Render("  "+i18n.P("Label:")+" ") + normalStyle.Render(val)
+			}
+		}
+
+		rows = append(rows, header, markersStr, labelLine)
+	}
+
+	content := strings.Join(rows, "\n")
+
+	// Status bar.
+	labeled := c.labeledCount()
+	total := len(c.clusters)
+	statusStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Width(width)
+	status := statusStyle.Render(fmt.Sprintf(
+		"  %d/%d labeled", labeled, total,
+	))
+
+	return lipgloss.JoinVertical(lipgloss.Left, content, "", status)
+}
+
+func (c *CellTypeSelectorComponent) SetData(data json.RawMessage) error {
+	var d CellTypeSelectorData
+	if err := json.Unmarshal(data, &d); err != nil {
+		return fmt.Errorf("cell_type_selector: invalid update data: %w", err)
+	}
+	if len(d.Clusters) > 0 {
+		// Re-initialize with new cluster data.
+		return c.Init(data)
+	}
+	return nil
+}
+
+func (c *CellTypeSelectorComponent) InitCmd() tea.Cmd { return nil }
+func (c *CellTypeSelectorComponent) Name() string     { return "cell_type_selector" }
+func (c *CellTypeSelectorComponent) Mode() string     { return "overlay" }
+
+func (c *CellTypeSelectorComponent) KeyBindings() []key.Binding {
+	return []key.Binding{
+		key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("^/v", i18n.P("navigate"))),
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", i18n.P("edit"))),
+		key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", i18n.P("accept+next"))),
+		key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("C-s", i18n.P("submit all"))),
+		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", i18n.P("cancel/exit edit"))),
+	}
+}
+
+func (c *CellTypeSelectorComponent) ChangeEvent() map[string]any { return nil }

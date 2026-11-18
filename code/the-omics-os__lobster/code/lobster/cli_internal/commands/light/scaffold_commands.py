@@ -1,0 +1,88 @@
+"""Scaffold commands for generating plugin packages."""
+
+from pathlib import Path
+from typing import Optional
+
+import typer
+
+from lobster.i18n import h, t
+
+scaffold_app = typer.Typer(
+    name="scaffold",
+    help=t("light.scaffold.help"),
+    no_args_is_help=True,
+)
+
+
+@scaffold_app.command(name="agent")
+def scaffold_agent_cmd(
+    name: str = typer.Option(
+        ..., "--name", help=h("Agent name in snake_case (e.g., epigenomics_expert)")
+    ),
+    display_name: str = typer.Option(
+        ...,
+        "--display-name",
+        help=h("Human-readable name (e.g., 'Epigenomics Expert')"),
+    ),
+    description: str = typer.Option(
+        ..., "--description", help=h("Agent capabilities description")
+    ),
+    tier: str = typer.Option(
+        "free", "--tier", hidden=True, help=h("Deprecated — all agents are open source")
+    ),
+    children: Optional[str] = typer.Option(
+        None, "--children", help=h("Comma-separated child agent names")
+    ),
+    output_dir: Path = typer.Option(
+        Path("."), "--output-dir", "-o", help=h("Output directory")
+    ),
+    author_name: str = typer.Option(
+        "Lobster AI Community", "--author-name", help=h("Package author name")
+    ),
+    author_email: str = typer.Option(
+        "community@lobsterbio.com", "--author-email", help=h("Package author email")
+    ),
+):
+    """Generate a complete agent plugin package.
+
+    Examples:
+        lobster scaffold agent --name <domain>_expert --display-name "<Domain> Expert" --description "<capabilities>"
+
+        lobster scaffold agent --name <domain>_expert --display-name "<Domain> Expert" --description "<capabilities>" --children <sub>_expert,<sub2>_expert
+    """
+    from lobster.scaffold import scaffold_agent
+
+    children_list = [c.strip() for c in children.split(",")] if children else []
+
+    pkg_dir = scaffold_agent(
+        name=name,
+        display_name=display_name,
+        description=description,
+        tier=tier,
+        children=children_list,
+        output_dir=output_dir,
+        author_name=author_name,
+        author_email=author_email,
+    )
+
+    # Show relative path to avoid confusing agents/users
+    try:
+        rel_path = pkg_dir.relative_to(Path.cwd())
+    except ValueError:
+        rel_path = pkg_dir
+    typer.echo(h("Plugin package created at: ./{path}").format(path=rel_path))
+    typer.echo(h("\nNext steps:"))
+    typer.echo(
+        h(
+            "  1. Fill in domain-specific tools in ./{path}/lobster/agents/*/shared_tools.py"
+        ).format(path=rel_path)
+    )
+    typer.echo(h("  2. Add services and platform configs"))
+    typer.echo(
+        h(
+            "  3. Replace the placeholder figure_tool_cases() in ./{path}/tests/test_contract.py with real fixture data (D8: analysis tools never create figures)"
+        ).format(path=rel_path)
+    )
+    typer.echo(
+        h("  4. Validate: lobster validate-plugin ./{path}").format(path=rel_path)
+    )

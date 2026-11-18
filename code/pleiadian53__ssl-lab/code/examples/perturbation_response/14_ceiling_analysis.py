@@ -1,0 +1,333 @@
+"""Ceiling analysis — how well could Stage B *possibly* do?
+
+Three rounds of this project have improved Stage B (the thing that turns a perturbation into a
+cloud of outcome latents): a Gaussian flow, a transport flow, an action operator. They land at
+0.612, 0.648, 0.645. The NB-VAE sat at 0.766 when this analysis was designed; round 6 of the
+results ledger later raised that bar to 0.858 by letting the VAE's encoder read the perturbation
+too, and round 7 scored a training-free additive reference, the sum of the two single-gene effects,
+at 0.961, above every learned model. Every round asked "is this lever better than the last one" and none asked the prior question:
+
+    **Given this frozen encoder and this trained decoder, what is the best score ANY Stage B
+    could achieve?**
+
+That is a ceiling, and it is measurable without training anything. Stage B's entire job is to
+produce the perturbed latents. So hand the pipeline the *real* ones -- encode the actual held-out
+perturbed cells -- and score the result through the same decoder and the same metric. That is a
+Stage B which is perfect by construction, and whatever it scores is the ceiling. Any shortfall
+below 1.0 is information the **encoder and decoder** destroyed, and no Stage B can put it back.
+
+The arms form a ladder, each one removing a suspect:
+
+    identity     pred = the true test mean.                       Must score 1.000.
+                 An acceptance gate on the harness itself: if this is not 1.0, the metric is
+                 broken and every other number on this page is meaningless. (Chapter 3e of the
+                 method series exists because exactly that happened once.)
+
+    roundtrip    z = E(real held-out perturbed cells) -> decoder. THE CEILING.
+                 Stage B is perfect: it produced the real latents, cell for cell. What survives
+                 is what the encoder kept and the decoder could read back.
+
+    latent_mean  the *mean* real test latent, zero spread -> decoder.
+                 Asks whether latent spread matters for the effect-size metric at all. If this
+                 ties `roundtrip`, a deterministic Stage B is sufficient for Delta-r, and the
+                 whole stochastic-operator question is irrelevant to the primary endpoint.
+
+    linear       ridge z -> expression, fit on TRAIN cells only, applied to real test latents.
+                 Bypasses the NB decoder entirely, so it *attributes* the loss. If `linear` beats
+                 `roundtrip`, the effect is present in the latent and the decoder is losing it. If
+                 `linear` is no better, the **encoder** already threw it away, and no decoder lever
+                 can help.
+
+Read against the scoreboard as it stood when this rule was fixed (transport flow 0.648, operator
+0.645, NB-VAE 0.766; the strongest learned baseline has been 0.858 since round 6, and the training-free
+additive reference 0.961 since round 7), the `roundtrip` number decides the
+project's next move:
+
+  * roundtrip near 0.65  -> Stage B is SATURATED. The flow/operator tie is a wall, not a failure,
+                            and further Stage-B levers cannot pay. If it also sits *below* 0.766,
+                            then no Stage-B lever can ever reach the VAE and the frozen
+                            representation is provably the bottleneck.
+  * roundtrip near 0.95  -> Stage B has real headroom and genuinely underperforms.
+
+Nothing is trained here (the ridge is a closed-form solve). CPU, minutes.
+
+The latents normally come from running ``--encoder``. With ``--latents <store>`` they are looked up
+instead in a precomputed embedding store written by any encoder (:mod:`ssllab.embeddings`), such as
+Geneformer's cell embeddings; the decoder must have been trained on the same store. The
+ridge's ``--ridge-lambda`` is not scale-invariant, so on a store whose vectors have a different
+scale or width than the JEPA's, the ``linear`` arm's number is descriptive only.
+
+Usage
+-----
+    python examples/perturbation_response/14_ceiling_analysis.py \
+        --encoder output/norman_stage_a/checkpoints/encoder.pt \
+        --decoder output/norman_flow_control/checkpoints/count_decoder.pt \
+        --split combo
+
+Output
+------
+    output/<experiment>/reports/ceiling.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import logging
+import sys
+from pathlib import Path
+
+import numpy as np
+import torch
+
+_SRC = Path(__file__).resolve().parents[2] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from ssllab.checkpoint import load_jepa
+from ssllab.data.perturbseq import (
+    DEFAULT_N_TOKENS,
+    SPLIT_TEST,
+    SPLIT_TRAIN,
+    cache_fingerprint,
+    load_cache,
+    make_gene_partition,
+)
+from ssllab.embeddings import JepaSource, PrecomputedSource, check_same_space
+from ssllab.eval.effect_size import run_effect_size_eval
+from ssllab.experiment import experiment
+from ssllab.generative.perturb import load_count_decoder
+from ssllab.utils import get_device, set_seed
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)-7s  %(message)s", datefmt="%H:%M:%S")
+logger = logging.getLogger(__name__)
+
+ARMS = ("identity", "roundtrip", "latent_mean", "linear")
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Oracle ceiling for Stage B (no training).")
+    p.add_argument("--experiment", type=str, default="norman_ceiling")
+    p.add_argument("--output-root", type=str, default="output")
+    p.add_argument("--data-dir", type=str, default="data")
+    p.add_argument("--artifact", type=str, default="norman2019")
+    p.add_argument("--encoder", type=str, default="output/norman_stage_a/checkpoints/encoder.pt")
+    p.add_argument("--latents", type=str, default=None,
+                   help="read latents from this embedding store instead of running --encoder")
+    p.add_argument("--decoder", type=str, default="output/norman_flow_control/checkpoints/count_decoder.pt")
+    p.add_argument("--split", type=str, default="combo", choices=["combo", "cells"])
+    p.add_argument("--arms", type=str, nargs="+", default=list(ARMS), choices=list(ARMS))
+    p.add_argument("--ridge-lambda", type=float, default=1.0, help="L2 for the linear readout arm")
+    p.add_argument("--ridge-max-cells", type=int, default=None,
+                   help="smoke only: fit the ridge on a random subset of this many training cells "
+                        "(default: every training cell, as every reported number used)")
+    p.add_argument("--batch-size", type=int, default=256)
+    # These three MUST match the harness the published numbers were graded on.
+    p.add_argument("--top-k", type=int, default=20)
+    p.add_argument("--min-test-cells", type=int, default=20)
+    p.add_argument("--limit-perts", type=int, default=None)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--device", type=str, default="auto")
+    p.add_argument("--save-profiles", action="store_true",
+                   help="also write each arm's predicted mean profile per perturbation to "
+                        "reports/ceiling_profiles.npz, for metrics that need the profile itself "
+                        "(e.g. the relative error in ssllab.eval.interaction), together with each "
+                        "arm's prediction for the control cells (``<arm>__control``): the same "
+                        "readout applied to the real control cells the metric's control mean "
+                        "averages, so a predicted change can also be taken against the readout's "
+                        "own control prediction")
+    return p.parse_args()
+
+
+def _md5(path: Path) -> str:
+    """Hash of an input artifact, recorded in the report so it can prove what it was computed on.
+
+    The Round-3 reports do not say which decoder they used, and establishing it after the fact
+    meant hash-comparing checkpoints. Reports should not need forensics.
+    """
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+@torch.no_grad()
+def decode_mean(decoder, z: torch.Tensor, device) -> torch.Tensor:
+    """Mean predicted log1p-CP10K over a cloud of latents -- the identical readout path as `06`.
+
+    `predicted_expression()` in perturb.py does exactly this to the flow's sampled latents; the
+    only thing this script changes is *where the latents came from*.
+    """
+    z = z.to(device)
+    rho = decoder(z, library_size=torch.ones(len(z), device=device))["rho"]
+    return torch.log1p(1e4 * rho).mean(0).cpu()
+
+
+def fit_ridge(Z: torch.Tensor, Y: torch.Tensor, lam: float) -> tuple[torch.Tensor, torch.Tensor]:
+    """Closed-form ridge from latents to expression, fit on TRAIN cells only.
+
+    Solves min_W ||Z W - Y||^2 + lam ||W||^2 on centered data. Returns (W, intercept). This is a
+    *readout probe*, not a model: it asks how much of the effect is linearly present in the frozen
+    latent, with the NB decoder taken out of the picture entirely.
+    """
+    z_mu, y_mu = Z.mean(0, keepdim=True), Y.mean(0, keepdim=True)
+    Zc, Yc = (Z - z_mu).double(), (Y - y_mu).double()
+    d = Zc.shape[1]
+    A = Zc.T @ Zc + lam * torch.eye(d, dtype=torch.float64)
+    W = torch.linalg.solve(A, Zc.T @ Yc)
+    return W.float(), (y_mu - z_mu @ W.float()).squeeze(0)
+
+
+def main() -> None:
+    args = parse_args()
+    set_seed(args.seed)
+    device = get_device(args.device)
+    exp = experiment(args.experiment, args.output_root).ensure()
+
+    enc_path = None if args.latents else Path(args.encoder)
+    dec_path = Path(args.decoder)
+    for p in (enc_path, dec_path):
+        if p is not None and not p.exists():
+            raise FileNotFoundError(f"missing required checkpoint: {p}")
+
+    decoder = load_count_decoder(dec_path, device)
+    cache = load_cache(Path(args.data_dir) / args.artifact)
+
+    hvg = cache.hvg_X                                              # (N, G) normalized log1p-CP10K
+    split_col = cache.split_combo if args.split == "combo" else cache.split_cells
+    is_test = split_col == SPLIT_TEST
+    control_mean = hvg[cache.is_control.astype(bool)].mean(0)
+
+    tok = cache.manifest.get("tokenization", {})
+    partition = make_gene_partition(
+        cache.n_hvg, int(tok.get("n_tokens", DEFAULT_N_TOKENS)), int(tok.get("partition_seed", 0))
+    )
+    # Every latent below comes from one source: the encoder run on the rows, or a store lookup.
+    if args.latents:
+        source = PrecomputedSource.open(args.latents, cache_fingerprint(cache))
+        logger.info("latents from store %s (%s, width %d)", args.latents, source.identity().get("source"), source.dim)
+    else:
+        source = JepaSource(load_jepa(enc_path, device), enc_path, hvg, partition, device, args.batch_size)
+        logger.info("encoder %s (md5 %s)", enc_path, _md5(enc_path)[:8])
+    check_same_space(getattr(decoder, "latent_source", None), source.identity(), "decoder and the latents it reads")
+    logger.info("decoder %s (md5 %s)", dec_path, _md5(dec_path)[:8])
+    logger.info("split=%s  %d test cells  %d genes", args.split, int(is_test.sum()), cache.n_hvg)
+
+    # The linear arm's readout is fit on TRAIN cells only -- never on anything the metric scores.
+    ridge = None
+    if "linear" in args.arms:
+        train_rows = np.flatnonzero(split_col == SPLIT_TRAIN)
+        if args.ridge_max_cells and len(train_rows) > args.ridge_max_cells:
+            train_rows = np.sort(np.random.default_rng(0).choice(train_rows, args.ridge_max_cells, replace=False))
+        Z_tr = source.encode(train_rows)
+        Y_tr = torch.from_numpy(np.ascontiguousarray(hvg[train_rows]))
+        ridge = fit_ridge(Z_tr, Y_tr, args.ridge_lambda)
+        logger.info("ridge readout fit on %d TRAIN cells (lambda=%.3g)", len(train_rows), args.ridge_lambda)
+
+    # Cache the per-perturbation test latents once; every arm reads the same cells the metric does.
+    def rows_of(pid: int) -> np.ndarray:
+        return np.flatnonzero((cache.pert_id == pid) & is_test)
+
+    latents: dict[int, torch.Tensor] = {}
+
+    def z_of(pid: int) -> torch.Tensor:
+        if pid not in latents:
+            latents[pid] = source.encode(rows_of(pid))
+        return latents[pid]
+
+    def predictor(arm: str):
+        def predict(pid: int, name: str) -> torch.Tensor:
+            if arm == "identity":
+                # The truth itself. Scores 1.000 or the harness is broken.
+                return torch.from_numpy(hvg[rows_of(pid)].mean(0))
+            z = z_of(pid)
+            if arm == "roundtrip":
+                return decode_mean(decoder, z, device)
+            if arm == "latent_mean":
+                return decode_mean(decoder, z.mean(0, keepdim=True), device)
+            if arm == "linear":
+                W, b = ridge
+                return (z @ W + b).mean(0)
+            raise ValueError(arm)
+        return predict
+
+    # Each arm's prediction for the control cells: the same readout applied to the real control
+    # cells that `control_mean` averages (encoded once, only when profiles are saved). For the
+    # identity arm it is `control_mean` itself.
+    ctrl_rows = np.flatnonzero(cache.is_control.astype(bool))
+    z_ctrl: list[torch.Tensor] = []
+
+    def control_prediction(arm: str) -> np.ndarray:
+        if arm == "identity":
+            return np.asarray(control_mean, dtype=np.float64)
+        if not z_ctrl:
+            z_ctrl.append(source.encode(ctrl_rows))
+        z = z_ctrl[0]
+        if arm == "roundtrip":
+            out = decode_mean(decoder, z, device)
+        elif arm == "latent_mean":
+            out = decode_mean(decoder, z.mean(0, keepdim=True), device)
+        elif arm == "linear":
+            W, b = ridge
+            out = (z @ W + b).mean(0)
+        else:
+            raise ValueError(arm)
+        return out.numpy().astype(np.float64)
+
+    results: dict[str, dict] = {}
+    saved: dict[str, np.ndarray] = {}
+    for arm in args.arms:
+        profiles: dict[str, np.ndarray] | None = {} if args.save_profiles else None
+        per_pert, summary = run_effect_size_eval(
+            predictor(arm),
+            hvg_X=hvg, pert_names=cache.pert_names, pert_id=cache.pert_id,
+            is_test=is_test, de_genes=cache.de_genes["per_pert"],
+            control_mean=control_mean, top_k=args.top_k, min_test_cells=args.min_test_cells,
+            limit_perts=args.limit_perts, profiles=profiles,
+        )
+        results[arm] = {**summary, "per_pert": per_pert}
+        if profiles:
+            names = sorted(profiles)
+            saved[f"{arm}__names"] = np.array(names)
+            saved[f"{arm}__profiles"] = np.stack([profiles[k] for k in names])
+            saved[f"{arm}__control"] = control_prediction(arm)
+        logger.info("%-12s  Delta-r mean %.3f  median %.3f  over %d perturbations",
+                    arm, summary["mean_delta_r"], summary["median_delta_r"], summary["n_perturbations"])
+
+    # Acceptance gate. A metric that cannot score the truth as 1.0 cannot score anything.
+    if "identity" in results:
+        got = results["identity"]["mean_delta_r"]
+        if not (got > 0.999):
+            raise RuntimeError(
+                f"ACCEPTANCE GATE FAILED: the `identity` arm feeds the metric its own ground truth "
+                f"and must score 1.000, but scored {got:.4f}. The harness is misaligned (most likely "
+                f"the predicted rows are not the rows the metric averages). Every other number in "
+                f"this report is meaningless until this passes."
+            )
+        logger.info("acceptance gate PASSED: identity arm scores %.4f", got)
+
+    exp.write_report("ceiling", {
+        "split": args.split,
+        "top_k": args.top_k,
+        "min_test_cells": args.min_test_cells,
+        "ridge_lambda": args.ridge_lambda,
+        "encoder": str(enc_path) if enc_path else None, "encoder_md5": _md5(enc_path) if enc_path else None,
+        "latent_source": source.identity(),
+        "decoder": str(dec_path), "decoder_md5": _md5(dec_path),
+        "de_genes_ranked_by": cache.de_genes.get("ranked_by"),
+        "arms": results,
+    })
+    logger.info("wrote report -> %s", exp.reports / "ceiling.json")
+    if saved:
+        np.savez_compressed(exp.reports / "ceiling_profiles.npz", **saved)
+        logger.info("wrote profiles -> %s", exp.reports / "ceiling_profiles.npz")
+
+    if "roundtrip" in results:
+        ceil = results["roundtrip"]["mean_delta_r"]
+        logger.info("")
+        logger.info("CEILING (oracle Stage B) = %.3f   [flow 0.648 | operator 0.645 | NB-VAE 0.766]", ceil)
+
+
+if __name__ == "__main__":
+    main()

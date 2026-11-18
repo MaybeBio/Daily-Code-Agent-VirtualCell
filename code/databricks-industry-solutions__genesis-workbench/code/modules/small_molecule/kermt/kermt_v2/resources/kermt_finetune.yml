@@ -1,0 +1,62 @@
+resources:
+  jobs:
+    kermt_finetune:
+      name: kermt_finetune_job
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: kermt_finetune_task
+          max_retries: 0
+          disable_auto_optimization: true
+          retry_on_timeout: false
+          environment_key: gpu_env
+          compute:
+            hardware_accelerator: GPU_1xA10
+          notebook_task:
+            notebook_path: ../notebooks/02_kermt_finetune.py
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: cache_dir
+          default: ${var.cache_dir}
+        - name: kermt_src_path
+          default: ${workspace.file_path}/kermt_src
+        - name: user_email
+          default: ${var.current_user}
+        - name: train_data_location
+          default: /Volumes/${var.core_catalog_name}/${var.core_schema_name}/${var.cache_dir}/ft_data/clintox_train.csv
+        - name: validation_data_location
+          default: /Volumes/${var.core_catalog_name}/${var.core_schema_name}/${var.cache_dir}/ft_data/clintox_val.csv
+        - name: test_data_location
+          default: /Volumes/${var.core_catalog_name}/${var.core_schema_name}/${var.cache_dir}/ft_data/clintox_test.csv
+        - name: target_names
+          default: toxicity
+        - name: dataset_type
+          default: classification
+        - name: finetune_label
+          default: kermt_clintox_ft
+        - name: epochs
+          default: "20"
+        - name: batch_size
+          default: "16"
+        - name: ffn_hidden_size
+          default: "700"
+        - name: experiment_name
+          default: gwb_kermt_finetune
+        - name: mlflow_run_name
+          default: ""
+        - name: mlflow_run_id
+          default: ""
+
+      environments:
+        - environment_key: gpu_env
+          spec:
+            client: "4"
+
+      tags: ${var.common_resource_tags}

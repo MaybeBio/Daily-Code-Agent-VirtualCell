@@ -1,0 +1,85 @@
+resources:
+  jobs:
+    rapidssinglecell:
+      name: run_rapidssinglecell_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: run_rapidssinglecell
+          max_retries: 0
+          disable_auto_optimization: true
+          retry_on_timeout: false
+          environment_key: gpu_env
+          compute:
+            hardware_accelerator: GPU_1xA10
+          notebook_task:
+            notebook_path: ../notebooks/analyze_single_h5ad.py
+            base_parameters:
+              data_path: ""
+              gene_name_column: ""
+              species: hsapiens
+            source: WORKSPACE
+
+        # Failure-finalize. Fires only when the analyze task fails. Sets
+        # tags.job_status='failed' on the pre-created MLflow run so the
+        # app's Search Past Runs view flips 'started' → 'failed'. Runs
+        # serverless — cheap, ~5 s.
+        - task_key: tag_failed
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: run_rapidssinglecell
+          run_if: AT_LEAST_ONE_FAILED
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/tag_run_failed.py
+            source: WORKSPACE
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+        - environment_key: gpu_env
+          spec:
+            client: '4'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: user_email
+          default: ${var.current_user}
+        - name: data_path
+          default: dummy_data_path.h5ad
+        - name: mlflow_experiment
+          default: rapidssinglecell_genesis_workbench
+        - name: mlflow_run_name
+          default: rapidssinglecell_genesis_workbench
+        - name: mlflow_run_id
+          default: ""
+        - name: gene_name_column
+          default: ""
+        - name: species
+          default: hsapiens
+        - name: min_genes
+          default: 200
+        - name: min_cells
+          default: 3
+        - name: pct_counts_mt
+          default: 5
+        - name: n_genes_by_counts
+          default: 2500
+        - name: target_sum
+          default: 10000
+        - name: n_top_genes
+          default: 500
+        - name: n_pcs
+          default: 50
+        - name: cluster_resolution
+          default: 0.2
+
+      tags: ${var.common_resource_tags}

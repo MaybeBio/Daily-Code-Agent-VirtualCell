@@ -1,0 +1,193 @@
+resources:
+  jobs:
+    register_scimilarity:
+      name: register_scimilarity
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        #this task can use serverless (OR 14.3 LTS L runtime)
+        - task_key: wget_SCimilarity_task # register_scimilarity_task
+          max_retries: 0
+          ## use serverless when files already exist in the cache_dir
+          job_cluster_key: job_cluster_wget # maybe faster than serverless?
+          notebook_task:
+            notebook_path: ../notebooks/01_wget_scimilarity.py
+
+        - task_key: register_GeneOrder_task
+          max_retries: 0
+          depends_on: 
+            - task_key: wget_SCimilarity_task
+          job_cluster_key: job_cluster_gene_order
+          notebook_task:
+            notebook_path: ../notebooks/02_register_GeneOrder.py 
+        
+        - task_key: register_GetEmbedding_task
+          max_retries: 0
+          depends_on: 
+            - task_key: wget_SCimilarity_task
+          job_cluster_key: job_cluster_get_embedding
+          notebook_task:
+            notebook_path: ../notebooks/03_register_GetEmbedding.py 
+        
+        #this task can utilize serverless runtime with python 3.11
+        - task_key: importNserve_scimilarity_models_task
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: "register_GeneOrder_task"
+            - task_key: "register_GetEmbedding_task"
+          notebook_task:
+            notebook_path: ../notebooks/05_importNserve_model_gwb.py
+
+        # Extract disease/celltype sample data for 06b endpoint testing
+        # Runs in parallel with register tasks after wget completes
+        - task_key: extract_sample_data_task
+          max_retries: 0
+          depends_on:
+            - task_key: wget_SCimilarity_task
+          job_cluster_key: job_cluster_search_nearest
+          notebook_task:
+            notebook_path: ../notebooks/06a_extractNsave_DiseaseCellTypeSamples.py
+
+        # Externalize the 23M-cell reference to a Delta table for Vector Search.
+        # Needs a memory-sized single-node cluster — CellQuery loads ~12 GB into RAM.
+        # Runs in parallel with register_* tasks after wget completes.
+        - task_key: extract_reference_to_delta_task
+          max_retries: 0
+          depends_on:
+            - task_key: wget_SCimilarity_task
+          job_cluster_key: job_cluster_search_nearest
+          notebook_task:
+            notebook_path: ../notebooks/06b_extract_reference_to_delta.py
+
+        # Create the Databricks Vector Search endpoint and Delta Sync index.
+        # Lightweight — runs on serverless once the source Delta table exists.
+        - task_key: create_cell_vector_index_task
+          max_retries: 0
+          disable_auto_optimization: true
+          depends_on:
+            - task_key: extract_reference_to_delta_task
+          notebook_task:
+            notebook_path: ../notebooks/06c_create_cell_vector_index.py
+
+      environments: ## serverless
+        - environment_key: default
+          spec:
+            client: '2'
+            
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: SCimilarity
+        - name: cache_dir
+          default: ${var.cache_dir}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name} 
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: gene_order_workload_type
+          default: CPU
+        - name: gene_order_workload_size
+          default: Small
+        # SCimilarity's CellEmbedding is a small MLP encoder — a single A10 (GPU_MEDIUM)
+        # is ample. MULTIGPU_MEDIUM was aborting with "resource did not become available
+        # in time": the workshop serving fleet has no multi-GPU capacity, and this model
+        # never needed it. GPU_MEDIUM is the proven-available single-GPU tier (esmfold/boltz).
+        - name: get_embedding_workload_type
+          default: GPU_MEDIUM
+        - name: get_embedding_workload_size
+          default: Small
+
+      job_clusters:
+        # wget only downloads files — CPU node is sufficient and cheaper than GPU
+        - job_cluster_key: job_cluster_wget
+          new_cluster:
+            num_workers: 0
+            node_type_id: ${var.cpu_node_type}
+            driver_node_type_id: ${var.cpu_node_type}
+            spark_version: '14.3.x-cpu-ml-scala2.12'
+            enable_elastic_disk: true
+            data_security_mode: SINGLE_USER
+            single_user_name: ${workspace.current_user.userName}
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
+
+        # GeneOrder registration runs utils.py which loads the ~23M cell reference DB (20-40 GB RAM)
+        # via CellQuery(model_path); needs a high-memory node, not just the 50KB TSV it logs.
+        - job_cluster_key: job_cluster_gene_order
+          new_cluster:
+            num_workers: 0
+            node_type_id: ${var.cpu_xlarge_node_type}
+            driver_node_type_id: ${var.cpu_xlarge_node_type}
+            spark_version: '14.3.x-cpu-ml-scala2.12'
+            enable_elastic_disk: true
+            data_security_mode: SINGLE_USER
+            single_user_name: ${workspace.current_user.userName}
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
+
+        # GetEmbedding registration logs the CellEmbedding pyfunc + runs a small local
+        # smoke test. SCimilarity 0.4.0 is Python-3.10-locked (numpy 1.26.4 / pandas 1.5.3)
+        # and its encoder runs fine on CPU — GPU is only a speedup for bulk embedding, which
+        # this task does not do. The workshop AWS account has EC2 GPU vCPU quota = 0, so the
+        # a10 (g5) node cannot provision; run on a high-RAM CPU node (14.3 LTS ML = py3.10).
+        # The SERVED endpoint still runs on MULTIGPU_MEDIUM managed serving GPU (notebook 05),
+        # which draws from the serving fleet, not the EC2 quota.
+        - job_cluster_key: job_cluster_get_embedding
+          new_cluster:
+            num_workers: 0
+            ### high-RAM CPU: utils.py loads the full ~23M-cell CellQuery reference (~12 GB)
+            node_type_id: ${var.cpu_large_node_type}
+            driver_node_type_id: ${var.cpu_large_node_type}
+            spark_version: '14.3.x-cpu-ml-scala2.12'
+            enable_elastic_disk: true
+            data_security_mode: SINGLE_USER
+            single_user_name: ${workspace.current_user.userName}
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
+
+        # 06a (extract samples) and 06b (extract 23M-cell reference to Delta) are RAM-bound,
+        # not GPU-bound: 06b reads PRECOMPUTED embeddings from TileDB (no GPU) and 06a embeds
+        # only the small adams sample. Both load CellQuery (~12 GB); 06b briefly holds two.
+        # Same quota rationale as above — use the largest CPU node (768 GB) on 14.3 LTS ML.
+        - job_cluster_key: job_cluster_search_nearest
+          new_cluster:
+            num_workers: 0
+            ### largest CPU node — 06b can hold two CellQuery references + the reference matrix
+            node_type_id: ${var.cpu_xlarge_node_type}
+            driver_node_type_id: ${var.cpu_xlarge_node_type}
+            spark_version: '14.3.x-cpu-ml-scala2.12'
+            enable_elastic_disk: true
+            data_security_mode: SINGLE_USER
+            single_user_name: ${workspace.current_user.userName}
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              ResourceClass: SingleNode
+
+        ## critical for model training
+        ## singleNode GPU options: ## Standard_NV36ads_A10_v5 #440gigs #'Standard_NC16as_T4_v3' #110gigs #'Standard_NC4as_T4_v3'  
+        ## 14.3.x-gpu-ml-scala2.12
+
+        ## singleNode CPU options: # Standard_E48ads_v5 #384gigs # Standard_E32ads_v5 #256gigs 
+        ## 14.3.x-cpu-ml-scala2.12
+
+      tags: ${var.common_resource_tags}

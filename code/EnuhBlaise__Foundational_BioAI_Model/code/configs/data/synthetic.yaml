@@ -1,0 +1,34 @@
+defaults:
+  - tokenizer: binned
+  - splitter: donor_held_out
+  - _self_
+
+# Simulated data. Use for development, CI and for metric sanity checks where
+# ground truth must be known. Never for a claim about biology.
+source:
+  name: synthetic
+  n_cells: 6000
+  n_genes: 2000
+  n_cell_types: 8
+  n_lineages: 3
+  n_batches: 4
+  n_donors: 12
+  n_studies: 2
+  n_tissues: 2
+  batch_effect: 0.6
+  donor_effect: 0.25
+  ambient_fraction: 0.08
+  doublet_rate: 0.05
+  composition_shift: 0.5
+  seed: ${seed}
+
+n_hvg: 1200
+batch_size: 64
+num_workers: 0
+mask_ratio: 0.15
+min_genes_per_cell: 10
+min_cells_per_gene: 3
+label_columns: [cell_type, batch_id]
+return_counts: false
+fail_on_leakage: true
+seed: ${seed}

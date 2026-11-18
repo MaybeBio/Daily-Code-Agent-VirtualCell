@@ -1,0 +1,38 @@
+resources:
+  jobs:
+    register_molecule_optimization_job:
+      name: register_molecule_optimization_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: register_orchestrator_job
+          max_retries: 0
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/register_molecule_optimization_job.py
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: run_molecule_optimization_job_id
+          default: ${resources.jobs.run_molecule_optimization.id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: databricks_app_name
+          default: ${var.app_name}
+        - name: databricks_app_names
+          default: genesis-workbench:mcp-genesis-workbench
+
+      tags: ${var.common_resource_tags}

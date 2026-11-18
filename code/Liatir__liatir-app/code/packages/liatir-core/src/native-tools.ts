@@ -1,0 +1,230 @@
+// @liatir/core — Native Tools Catalog
+//
+// Single source of truth for bioinformatics tools bundled with Liatir.
+// The SDK (@liatir/api), frontend, and backend all derive from this catalog.
+
+/**
+ * Metadata for a native bioinformatics tool bundled with Liatir.
+ */
+export interface LiatirNativeToolMetadata {
+  /** Unique identifier (matches binary name). */
+  id: string;
+  /** Binary name (used in CLI). */
+  name: string;
+  /** Human-readable display name. */
+  displayName: string;
+  /** Short description of the tool's purpose. */
+  description: string;
+  /** Category for grouping in UI (e.g., "Alignment", "QC", "Variant Calling"). */
+  category: string;
+  /** Tool version bundled with Liatir. */
+  version?: string;
+  /** Binary name in bundle.externalBin (no platform suffix). */
+  binaryName: string;
+  /** Tags for filtering and search. */
+  tags?: string[];
+}
+
+// ── Tool IDs ─────────────────────────────────────────────────────────────────
+
+export const SAMTOOLS_ID = 'samtools';
+export const BWA_ID = 'bwa';
+export const MINIMAP2_ID = 'minimap2';
+export const BCFTOOLS_ID = 'bcftools';
+export const FASTP_ID = 'fastp';
+export const SEQKIT_ID = 'seqkit';
+export const SNPEFF_ID = 'snpeff';
+export const SIMPLEAF_ID = 'simpleaf';
+export const ALEVIN_FRY_ID = 'alevin-fry';
+export const H5REPACK_ID = 'h5repack';
+
+// ── Built-in Native Tools Registry ───────────────────────────────────────────
+
+export const BUILT_IN_NATIVE_TOOLS: LiatirNativeToolMetadata[] = [
+  {
+    id: SAMTOOLS_ID,
+    name: 'samtools',
+    displayName: 'Samtools',
+    description: 'SAM/BAM/CRAM processing toolkit for viewing, sorting, filtering, and converting alignment files.',
+    category: 'Alignment',
+    binaryName: 'samtools',
+    tags: ['built-in', 'alignment', 'bam', 'sam', 'cram', 'indexing']
+  },
+  {
+    id: BWA_ID,
+    name: 'bwa',
+    displayName: 'BWA',
+    description: 'Burrows-Wheeler Aligner for short-read alignment against a reference genome.',
+    category: 'Alignment',
+    binaryName: 'bwa',
+    tags: ['built-in', 'alignment', 'short-read', 'mapping']
+  },
+  {
+    id: MINIMAP2_ID,
+    name: 'minimap2',
+    displayName: 'Minimap2',
+    description: 'Versatile pairwise aligner for long-read and short-read sequences.',
+    category: 'Alignment',
+    binaryName: 'minimap2',
+    tags: ['built-in', 'alignment', 'long-read', 'short-read', 'mapping']
+  },
+  {
+    id: BCFTOOLS_ID,
+    name: 'bcftools',
+    displayName: 'BCFtools',
+    description: 'Utilities for variant calling and manipulating VCF/BCF files.',
+    category: 'Variant Calling',
+    binaryName: 'bcftools',
+    tags: ['built-in', 'variant-calling', 'vcf', 'bcf', 'filtering']
+  },
+  {
+    id: FASTP_ID,
+    name: 'fastp',
+    displayName: 'fastp',
+    description: 'Ultra-fast all-in-one FASTQ preprocessor for quality control and filtering.',
+    category: 'Quality Control',
+    binaryName: 'fastp',
+    tags: ['built-in', 'qc', 'fastq', 'trimming', 'filtering']
+  },
+  {
+    id: SEQKIT_ID,
+    name: 'seqkit',
+    displayName: 'SeqKit',
+    description: 'Cross-platform and ultrafast toolkit for FASTA/Q file manipulation.',
+    category: 'Sequence Processing',
+    binaryName: 'seqkit',
+    tags: ['built-in', 'fasta', 'fastq', 'sequence', 'statistics']
+  },
+  {
+    id: SNPEFF_ID,
+    name: 'snpeff',
+    displayName: 'SnpEff',
+    description: 'Genetic variant annotation and functional effect prediction toolbox.',
+    category: 'Variant Annotation',
+    binaryName: 'snpeff',
+    tags: ['built-in', 'annotation', 'variant-effect', 'snv', 'indel']
+  },
+  {
+    id: SIMPLEAF_ID,
+    name: 'simpleaf',
+    displayName: 'simpleaf',
+    description:
+      'Single-cell RNA-seq workflow driver: builds the reference index and runs mapping and quantification end to end, writing an AnnData .h5ad count matrix.',
+    category: 'Single-cell',
+    binaryName: 'simpleaf',
+    tags: ['built-in', 'single-cell', 'rna-seq', 'quantification', 'anndata']
+  },
+  {
+    id: ALEVIN_FRY_ID,
+    name: 'alevin-fry',
+    displayName: 'alevin-fry',
+    description:
+      'Single-cell quantification engine: cell-barcode permit list, collation and UMI resolution into a per-cell, per-gene count matrix.',
+    category: 'Single-cell',
+    binaryName: 'alevin-fry',
+    tags: ['built-in', 'single-cell', 'rna-seq', 'quantification', 'umi']
+  }
+];
+
+// ── Helper functions ─────────────────────────────────────────────────────────
+
+/**
+ * Get native tool metadata by ID.
+ */
+export function getNativeToolMetadata(id: string): LiatirNativeToolMetadata | undefined {
+  return BUILT_IN_NATIVE_TOOLS.find(t => t.id === id);
+}
+
+/**
+ * Get all native tool IDs.
+ */
+export function getNativeToolIds(): string[] {
+  return BUILT_IN_NATIVE_TOOLS.map(t => t.id);
+}
+
+/**
+ * Check if a tool ID is a known bundled native tool.
+ */
+export function isBundledNativeTool(id: string): boolean {
+  return BUILT_IN_NATIVE_TOOLS.some(t => t.id === id);
+}
+
+// ── Native Tools Scrollcase box ──────────────────────────────────────────────
+//
+// The process-backed tools ship inside the application as one signed Scrollcase
+// box. The user installs nothing and the application verifies the box before it
+// can execute anything from it.
+//
+// FastQC is absent because it runs as WASM in-process, and SnpEff because it is
+// a Java runtime whose JRE would outweigh every tool here combined.
+//
+// simpleaf carries piscem and alevin-fry with it; piscem is the mapping engine
+// simpleaf drives and is never launched on its own, so it is present in the box
+// without being a tool Liatir exposes.
+//
+// h5repack rewrites simpleaf's .h5ad with standard gzip compression. simpleaf
+// compresses every matrix with the Blosc HDF5 filter, which the stock HDF5 in the
+// single-cell AI Model boxes cannot decode. The decoder h5repack needs to read
+// Blosc comes from hdf5plugin, which is in the box for that alone.
+
+/** Scrollcase target IDs Liatir builds the Native Tools box for. */
+export type LiatirNativeToolsTargetId = 'macos-aarch64-cpu' | 'linux-x86_64-cpu';
+
+/** Tool IDs provided by the box, in build order. */
+export const NATIVE_TOOLS_BOX_TOOL_IDS: readonly string[] = [
+  SAMTOOLS_ID,
+  BCFTOOLS_ID,
+  SEQKIT_ID,
+  FASTP_ID,
+  BWA_ID,
+  MINIMAP2_ID,
+  SIMPLEAF_ID,
+  ALEVIN_FRY_ID,
+  H5REPACK_ID,
+];
+
+/** Product metadata compiled into the app and included inside every box target. */
+export interface LiatirNativeToolsBoxMetadata {
+  schemaVersion: 1;
+  boxId: 'native-tools';
+  /** `package` names the conda package when it is not the tool's own name. */
+  tools: { id: string; version: string; package?: string }[];
+}
+
+/**
+ * How a host runs the box.
+ *
+ * `native` executes the verified payload in place. `wsl2` is Windows: bioconda publishes
+ * no `win-64` builds and almost none of these tools have a Windows build anywhere,
+ * so Windows ships the Linux Scrollcase target and runs it through WSL2 — the
+ * same backend External Workflows already requires for Nextflow.
+ */
+export interface LiatirNativeToolsBoxPlacement {
+  targetId: LiatirNativeToolsTargetId;
+  execution: 'native' | 'wsl2';
+}
+
+export function nativeToolsBoxPlacement(
+  os: 'macos' | 'linux' | 'windows',
+  arch: 'x86_64' | 'arm64',
+): LiatirNativeToolsBoxPlacement | null {
+  if (os === 'macos' && arch === 'arm64') {
+    return { targetId: 'macos-aarch64-cpu', execution: 'native' };
+  }
+  if (os === 'linux' && arch === 'x86_64') {
+    return { targetId: 'linux-x86_64-cpu', execution: 'native' };
+  }
+  if (os === 'windows' && arch === 'x86_64') {
+    return { targetId: 'linux-x86_64-cpu', execution: 'wsl2' };
+  }
+  return null;
+}
+
+/** True when this host gets `id` from the box instead of from the user's machine. */
+export function isProvidedByNativeToolsBox(
+  id: string,
+  os: 'macos' | 'linux' | 'windows',
+  arch: 'x86_64' | 'arm64',
+): boolean {
+  return nativeToolsBoxPlacement(os, arch) !== null && NATIVE_TOOLS_BOX_TOOL_IDS.includes(id);
+}

@@ -1,0 +1,986 @@
+"""
+H5AD backend implementation with S3-ready path handling.
+
+This module provides the H5ADBackend for storing AnnData objects
+in the H5AD format with support for local storage and future
+S3 integration without API changes.
+"""
+
+import logging
+import os
+import stat
+import uuid
+from pathlib import Path
+from typing import Any, Dict, Optional, Union
+
+import anndata
+import numpy as np
+import pandas as pd
+
+from lobster.core.backends.base import BaseBackend
+from lobster.core.utils.h5ad_utils import repair_log1p_base as _repair_log1p_base
+from lobster.core.utils.h5ad_utils import repair_marker_names
+from lobster.core.utils.h5ad_utils import sanitize_key as util_sanitize_key
+from lobster.core.utils.h5ad_utils import sanitize_keys as util_sanitize_keys
+from lobster.core.utils.h5ad_utils import sanitize_value as util_sanitize_value
+
+logger = logging.getLogger(__name__)
+
+
+class H5ADBackend(BaseBackend):
+    """
+    Backend for H5AD file storage with S3-ready path handling.
+
+    This backend handles AnnData objects stored in H5AD format,
+    with path parsing that's ready for future S3 integration
+    without requiring API changes.
+    """
+
+    def __init__(
+        self,
+        base_path: Optional[Union[str, Path]] = None,
+        compression: str = "gzip",
+        compression_opts: Optional[int] = None,
+    ):
+        """
+        Initialize the H5AD backend.
+
+        Args:
+            base_path: Optional base path for all operations
+            compression: Compression method for H5AD files
+            compression_opts: Compression level (1-9 for gzip)
+        """
+        super().__init__(base_path=base_path)
+        self.compression = compression
+        self.compression_opts = compression_opts or 6  # Default compression level
+
+        # S3-ready configuration (for future use)
+        self.s3_config = {
+            "bucket": None,
+            "region": None,
+            "access_key": None,
+            "secret_key": None,  # nosec B105 # Unset credential field, not an embedded secret.
+        }
+
+    def load(self, path: Union[str, Path], **kwargs) -> anndata.AnnData:
+        """
+        Load AnnData from H5AD file.
+
+        Args:
+            path: Path to H5AD file (local path or future S3 URI)
+            **kwargs: Additional loading parameters:
+                - backed: Load in backed mode (default: False)
+                - chunk_size: Chunk size for backed mode
+
+        Returns:
+            anndata.AnnData: Loaded AnnData object
+
+        Raises:
+            FileNotFoundError: If the file doesn't exist
+            ValueError: If the file format is invalid
+        """
+        resolved_path = self._resolve_path_with_s3_support(path)
+
+        # Check if this is an S3 path (for future implementation)
+        if self._is_s3_path(path):
+            return self._load_from_s3(path, **kwargs)
+
+        # Local file loading
+        if not resolved_path.exists():
+            raise FileNotFoundError(f"H5AD file not found: {resolved_path}")
+
+        try:
+            # Extract loading parameters
+            backed = kwargs.get("backed", False)
+
+            if backed:
+                # Load in backed mode for large files
+                adata = anndata.read_h5ad(resolved_path, backed="r")
+            else:
+                # Load fully into memory
+                adata = anndata.read_h5ad(resolved_path)
+            _repair_log1p_base(adata)
+
+            self._log_operation(
+                "load",
+                resolved_path,
+                backed=backed,
+                size_mb=resolved_path.stat().st_size / 1024**2,
+            )
+
+            return adata
+
+        except Exception as e:
+            raise ValueError(f"Failed to load H5AD file {resolved_path}: {e}")
+
+    @staticmethod
+    def sanitize_anndata(adata, slash_replacement="__"):
+        """
+        Sanitize AnnData object so it can be safely written to H5AD.
+        - Converts OrderedDict → dict
+        - Converts tuple → list
+        - Converts numpy scalars → Python scalars
+        - Replaces '/' in keys with '__' (HDF5 safe)
+        - Leaves bool/boolean dtype columns ALONE (anndata writes them natively);
+          only object-dtype columns holding bool objects are stringified
+        - Handles mixed-type columns (converts to strings)
+        - Converts None/NaN to "NA" for HDF5 compatibility
+        - Recursively applies to .uns, .obsm, .varm, .layers
+        - CRITICAL FIX: Removes columns with None names (prevents PurePosixPath errors)
+
+        Note: Uses centralized sanitization utilities from lobster.core.utils.h5ad_utils
+        """
+
+        def _numeric_coercion_is_lossless(original, coerced):
+            """True if numeric coercion preserves each string value's textual
+            identity, so identifier columns are never silently rewritten.
+
+            "001" -> 1 (leading zero), " 1 " -> 1 (whitespace), "1e3" -> 1000.0,
+            "+1" -> 1, "1.50" -> 1.5, and "" -> NaN all CHANGE the text and are
+            rejected (the column is kept as strings). Canonical spellings ("1",
+            "1.0", "-1", exact large integers) are accepted. Non-string originals
+            (python int/float objects) are lossless by construction.
+
+            The comparison is against the ORIGINAL string, not a stripped copy --
+            whitespace is part of identity. ``int()`` is never called on a
+            non-finite float: ``float.is_integer()`` is False for inf/nan, so
+            "inf"/"-inf" match via ``repr`` and coerce (as before) without
+            raising.
+
+            This is a conservative SPELLING-preservation heuristic, not a
+            complete identifier-vs-measurement classifier: "1" is coerced whether
+            it denotes a measurement or an ID, and "1e3" is preserved whether it
+            denotes an ID or a measurement. Value alone cannot decide that;
+            deciding it belongs at ingestion or behind a column-role signal
+            (tracked follow-on). The only guarantee here is that an accepted
+            coercion never changes a value's text.
+            """
+            from numbers import Integral
+
+            for orig, num in zip(original.tolist(), coerced.tolist()):
+                if not isinstance(orig, str):
+                    continue
+                # A string that parsed to a missing value (e.g. "") is NOT
+                # lossless -- coercing it would destroy the token.
+                if pd.isna(num):
+                    return False
+                if isinstance(num, Integral):
+                    candidates = {str(int(num))}
+                else:
+                    as_float = float(num)
+                    candidates = {repr(as_float)}
+                    if as_float.is_integer():
+                        candidates.add(str(int(as_float)))
+                if orig not in candidates:
+                    return False
+            return True
+
+        # Preserve structured ranking fields; repair only missing text names
+        # on the serialization copy, never numeric statistical NaNs.
+        repair_marker_names(adata)
+
+        # Normalize only injective key mappings; never choose a surviving payload.
+        uns_keys = util_sanitize_keys(adata.uns, slash_replacement)
+        adata.uns = {
+            key: util_sanitize_value(value, slash_replacement)
+            for key, value in zip(uns_keys, adata.uns.values())
+        }
+
+        # Apply the same refusal contract to each other rewritten AnnData slot.
+        for slot in ("obsm", "varm", "layers"):
+            values = getattr(adata, slot)
+            is_x_alias = slot == "layers" and None in values and values[None] is adata.X
+            if is_x_alias:
+                # anndata >=0.13 exposes X through layers[None]. Confirm the
+                # identity alias, not equal values or mere None membership:
+                # older non-alias mappings may contain genuine None-key data.
+                values = {
+                    key: value for key, value in values.items() if key is not None
+                }
+            keys = util_sanitize_keys(values, slash_replacement)
+            sanitized = dict(zip(keys, values.values()))
+            if is_x_alias:
+                # Explicitly preserve X when assigning the new layer mapping;
+                # do not rely on anndata's deprecated implicit-X preservation.
+                sanitized[None] = adata.X
+            setattr(adata, slot, sanitized)
+
+        # CRITICAL FIX: Remove columns with None names BEFORE sanitization
+        # (Prevents TypeError: PurePosixPath() argument must be str, not 'NoneType')
+        # Check obs DataFrame
+        logger.debug(
+            f"SANITIZE: Checking adata.obs columns for None values. Total columns: {len(adata.obs.columns)}"
+        )
+        none_columns_obs = [col for col in adata.obs.columns if col is None]
+        if none_columns_obs:
+            logger.warning(
+                f"❗ SANITIZE: Dropping {len(none_columns_obs)} column(s) with None names in adata.obs. "
+                f"This prevents H5AD serialization errors. "
+                f"Columns with None names are usually caused by malformed metadata or "
+                f"incorrect DataFrame construction during data loading."
+            )
+            adata.obs = adata.obs.drop(columns=none_columns_obs)
+        else:
+            logger.debug("SANITIZE: No None column names found in adata.obs")
+
+        # Check var DataFrame
+        logger.debug(
+            f"SANITIZE: Checking adata.var columns for None values. Total columns: {len(adata.var.columns)}"
+        )
+        logger.debug(f"SANITIZE: First 10 var columns: {list(adata.var.columns[:10])}")
+
+        # CRITICAL FIX: Check and fix None/empty index names in obs and var
+        # Use falsy check to catch both None AND empty string ("") which also breaks H5AD
+        if not adata.obs.index.name:
+            logger.debug("SANITIZE: obs.index.name is None/empty, setting to 'index'")
+            adata.obs.index.name = "index"
+        if not adata.var.index.name:
+            logger.debug("SANITIZE: var.index.name is None/empty, setting to 'gene_id'")
+            adata.var.index.name = "gene_id"
+
+        none_columns_var = [col for col in adata.var.columns if col is None]
+        if none_columns_var:
+            logger.warning(
+                f"❗ SANITIZE: Dropping {len(none_columns_var)} column(s) with None names in adata.var. "
+                f"This prevents H5AD serialization errors. "
+                f"Columns with None names are usually caused by malformed metadata or "
+                f"incorrect DataFrame construction during data loading."
+            )
+            adata.var = adata.var.drop(columns=none_columns_var)
+        else:
+            logger.debug("SANITIZE: No None column names found in adata.var")
+
+        # Sanitize DataFrame column names in obs and var
+        # DEFENSIVE: Handle edge case where util_sanitize_key might return None
+        def safe_sanitize_column_name(col, replacement):
+            """Sanitize column name with fallback for None/invalid names."""
+            sanitized = util_sanitize_key(col, replacement)
+            # If sanitization returns None or empty string, generate placeholder
+            if sanitized is None or sanitized == "":
+                logger.warning(
+                    f"Column name '{col}' sanitized to None/empty - using placeholder 'unnamed_column'"
+                )
+                return "unnamed_column"
+            return sanitized
+
+        for frame in (adata.obs, adata.var):
+            columns = [
+                safe_sanitize_column_name(column, slash_replacement)
+                for column in frame.columns
+            ]
+            # Include fallback names without applying slash replacement twice.
+            if len(set(columns)) != len(columns):
+                raise ValueError("H5AD key collision after column sanitization")
+            frame.columns = columns
+
+        # Sanitize DataFrame VALUES in obs and var (COMPREHENSIVE)
+        # This prevents serialization errors when writing to H5AD
+        for df in [adata.obs, adata.var]:
+            columns_to_drop = []
+            for col in df.columns:
+                # Step 1: Check if column is entirely None/NaN
+                if df[col].isna().all():
+                    columns_to_drop.append(col)
+                    logger.debug(f"Dropping column '{col}' - all values are None/NaN")
+                    continue
+
+                # Step 2: Boolean columns.
+                #
+                # `bool` and `boolean` (nullable) dtypes are written NATIVELY by anndata,
+                # including pd.NA — verified against anndata 0.13.2 / pandas 3.0.5. They are
+                # left ALONE, and this is load-bearing: converting them to 'True'/'False'
+                # strings here had no inverse in load(), so a column written as bool came back
+                # as a categorical of strings and every downstream boolean mask raised
+                # IndexError. `adata.var['highly_variable']` is the canonical scanpy idiom, so
+                # this silently broke HVG-style analyses — worse than a crash, because the
+                # agent's code was correct and it would retry equally-correct formulations.
+                #
+                # The `continue` is required, not decorative: without it a nullable `boolean`
+                # column with pd.NA falls through to step 3, whose `fillna("NA")` raises
+                # `TypeError: Invalid value 'NA' for dtype 'boolean'` on pandas >= 3.0.
+                if df[col].dtype == bool or df[col].dtype == "boolean":
+                    continue
+
+                # Step 2b: `object` dtype holding bool objects DOES still need stringifying —
+                # HDF5 raises "Can't implicitly convert non-string objects to strings". This is
+                # the narrow case the original blanket guard was really written for.
+                #
+                # Tested with `isinstance`, NOT `type(x) is bool`: `np.bool_` is not a subclass
+                # of `bool`, so an identity check silently skips numpy-bool object columns and
+                # turns this into a write crash.
+                if df[col].dtype == object:
+                    _non_null = df[col].dropna()
+                    if (
+                        len(_non_null) > 0
+                        and _non_null.map(
+                            lambda x: isinstance(x, (bool, np.bool_))
+                        ).any()
+                    ):
+                        df[col] = df[col].map(
+                            lambda x: (
+                                str(x) if x is not None and x is not pd.NA else "NA"
+                            )
+                        )
+                        logger.debug(
+                            f"Sanitized column '{col}' - object-dtype bool values converted to string"
+                        )
+                        continue
+
+                # Step 2.5: Handle categorical columns BEFORE numeric checks.
+                # np.issubdtype() crashes on CategoricalDtype (and other pandas
+                # extension dtypes) — must be handled first.
+                if hasattr(df[col], "cat"):
+                    categories = df[col].cat.categories
+                    if not all(isinstance(cat, str) for cat in categories):
+                        df[col] = (
+                            df[col]
+                            .map(lambda x: str(x) if x is not None else "NA")
+                            .astype("category")
+                        )
+                        logger.debug(
+                            f"Sanitized column '{col}' - converted categorical to string categories"
+                        )
+                    # Categorical columns with string categories are already
+                    # H5AD-safe — skip remaining steps.
+                    continue
+
+                # Step 3: Handle None/NaN in numeric columns
+                # Guard: np.issubdtype() cannot handle pandas extension dtypes
+                # (CategoricalDtype, ArrowDtype, etc.).  Use try/except as a
+                # safety net beyond the explicit categorical check above.
+                if df[col].isna().any():
+                    is_numeric = False
+                    try:
+                        is_numeric = np.issubdtype(df[col].dtype, np.number)
+                    except TypeError:
+                        # Extension dtype that numpy can't interpret — treat
+                        # as non-numeric (will be caught by later steps).
+                        pass
+                    if is_numeric:
+                        # Numeric column with NaN - keep as NaN (HDF5 handles it)
+                        pass
+                    else:
+                        # Object dtype with None - convert None to "NA"
+                        df[col] = df[col].fillna("NA")
+                        logger.debug(
+                            f"Sanitized column '{col}' - converted None to 'NA'"
+                        )
+
+                # Step 4: Handle mixed-type columns (object dtype only).
+                # Intentionally NOT broadened to pandas-3 ``str`` / StringDtype:
+                # the single-type branch below calls ``pd.to_numeric`` and would
+                # rewrite numeric-looking string IDs (e.g. "001" -> 1, losing the
+                # leading zero). pandas-3 str columns are already natively
+                # H5AD-writable, so routing them here corrupts identifiers for no
+                # benefit. The object-path coercion in the single-type branch
+                # below is now conservative: it coerces only when the numeric
+                # form round-trips to the original text, so object ID columns
+                # like "001" are preserved here too (see
+                # _numeric_coercion_is_lossless). is_object_dtype asks the same
+                # representation-level question as ``== "object"`` but states the
+                # intent in code and deliberately excludes StringDtype / str.
+                if pd.api.types.is_object_dtype(df[col]):
+                    # Check if column has multiple types
+                    non_null_values = df[col].dropna()
+                    if len(non_null_values) > 0:
+                        unique_types = non_null_values.apply(
+                            lambda x: type(x).__name__
+                        ).unique()
+
+                        if len(unique_types) > 1:
+                            # Mixed types detected - convert all to string
+                            df[col] = df[col].apply(
+                                lambda x: str(x) if x is not None else "NA"
+                            )
+                            logger.debug(
+                                f"Sanitized column '{col}' - mixed types {unique_types} converted to string"
+                            )
+                        else:
+                            # Single type, object dtype. Coerce to numeric ONLY
+                            # when it is lossless. This guards identifier columns:
+                            # pd.to_numeric rewrites "001" -> 1 (leading zero lost)
+                            # and "1e3" -> 1000.0, corrupting IDs. Coerce only if
+                            # every value round-trips to its original text;
+                            # otherwise keep the column as strings, which anndata
+                            # writes natively.
+                            #
+                            # Do NOT "fix" the gate above by broadening it to
+                            # str/StringDtype. pandas-3 str columns are already
+                            # H5AD-writable, and routing them through pd.to_numeric
+                            # is this exact corruption: ["001","002"] -> Int64 [1,2].
+                            # (Deploy postmortem error 11: widening the gate turned
+                            # a silent write skip into active ID corruption on every
+                            # managed write.) The revert-guard test stays red against
+                            # any widening.
+                            try:
+                                coerced = pd.to_numeric(df[col])
+                            except (ValueError, TypeError):
+                                coerced = None
+
+                            if coerced is not None and _numeric_coercion_is_lossless(
+                                df[col], coerced
+                            ):
+                                df[col] = coerced
+                                logger.debug(
+                                    f"Sanitized column '{col}' - converted to numeric"
+                                )
+                            elif coerced is None:
+                                # Not numeric — check if values are non-string types
+                                # that HDF5 can't serialize (bool, int, etc.).
+                                # Do NOT use astype(str) — pandas >=2.2 re-creates
+                                # ArrowStringArray with pyarrow installed.
+                                first_type = (
+                                    unique_types[0] if len(unique_types) > 0 else "str"
+                                )
+                                if first_type != "str":
+                                    df[col] = df[col].apply(
+                                        lambda x: str(x) if x is not None else "NA"
+                                    )
+                                    logger.debug(
+                                        f"Sanitized column '{col}' - non-string object type '{first_type}' converted to string"
+                                    )
+                            # else: numeric-looking strings that do NOT round-trip
+                            # (identifiers like "001") -> leave as object strings so
+                            # the identifier survives; anndata writes them natively.
+
+            # Drop columns that are entirely None/NaN
+            if columns_to_drop:
+                df.drop(columns=columns_to_drop, inplace=True)
+                logger.info(
+                    f"Dropped {len(columns_to_drop)} empty columns: {columns_to_drop}"
+                )
+
+        # POST-SANITIZATION VALIDATION: Final check for None column names
+        # (Defense-in-depth safety check - should never trigger if above logic is correct)
+        for df_name, df in [("obs", adata.obs), ("var", adata.var)]:
+            remaining_none_columns = [
+                col for col in df.columns if col is None or col == ""
+            ]
+            if remaining_none_columns:
+                logger.error(
+                    f"CRITICAL BUG: Post-sanitization check found {len(remaining_none_columns)} "
+                    f"None/empty column names in adata.{df_name}. This should never happen. "
+                    f"Dropping columns as emergency fallback."
+                )
+                df.drop(columns=remaining_none_columns, inplace=True)
+
+        return adata
+
+    @staticmethod
+    def _convert_arrow_to_standard(adata: anndata.AnnData) -> anndata.AnnData:
+        """
+        Convert ArrowExtensionArray columns to standard pandas dtypes.
+
+        Delegates to the shared utility in ``lobster.core.utils.h5ad_utils``
+        so that any code path writing H5AD can use the same conversion.
+        """
+        from lobster.core.utils.h5ad_utils import convert_arrow_to_standard
+
+        return convert_arrow_to_standard(adata)
+
+    def save(self, adata: anndata.AnnData, path: Union[str, Path], **kwargs) -> None:
+        """
+        Save AnnData to H5AD file.
+
+        Args:
+            adata: AnnData object to save
+            path: Destination path (local path or future S3 URI)
+            **kwargs: Additional saving parameters:
+                - compression: Override default compression
+                - compression_opts: Override compression level
+                - as_dense: Save sparse matrices as dense
+
+        Raises:
+            ValueError: If the data cannot be serialized
+            PermissionError: If write access is denied
+        """
+        resolved_path = self._resolve_path_with_s3_support(path)
+
+        # Check if this is an S3 path (for future implementation)
+        if self._is_s3_path(path):
+            return self._save_to_s3(adata, path, **kwargs)
+
+        # Resolve relative symlinks too: replacement must preserve the link itself.
+        resolved_path = resolved_path.resolve()
+        self._ensure_directory(resolved_path)
+
+        # Until replacement succeeds, cleanup owns only the staging file.
+        temporary_path = None
+        mode_probe = None
+        committed = False
+        settings_restored = False
+        failure = None
+        _prev_infer = pd.options.future.infer_string
+        _prev_nullable = anndata.settings.allow_write_nullable_strings
+
+        try:
+            # Refuse read-only existing files before preparing or creating anything.
+            target_mode = None
+            if resolved_path.exists():
+                target_mode = stat.S_IMODE(resolved_path.stat().st_mode)
+                if not target_mode & 0o222 or not os.access(resolved_path, os.W_OK):
+                    raise PermissionError("Existing H5AD target is read-only")
+
+            # Disable Arrow string inference for the entire save path — pandas 3.0+
+            # re-creates ArrowStringArray on copy()/sanitize() even after conversion.
+            import pandas as _pd
+
+            _pd.options.future.infer_string = False
+
+            # Opt in to writing nullable-string arrays because current anndata releases
+            # reject the default nullable-string representation during serialization.
+            # write them while both this setting is None and `infer_string` is False — which
+            # is exactly the state we just created on the line above. The only place this was
+            # ever set was the sandbox subprocess preamble
+            # (`custom_code_execution_service.py:925`), never the main process, so
+            # `save_modality` raised on a fresh session until some `execute_custom_code` call
+            # happened to run first. That made the failure ORDER-DEPENDENT, which is why it
+            # went unnoticed: any test or session that exercised custom code first masked it.
+            # Reproduced in isolation: store pbmc3k, call filter_and_normalize, observe the
+            # raise and an EMPTY provenance activity list.
+            anndata.settings.allow_write_nullable_strings = True
+
+            # Extract saving parameters
+            compression = kwargs.get("compression", self.compression)
+            compression_opts = kwargs.get("compression_opts", self.compression_opts)
+            as_dense = kwargs.get("as_dense", False)
+
+            # PRE-SAVE DIAGNOSTIC: Check for None column names BEFORE sanitization
+            # (Helps identify where None columns are being introduced)
+            for df_name, df in [("obs", adata.obs), ("var", adata.var)]:
+                none_cols = [col for col in df.columns if col is None]
+                if none_cols:
+                    logger.warning(
+                        f"PRE-SAVE DIAGNOSTIC: Found {len(none_cols)} column(s) with None names "
+                        f"in adata.{df_name} before sanitization. These will be removed. "
+                        f"This indicates a bug in data loading or processing. "
+                        f"Total columns in {df_name}: {len(df.columns)}"
+                    )
+                    # Log first few rows to help debug
+                    logger.debug(
+                        f"Sample column names in {df_name}: {list(df.columns[:20])}"
+                    )
+
+            # Convert ArrowExtensionArray to standard types FIRST
+            # (pandas >=2.2.0 uses PyArrow-backed strings by default)
+            # Must be done before sanitization to ensure proper handling
+            adata_converted = self._convert_arrow_to_standard(adata)
+
+            # saniztize Anndata before storing
+            adata_sanitized = self.sanitize_anndata(adata_converted)
+            _repair_log1p_base(adata_sanitized)
+
+            # FIX #5.2: Post-sanitization validation (diagnostic safety check)
+            # Verify that sanitization actually worked before attempting write
+            if hasattr(adata_sanitized, "uns") and adata_sanitized.uns:
+                from lobster.core.utils.h5ad_utils import validate_for_h5ad
+
+                post_issues = validate_for_h5ad(adata_sanitized.uns, "adata.uns")
+                if post_issues and logger.isEnabledFor(logging.DEBUG):
+                    logger.warning(
+                        f"Post-sanitization check found {len(post_issues)} remaining issues (may be false positives):"
+                    )
+                    for issue in post_issues[:5]:
+                        logger.warning(f"  - {issue}")
+                    # Don't raise error - these might be false positives from validation
+                    # The write will catch real issues
+
+            # make variables unique
+            adata_sanitized.var_names_make_unique(join="__")
+
+            # Prepare AnnData for saving
+            # FIX #5.3: Explicit deep copy of uns to ensure sanitization is preserved
+            import copy
+
+            adata_to_save = adata_sanitized.copy()
+            if hasattr(adata_sanitized, "uns") and adata_sanitized.uns:
+                # Force deep copy of uns to prevent shallow copy issues
+                adata_to_save.uns = copy.deepcopy(adata_sanitized.uns)
+
+            if as_dense and hasattr(adata_to_save.X, "toarray"):
+                # Convert sparse to dense if requested
+                adata_to_save.X = adata_to_save.X.toarray()
+
+            # FINAL CHECK: Verify no None/empty index names or column names right before write
+            # CRITICAL: Check if index name is None/empty and fix it
+            # Use falsy check to catch both None AND empty string ("") which also breaks H5AD
+            if not adata_to_save.obs.index.name:
+                logger.debug(
+                    "Pre-write fix: obs.index.name is None/empty, setting to 'index'"
+                )
+                adata_to_save.obs.index.name = "index"
+            if not adata_to_save.var.index.name:
+                logger.debug(
+                    "Pre-write fix: var.index.name is None/empty, setting to 'index'"
+                )
+                adata_to_save.var.index.name = "index"
+
+            final_none_obs = [col for col in adata_to_save.obs.columns if col is None]
+            final_none_var = [col for col in adata_to_save.var.columns if col is None]
+
+            if final_none_obs or final_none_var:
+                logger.error(
+                    f"🚨 PRE-WRITE CHECK: Found None columns after sanitization! "
+                    f"obs: {len(final_none_obs)}, var: {len(final_none_var)}. "
+                    f"Removing them now as emergency fallback."
+                )
+                if final_none_obs:
+                    logger.error(f"🚨 Dropping None columns from obs: {final_none_obs}")
+                    adata_to_save.obs = adata_to_save.obs.drop(columns=final_none_obs)
+                if final_none_var:
+                    logger.error(f"🚨 Dropping None columns from var: {final_none_var}")
+                    adata_to_save.var = adata_to_save.var.drop(columns=final_none_var)
+
+            # Observe the ordinary fresh-file mode without changing the umask.
+            # This exclusively owned probe stays empty and is removed before writing.
+            if target_mode is None:
+                probe = resolved_path.parent / f".lobster-h5ad-{uuid.uuid4().hex}.mode"
+                descriptor = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o666)
+                mode_probe = probe
+                try:
+                    target_mode = stat.S_IMODE(os.fstat(descriptor).st_mode)
+                finally:
+                    os.close(descriptor)
+                mode_probe.unlink()
+                mode_probe = None
+
+            # Actual data staging is private from creation. An owner-restrictive
+            # umask may remove write permission, so restore owner-RW on the open FD.
+            staging = resolved_path.parent / f".lobster-h5ad-{uuid.uuid4().hex}.h5ad"
+            descriptor = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            temporary_path = staging
+            try:
+                if hasattr(os, "fchmod"):
+                    os.fchmod(descriptor, 0o600)
+                else:
+                    temporary_path.chmod(0o600)
+            finally:
+                os.close(descriptor)
+            adata_to_save.write_h5ad(
+                temporary_path,
+                compression=compression,
+                compression_opts=compression_opts,
+            )
+
+            # Every fallible preparation/check happens before the atomic commit.
+            temporary_path.chmod(target_mode)
+            size_mb = temporary_path.stat().st_size / 1024**2
+            details = dict(
+                compression=compression,
+                compression_opts=compression_opts,
+                shape=adata.shape,
+                size_mb=size_mb,
+            )
+            self._log_operation("save_prepared", resolved_path, **details)
+            _pd.options.future.infer_string = _prev_infer
+            anndata.settings.allow_write_nullable_strings = _prev_nullable
+            settings_restored = True
+
+            os.replace(temporary_path, resolved_path)
+            committed = True
+            temporary_path = None
+            # Post-commit diagnostics cannot roll back or delete the saved data.
+            self._log_operation("save", resolved_path, **details)
+
+        except Exception as e:
+            failure = e
+            for owned_path in (temporary_path, mode_probe):
+                if owned_path is not None:
+                    try:
+                        owned_path.unlink(missing_ok=True)
+                    except (
+                        Exception
+                    ):  # nosec B110 # Cleanup failure must not replace the original save error.
+                        pass
+        finally:
+            if not settings_restored:
+                try:
+                    pd.options.future.infer_string = _prev_infer
+                    anndata.settings.allow_write_nullable_strings = _prev_nullable
+                except Exception as restore_error:
+                    if failure is None:
+                        failure = restore_error
+
+        if failure is not None:
+            if committed:
+                raise ValueError(
+                    f"Data was saved at {resolved_path}; bookkeeping failed: {failure}"
+                ) from failure
+            raise ValueError(
+                f"Failed to save H5AD file {resolved_path}: {failure}"
+            ) from failure
+
+    def supports_format(self, format_name: str) -> bool:
+        """
+        Check if the backend supports a specific file format.
+
+        Args:
+            format_name: Format to check
+
+        Returns:
+            bool: True if format is supported
+        """
+        return format_name.lower() in ["h5ad", "h5"]
+
+    def get_storage_info(self) -> Dict[str, Any]:
+        """
+        Get information about the storage backend.
+
+        Returns:
+            Dict[str, Any]: Storage backend information
+        """
+        info = super().get_storage_info()
+        info.update(
+            {
+                "supported_formats": ["h5ad"],
+                "compression": self.compression,
+                "compression_opts": self.compression_opts,
+                "s3_ready": True,
+                "backed_mode_support": True,
+            }
+        )
+        return info
+
+    def optimize_for_reading(
+        self, path: Union[str, Path], chunk_size: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Optimize H5AD file for reading performance.
+
+        Args:
+            path: Path to H5AD file
+            chunk_size: Optimal chunk size for reading
+
+        Returns:
+            Dict[str, Any]: Optimization results
+        """
+        resolved_path = self._resolve_path_with_s3_support(path)
+
+        if not resolved_path.exists():
+            raise FileNotFoundError(f"H5AD file not found: {resolved_path}")
+
+        try:
+            # Load file to analyze structure
+            adata = self.load(resolved_path, backed=True)
+
+            # Analyze data characteristics
+            analysis = {
+                "shape": adata.shape,
+                "is_sparse": hasattr(adata.X, "nnz"),
+                "sparsity": None,
+                "recommended_chunk_size": None,
+                "estimated_memory_mb": None,
+            }
+
+            if hasattr(adata.X, "nnz"):
+                # Sparse matrix analysis
+                analysis["sparsity"] = 1.0 - (
+                    adata.X.nnz / (adata.n_obs * adata.n_vars)
+                )
+
+                # Recommend chunk size based on sparsity and size
+                if analysis["sparsity"] > 0.9:  # Very sparse
+                    analysis["recommended_chunk_size"] = min(10000, adata.n_obs // 10)
+                else:
+                    analysis["recommended_chunk_size"] = min(5000, adata.n_obs // 20)
+
+            # Estimate memory usage
+            dtype_size = 4 if adata.X.dtype in [np.float32, np.int32] else 8
+            if analysis["is_sparse"]:
+                # Sparse matrix memory estimate
+                analysis["estimated_memory_mb"] = (
+                    adata.X.nnz * dtype_size * 3
+                ) / 1024**2  # data + indices + indptr
+            else:
+                # Dense matrix memory estimate
+                analysis["estimated_memory_mb"] = (
+                    adata.n_obs * adata.n_vars * dtype_size
+                ) / 1024**2
+
+            return analysis
+
+        except Exception as e:
+            self.logger.warning(f"Failed to optimize file {path}: {e}")
+            return {"error": str(e)}
+
+    def validate_file_integrity(self, path: Union[str, Path]) -> Dict[str, Any]:
+        """
+        Validate H5AD file integrity and structure.
+
+        Args:
+            path: Path to H5AD file
+
+        Returns:
+            Dict[str, Any]: Validation results
+        """
+        resolved_path = self._resolve_path_with_s3_support(path)
+
+        validation = {
+            "valid": False,
+            "readable": False,
+            "has_X": False,
+            "has_obs": False,
+            "has_var": False,
+            "shape": None,
+            "errors": [],
+            "warnings": [],
+        }
+
+        try:
+            # Check if file exists and is readable
+            if not resolved_path.exists():
+                validation["errors"].append("File does not exist")
+                return validation
+
+            # Try to load the file
+            adata = self.load(resolved_path, backed=True)
+            validation["readable"] = True
+
+            # Check basic structure
+            validation["shape"] = adata.shape
+            validation["has_X"] = adata.X is not None
+            validation["has_obs"] = len(adata.obs) > 0
+            validation["has_var"] = len(adata.var) > 0
+
+            # Check for common issues
+            if adata.n_obs == 0:
+                validation["warnings"].append("No observations in dataset")
+            if adata.n_vars == 0:
+                validation["warnings"].append("No variables in dataset")
+
+            # Validate X matrix
+            if adata.X is not None:
+                if hasattr(adata.X, "dtype"):
+                    if not np.issubdtype(adata.X.dtype, np.number):
+                        validation["errors"].append("Non-numeric data in X matrix")
+
+            validation["valid"] = len(validation["errors"]) == 0
+
+        except Exception as e:
+            validation["errors"].append(f"Failed to read file: {e}")
+
+        return validation
+
+    def _resolve_path_with_s3_support(self, path: Union[str, Path]) -> Path:
+        """
+        Resolve path with S3 support (future-ready).
+
+        Args:
+            path: Path to resolve
+
+        Returns:
+            Path: Resolved path (for local files)
+        """
+        # If it's an S3 path, we'll handle it differently in the future
+        if self._is_s3_path(path):
+            # For now, just return the string representation
+            # In future S3 implementation, this would handle S3 URIs
+            return Path(str(path))
+
+        # Handle local paths normally
+        return self._resolve_path(path)
+
+    def _is_s3_path(self, path: Union[str, Path]) -> bool:
+        """
+        Check if path is an S3 URI.
+
+        Args:
+            path: Path to check
+
+        Returns:
+            bool: True if path is S3 URI
+        """
+        path_str = str(path)
+        return path_str.startswith("s3://")
+
+    def _load_from_s3(self, s3_path: str, **kwargs) -> anndata.AnnData:
+        """
+        Load AnnData from S3 (future implementation).
+
+        Args:
+            s3_path: S3 URI
+            **kwargs: Loading parameters
+
+        Returns:
+            anndata.AnnData: Loaded data
+
+        Raises:
+            NotImplementedError: S3 support not yet implemented
+        """
+        # This is a placeholder for future S3 implementation
+        raise NotImplementedError(
+            "S3 support is not yet implemented. "
+            "The current backend supports local files only, "
+            "but the API is designed to support S3 in the future."
+        )
+
+    def _save_to_s3(self, adata: anndata.AnnData, s3_path: str, **kwargs) -> None:
+        """
+        Save AnnData to S3 (future implementation).
+
+        Args:
+            adata: AnnData object to save
+            s3_path: S3 URI
+            **kwargs: Saving parameters
+
+        Raises:
+            NotImplementedError: S3 support not yet implemented
+        """
+        # This is a placeholder for future S3 implementation
+        raise NotImplementedError(
+            "S3 support is not yet implemented. "
+            "The current backend supports local files only, "
+            "but the API is designed to support S3 in the future."
+        )
+
+    def configure_s3(
+        self,
+        bucket: str,
+        region: str = "us-east-1",
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+    ) -> None:
+        """
+        Configure S3 settings (future implementation).
+
+        Args:
+            bucket: S3 bucket name
+            region: AWS region
+            access_key: AWS access key
+            secret_key: AWS secret key
+        """
+        self.s3_config.update(
+            {
+                "bucket": bucket,
+                "region": region,
+                "access_key": access_key,
+                "secret_key": secret_key,
+            }
+        )
+
+        self.logger.info(
+            f"S3 configuration set for bucket: {bucket} in region: {region}"
+        )
+        self.logger.warning(
+            "S3 functionality is not yet implemented but configuration is stored"
+        )
+
+    def _detect_format(self, path: Union[str, Path]) -> str:
+        """
+        Detect file format from extension.
+
+        Args:
+            path: Path to analyze
+
+        Returns:
+            str: Detected format
+        """
+        path = Path(path)
+        extension = path.suffix.lower()
+
+        if extension == ".h5ad":
+            return "h5ad"
+        elif extension == ".h5":
+            return "h5"
+        else:
+            return "unknown"

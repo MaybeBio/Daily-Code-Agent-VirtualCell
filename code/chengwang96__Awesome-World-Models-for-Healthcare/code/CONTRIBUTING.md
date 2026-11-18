@@ -1,0 +1,117 @@
+# Contributing
+
+Thank you for helping improve Awesome World Models for Healthcare. This list is intentionally strict: medical or biomedical grounding is required but is not sufficient for inclusion in the main paper list. Use of the phrase "world model" is neither necessary nor sufficient.
+
+You can contribute with a pull request or use the [structured paper-suggestion form](https://github.com/chengwang96/Awesome-World-Models-for-Healthcare/issues/new?template=01-paper-suggestion.yml) if you prefer not to edit the catalog directly.
+
+## What Belongs in the Main List
+
+A paper must satisfy all five [strict inclusion criteria](https://github.com/chengwang96/Awesome-World-Models-for-Healthcare/blob/HEAD/README.md#strict-inclusion-criteria):
+
+1. **Medical grounding:** the modeled system and evaluated task are biomedical, clinical, or healthcare-related.
+2. **State:** the method represents a patient, organ, physiological process, medical image, procedure, cell, molecule, or population state.
+3. **Dynamics:** it learns an executable model of state evolution across time, space, procedure steps, views, or interventions. Learned transitions, data-driven discovery of dynamical structure, and learned surrogate, residual, or closure components can qualify when they generate evolving states or state distributions.
+4. **Operational rollout:** the learned model is used for future-state prediction, simulation, counterfactual intervention, planning, or control, not merely pretraining or static feature extraction.
+5. **Implemented evidence:** the paper implements and evaluates the learned state-evolution model or its operational use. A separate classifier or representation probe alone is insufficient.
+
+Learning-based surrogates may be trained on mechanistic simulation data. Direct prediction of a future trajectory or post-intervention state is eligible; autoregressive or multi-step rollout is not mandatory. Identify exactly what is learned and how it produces the evaluated state evolution.
+
+Action conditioning is optional for autonomous physiological processes. It is required when a paper claims that the model can evaluate treatments, interventions, or control actions. Distinguish action-conditioned prediction and in-model planning from causally identified treatment effects or clinical benefit.
+
+The following do not belong in the main list by themselves:
+
+- static representation learning or masked-feature prediction
+- ordinary conditional generation without state transitions
+- synthetic-cohort generation without longitudinal dynamics
+- static risk prediction with manually altered covariates
+- fixed mechanistic ODE/PDE, agent-based, or discrete-event simulation with only parameter calibration or state inversion
+- differentiable solvers or neural parameter-inference networks without learned state evolution
+- policy learning, downstream classification, or scalar plan-score optimization around a fixed simulator
+- benchmark-only or dataset-only contributions without an implemented simulator
+- surveys, perspectives, and conceptual frameworks
+
+Surveys and position papers may be proposed for **Survey Papers**. Near-scope work or new submissions with unresolved evidence are not added to the main list. A small set of legacy entries marked **Scope review pending** remains visible during the current audit; these are not precedents for inclusion and are not confirmed to meet the revised criteria.
+
+## Before Opening a Pull Request
+
+- Read the abstract and methods in the primary paper source; do not classify from the title alone.
+- Search the README for the title, arXiv identifier, and DOI to avoid duplicates.
+- Prefer canonical links from the publisher, arXiv, OpenReview, PubMed, bioRxiv, or medRxiv.
+- Link only official author code, weights, and project pages.
+- Confirm the publication year and venue status, including workshop, preprint, rejected, or withdrawn status when relevant.
+- Keep unrelated formatting or repository changes out of a paper-submission pull request.
+
+## Required Paper Format
+
+Add a full entry to the appropriate year under **World Model Papers**:
+
+```markdown
+- (*Venue'YY*) **Paper Title**
+  [[📝 Paper](https://example.org/paper)] [[💻 Code](https://github.com/org/repo)]
+  **Metadata:** `State: Patient` · `Dynamics: Temporal + Action-conditioned` · `Capability: Simulate + Plan` · `Assets: Code`
+  <details>
+  <summary>Why it qualifies</summary>
+  <p>Learns intervention-conditioned patient-state transitions and uses rollouts to compare treatment plans.</p>
+  </details>
+```
+
+Keep the qualification note in the default-collapsed details block shown above. Add the same title and links, without metadata or the qualification note, to every applicable subsection under **By Topic**.
+
+## Controlled Metadata
+
+Use only the labels below. Choose the smallest set directly demonstrated by the method.
+
+| Field | Allowed values |
+|---|---|
+| **State** | `Patient`, `Physiology`, `Anatomy`, `Medical image`, `Procedure/Robot`, `Clinical workflow`, `Cell`, `Molecule`, `Population` |
+| **Dynamics** | `Temporal`, `Action-conditioned`, `Mechanistic`, `Spatial/view`, `Event sequence` |
+| **Capability** | `Forecast`, `Simulate`, `Counterfactual`, `Plan`, `Control` |
+| **Assets** | `Code`, `Weights`, `Project`, `Paper only` |
+
+Metadata definitions:
+
+- **State** is the primary medical or biological state advanced by the model.
+- **Dynamics** describes the implemented transition structure, not the input modality. `Mechanistic` denotes physical or biological structure within a qualifying learned model, including physics-informed surrogates and hybrid dynamics; the label alone does not establish eligibility.
+- **Capability** records what evaluated rollouts accomplish, not suggested future applications.
+- **Assets** must match the public links in the entry.
+
+## Writing the Qualification Note
+
+The `Why it qualifies` sentence should name three things concretely:
+
+1. the state being modeled
+2. what state-evolution component is learned or discovered, and how it advances the state
+3. the evaluated prediction, simulation, or operational rollout, with its main evidence limitation
+
+Avoid circular explanations such as "it qualifies because it is a medical world model." Keep the note factual and short enough to verify against the abstract or methods.
+
+## Pull Request Review
+
+The pull request template asks for source-grounded scope evidence. Maintainers may request clarification, revise metadata, move a conceptual paper to Survey Papers, or decline submissions that do not meet the inclusion criteria. These decisions keep the list useful and do not assess the general quality of the paper.
+
+Before opening a pull request, run the same catalog check used by CI:
+
+```bash
+python scripts/validate_catalog.py
+```
+
+The validator checks controlled metadata, qualification notes, annual placement, duplicate titles and identifiers, asset labels, links, synchronization between the main list and **By Topic**, and taxonomy consistency in the paper-suggestion form.
+
+## Resource Contributions
+
+Datasets, benchmarks, and simulators are reviewed separately from main-list papers:
+
+- A **dataset** must have a public access page and be used to train or evaluate at least one qualifying medical world model.
+- A **benchmark** must evaluate state transitions, rollout quality, action fidelity, intervention response, planning, or control. Static diagnosis and representation benchmarks are out of scope.
+- A **simulator** must provide public code, weights, or an interactive implementation that advances a medical state through time, actions, or interventions.
+
+Use official project, repository, data-hosting, and primary-paper links. State access restrictions or paper-only availability explicitly.
+
+## Licensing Contributions
+
+By submitting a contribution, you agree that it may be distributed under the license that applies to its destination:
+
+- catalog text, metadata, documentation, templates, and original assets under [CC BY 4.0](https://github.com/chengwang96/Awesome-World-Models-for-Healthcare/blob/HEAD/LICENSE-CONTENT)
+- scripts, tests, workflow automation, and repository configuration under the [MIT License](https://github.com/chengwang96/Awesome-World-Models-for-Healthcare/blob/HEAD/LICENSE)
+
+Only submit material that you have the right to contribute. Linking to third-party resources does not transfer or change their licenses.

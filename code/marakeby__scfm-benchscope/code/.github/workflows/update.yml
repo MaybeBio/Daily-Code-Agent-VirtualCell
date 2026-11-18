@@ -1,0 +1,49 @@
+name: Update SCFM Inspector database
+
+on:
+  schedule:
+    - cron: '0 8 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install "openai>=1.76.0"
+          pip install --no-deps -e .
+
+      - name: Debug environment
+        working-directory: docs
+        run: |
+          python --version
+          pip show openai
+          python -c "from openai import OpenAI; print('OpenAI import: OK')"
+
+      - name: Run discovery agent
+        working-directory: docs
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python agent.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name  "scfm-agent[bot]"
+          git config user.email "scfm-agent@users.noreply.github.com"
+          git add docs/models.json docs/models.html docs/candidates
+          git diff --cached --quiet || git commit -m "chore: update scFM Inspector $(date -u '+%Y-%m-%d')"
+          git push

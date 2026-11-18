@@ -1,0 +1,241 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+---
+name: 'radiomics-pathomics-fusion-agent'
+description: 'AI-powered multimodal fusion of radiology (CT/MRI/PET) and pathology (H&E/IHC) imaging with clinical and genomic data for comprehensive cancer diagnostics and treatment prediction.'
+measurable_outcome: Execute skill workflow successfully with valid output within 15 minutes.
+allowed-tools:
+  - read_file
+  - run_shell_command
+---
+
+
+# Radiomics Pathomics Fusion Agent
+
+The **Radiomics Pathomics Fusion Agent** integrates multimodal medical imaging data from radiology (CT, MRI, PET) and digital pathology (H&E, IHC whole slide images) with clinical and genomic data using deep learning fusion architectures. It enables comprehensive cancer phenotyping, treatment response prediction, and prognostic modeling.
+
+## When to Use This Skill
+
+* When predicting treatment response using multimodal imaging.
+* For comprehensive tumor phenotyping combining macro and micro views.
+* To identify imaging biomarkers correlated with genomic features.
+* When building prognostic models from combined radiology-pathology.
+* For AI-powered second opinion integrating all imaging modalities.
+
+## Core Capabilities
+
+1. **Cross-Modal Fusion**: Integrate radiology and pathology features using attention.
+
+2. **Radiomics Extraction**: Compute 3D texture, shape, intensity features from CT/MRI.
+
+3. **Pathomics Extraction**: Extract histopathological features from WSI.
+
+4. **Clinical Integration**: Combine imaging with clinical variables and genomics.
+
+5. **Treatment Response Prediction**: Predict chemotherapy, immunotherapy response.
+
+6. **Survival Prediction**: Multi-modal prognostic modeling.
+
+7. **Stage I NSCLC Postoperative Risk Stratification**: Apply the CT–pathology-report DLRTransformer example described below, with patient-level partitioning, modality ablations, missing-modality policies, and survival calibration.
+
+8. **Candidate CT-Plus-Pathology Transformer Case Study**: Consider PMID 42886039 for postoperative stage I NSCLC risk stratification after methods review confirms pathology input type, endpoint, prediction time, and validation design. The supplied bibliographic finding does not establish performance or validation details; verify the reported design below against the full methods before reuse. Align modalities by patient and index resection with documented acquisition timing. Recommended additional checks, unless explicitly reported, include CT-only and pathology-only versus fused baselines on identical patient splits; missing-modality exclusions, fallback or abstention policies, and evaluation of supported missing-input patterns; patient-level splitting before preprocessing with all derived samples kept together, training-only fitting and tuning, and exclusion of outcome-derived predictors. Match discrimination and calibration to the confirmed outcome: censoring-aware C-index/time-dependent AUC and calibration at prespecified horizons for survival, or AUROC/precision-recall and probability calibration for a fixed-horizon binary outcome with appropriate follow-up handling. Record paper-reported validation separately from these recommended checks and any locally performed validation.
+
+## Supported Imaging Modalities
+
+| Modality | Features Extracted | Resolution |
+|----------|-------------------|------------|
+| CT | Texture, shape, density | Volumetric 3D |
+| MRI | Multi-sequence, perfusion | Volumetric 3D |
+| PET | SUV, metabolic features | Volumetric 3D |
+| H&E WSI | Nuclear, tissue architecture | 40x magnification |
+| IHC WSI | Marker quantification | 20-40x |
+| Multiplexed IF | Spatial protein patterns | Subcellular |
+
+## Fusion Architectures
+
+| Architecture | Method | Strengths |
+|--------------|--------|-----------|
+| Early Fusion | Concatenate features | Simple, baseline |
+| Late Fusion | Combine predictions | Modular |
+| Attention Fusion | Cross-modal attention | Interpretable |
+| Multimodal Transformer | Self-attention across modalities | State-of-art |
+| Graph Fusion | GNN for relationships | Spatial awareness |
+
+## Workflow
+
+1. **Input**: CT/MRI DICOM, pathology WSI, clinical data, optional genomics.
+
+2. **Segmentation**: Tumor ROI extraction from radiology.
+
+3. **Radiomics**: Extract 3D radiomic features.
+
+4. **Pathomics**: Extract histopathology features via foundation models.
+
+5. **Fusion**: Multimodal feature integration.
+
+6. **Prediction**: Treatment response, survival, biomarker prediction.
+
+7. **Output**: Integrated predictions, attention maps, explanations.
+
+## Example Usage
+
+**User**: "Predict immunotherapy response for this lung cancer patient using their CT scan and biopsy pathology."
+
+**Agent Action**:
+```bash
+python3 Skills/Oncology/Radiomics_Pathomics_Fusion_Agent/fusion_predict.py \
+    --ct_dicom ct_scan/ \
+    --wsi_path biopsy.svs \
+    --clinical_data patient_clinical.json \
+    --genomic_data tumor_wes.vcf \
+    --task immunotherapy_response \
+    --cancer_type nsclc \
+    --fusion_method attention \
+    --output fusion_prediction/
+```
+
+### Stage I NSCLC CT–Pathology Transformer Example
+
+**Reported design ([paper](https://pubs.rsna.org/doi/10.1148/rycan.250617))**: DLRTransformer combines patient-associated preoperative CT features, postoperative pathology report text, and clinical variables. Multiview 2.5D ResNet-50 features and volumetric radiomics represent CT; text-embedding-v3 followed by TransformerCoxNN produces 64-dimensional prognostic text features. Modality-specific MLPs feed a self-attention transformer fusion module. Whole-slide images serve a separate biologic interpretation analysis, not the fusion input. The endpoint is disease-free survival from surgery to recurrence or death, censoring event-free patients at last follow-up, capped at five years. The retrospective five-center design uses 412 training and 104 internal testing patients from one center, plus external cohorts of 151 and 227 patients from four other centers. Another 179 treated patients were reserved for treatment-benefit analysis. CT extractor selection used internal testing; the risk cutoff was training-derived and locked. Evaluation included four single-modality comparators and 3-/5-year calibration curves.
+
+**Implementation and evaluation requirements** (requirements for this skill, not assertions that every procedure was performed in the paper):
+
+* Pair CT, final pathology report, and clinical records by patient and index resection; document acquisition/report timing and prevent later outcome information from entering predictors.
+* Partition by patient before preprocessing or supervised representation learning; keep all scans, reports, slides, and derived samples from a patient together. Fit scaling, feature selection, survival-text training, and risk thresholds on training data only. Use a separate tuning partition or nested validation for architecture selection, and keep external centers untouched.
+* Compare CT-only, pathology-text-only, clinical-only, full fusion, and leave-one-modality-out variants on identical patient partitions; separate CT radiomics from learned CT features in ablations. Report discrimination with uncertainty rather than assuming fusion superiority.
+* Prespecify missing-modality handling: document exclusions and missingness by cohort; use a validated reduced-modality fallback or abstain when required inputs are absent. Evaluate each supported missing-input pattern separately; do not assume the reported transformer tolerates absent modalities.
+* Evaluate censoring-aware calibration at 3 and 5 years alongside C-index and time-dependent AUC in each held-out cohort. Fit any recalibration on a separate calibration set, and report its effect on untouched test data; a hazard score alone is not an absolute survival probability.
+
+## Radiomic Feature Categories
+
+| Category | Features | Count |
+|----------|----------|-------|
+| Shape | Volume, surface area, sphericity | 14 |
+| First-Order | Mean, variance, skewness, entropy | 18 |
+| GLCM | Contrast, correlation, homogeneity | 24 |
+| GLRLM | Run length, gray level emphasis | 16 |
+| GLSZM | Zone size, gray level variance | 16 |
+| GLDM | Dependence features | 14 |
+| NGTDM | Texture features | 5 |
+| **Total** | | **~107** |
+
+## Pathomics Feature Categories
+
+| Category | Source | Features |
+|----------|--------|----------|
+| Nuclear | Segmentation | Size, shape, texture |
+| Cellular | Detection | Density, clustering |
+| Tissue | Architecture | Glandular, stromal ratios |
+| Foundation Model | CONCH, TITAN, UNI | Deep embeddings |
+| Spatial | Graph analysis | Neighborhood patterns |
+
+## Output Components
+
+| Output | Description | Format |
+|--------|-------------|--------|
+| Prediction | Response/outcome probability | .json |
+| Confidence | Prediction uncertainty | .json |
+| Attention Maps | Cross-modal importance | .npy, .png |
+| Feature Importance | Shapley values | .csv |
+| ROI Highlights | Predictive regions | DICOM-SEG, GeoJSON |
+| Report | Clinical summary | .pdf |
+
+## Clinical Applications
+
+| Application | Modalities Used | Performance |
+|-------------|-----------------|-------------|
+| NSCLC Immunotherapy | CT + H&E | AUC 0.82-0.88 |
+| HCC Survival | MRI + H&E | C-index 0.78 |
+| Breast Neoadjuvant | MRI + H&E | AUC 0.85 |
+| HNSCC HPV/Response | CT + H&E | AUC 0.89 |
+| CRC MSI Prediction | CT + H&E | AUC 0.86 |
+
+## AI/ML Components
+
+**Radiomics Pipeline**:
+- PyRadiomics for feature extraction
+- 3D-CNN for learned features
+- Transformer for volumetric analysis
+
+**Pathomics Pipeline**:
+- Foundation models (CONCH, UNI, TITAN)
+- MIL (Multiple Instance Learning) for WSI
+- Graph networks for spatial patterns
+
+**Fusion Models**:
+- Cross-attention transformers
+- Multimodal variational autoencoders
+- Contrastive learning for alignment
+
+## Prerequisites
+
+* Python 3.10+
+* PyRadiomics, SimpleITK
+* OpenSlide, HistoEncoder
+* PyTorch, transformers
+* CONCH/TITAN model weights
+* GPU with 16GB+ VRAM
+
+## Related Skills
+
+* Pathology_AI/CONCH_Agent - Pathology foundation model
+* Radiology_AI agents - Modality-specific analysis
+* Pan_Cancer_MultiOmics_Agent - Genomic integration
+* TMB_Estimation_Agent - Tumor mutational burden
+
+## Multimodal Integration Strategies
+
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| Feature-Level | Combine extracted features | Limited data |
+| Embedding-Level | Fuse latent representations | Moderate data |
+| Decision-Level | Ensemble predictions | Interpretability |
+| End-to-End | Joint training | Large data |
+
+## Special Considerations
+
+1. **Data Alignment**: Ensure imaging from same timepoint
+2. **Missing Modalities**: Handle incomplete multimodal data
+3. **Class Imbalance**: Balance training across outcomes
+4. **Interpretability**: Attention maps for clinical trust
+5. **Validation**: External multi-site validation essential
+
+## Quality Control
+
+| QC Check | Threshold | Action |
+|----------|-----------|--------|
+| CT coverage | >90% tumor | Rescan if needed |
+| WSI quality | Blur score <X | Re-scan slide |
+| Segmentation | Dice >0.85 | Manual review |
+| Feature stability | ICC >0.8 | Robust features only |
+
+## Regulatory Considerations
+
+| Aspect | Status |
+|--------|--------|
+| FDA Clearance | Individual modality tools cleared |
+| Multimodal Fusion | Research use only (RUO) |
+| Clinical Integration | PACS/LIS integration pathways |
+| Explainability | Required for clinical adoption |
+
+## Author
+
+AI Group - Biomedical AI Platform
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->
+
+## References
+
+* Multimodal Transformer Integrating CT and Pathology for Postoperative Risk Stratification in Stage I Non-Small Cell Lung Cancer. Radiology: Imaging Cancer (2026). https://pubmed.ncbi.nlm.nih.gov/42886039/

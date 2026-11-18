@@ -1,0 +1,69 @@
+"""
+Shared configuration constants for LLM provider system.
+
+This module is the SINGLE SOURCE OF TRUTH for valid providers and profiles.
+All other modules should import from here rather than defining their own lists.
+"""
+
+from typing import Final, List
+
+# Valid LLM providers - add new providers here ONLY
+VALID_PROVIDERS: Final[List[str]] = [
+    "anthropic",
+    "bedrock",
+    "ollama",
+    "gemini",
+    "azure",
+    "openai",
+    "openrouter",
+    "omics-os",
+    "nebius",
+    "ollama-cloud",
+]
+
+# Valid agent configuration profiles
+VALID_PROFILES: Final[List[str]] = [
+    "development",
+    "production",
+    "performance",
+    "max",
+    "hybrid",
+]
+
+# Deprecated profile aliases (map old names → new names)
+DEPRECATED_PROFILE_ALIASES: Final[dict] = {
+    "ultra": "performance",
+    "godmode": "max",
+}
+
+# Provider display names for UI
+PROVIDER_DISPLAY_NAMES: Final[dict] = {
+    "anthropic": "Anthropic Direct API",
+    "bedrock": "AWS Bedrock",
+    "ollama": "Ollama (Local)",
+    "gemini": "Google Gemini",
+    "azure": "Azure AI",
+    "openai": "OpenAI",
+    "openrouter": "OpenRouter (600+ models)",
+    "omics-os": "Omics-OS Cloud",
+    "nebius": "Nebius AI Studio",
+    "ollama-cloud": "Ollama Cloud",
+}
+
+# Provider icons for UI. Single palette shared by every surface (status line,
+# /config model list, /status panel) and mirrored by the Go TUI's providerIcon().
+# Use PROVIDER_ICON_FALLBACK for unknown providers.
+PROVIDER_ICONS: Final[dict] = {
+    "anthropic": "🟣",
+    "bedrock": "🟠",
+    "ollama": "🦙",
+    "gemini": "🔶",
+    "azure": "🔷",
+    "openai": "🟢",
+    "openrouter": "🔵",
+    "omics-os": "🦞",
+    "nebius": "🔹",
+    "ollama-cloud": "☁️",
+}
+
+PROVIDER_ICON_FALLBACK: Final[str] = "⚪"

@@ -1,0 +1,890 @@
+[
+  {
+    "full_name": "bowang-lab/scGPT",
+    "score": 10,
+    "one_liner": "scGPT 是面向单细胞多组学的生成式预训练基座模型，提供预训练权重、微调与零样本推理代码，直接支撑细胞表征、注释、整合与参考映射等虚拟细胞建模核心任务。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "ok",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "theislab/nicheformer",
+    "score": 9,
+    "one_liner": "Nicheformer 是一个面向单细胞和空间组学的基座模型，提供预训练权重和代码，直接契合虚拟细胞/器官建模方向。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "score": 8,
+    "one_liner": "这是一个单细胞基座模型论文与资源的精选清单，覆盖单细胞基座模型、虚拟细胞、AI Agent等方向，与课题高度相关但缺乏代码实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Genentech/scimilarity",
+    "score": 8,
+    "one_liner": "SCimilarity 是一个基于单细胞表达谱的细胞基座模型，提供预训练表征和相似性搜索，支持细胞状态查询与大规模图谱利用，与虚拟细胞/细胞基座建模高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "mandel0614/circle-lang",
+    "score": 8,
+    "one_liner": "Circle 是一个面向虚拟细胞系统的声明式编程语言，通过 BioIR 中间表示和多种执行 profile 实现细胞行为建模与表型验证，与虚拟细胞/虚拟器官方向高度契合。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "ratschlab/DeepSpotM",
+    "score": 8,
+    "one_liner": "DeepSpot-M 是一个多模态基础模型，从组织学图像预测全转录组空间基因表达，利用单细胞基础模型（如 scGPT）的基因嵌入，与虚拟空间转录组和细胞表征建模高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Peg-Wu/DeSCOPE",
+    "score": 8,
+    "one_liner": "DeSCOPE 是一个基于条件变分自编码器和ESM2蛋白语言模型的单细胞扰动预测框架，面向scRNA-seq/scATAC-seq，可迁移至虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "ratschlab/DeepSpot2Cell",
+    "score": 8,
+    "one_liner": "DeepSpot2Cell 从 H&E 图像预测虚拟单细胞空间转录组，面向单细胞/空间组学，使用病理基础模型进行细胞级表达预测，与虚拟细胞建模高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Boom5426/VCDesign-CED",
+    "score": 8,
+    "one_liner": "VCDesign 面向单细胞 CRISPRi 扰动数据，将虚拟细胞干预设计建模为有限预算排序，结合候选效应蒸馏与生物知识图谱，提供可复现的模型训练与评估代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "zchxhcz1/Morph2Mol",
+    "score": 8,
+    "one_liner": "Morph2Mol 是一个从 H&E 组织学图像预测单细胞空间转录组的基座模型，通过图像编码器、空间解码器和参考细胞库实现跨模态细胞表征与表达预测，与虚拟细胞/空间组学建模高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Biodyn-AI/atlas-comparison",
+    "score": 8,
+    "one_liner": "该仓库对十个单细胞基座模型进行稀疏自编码器可解释性比较，构建跨模型特征图谱，虽非直接建模但深度服务于细胞表征与基座模型评估。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "gomezdj/exerkinemap",
+    "score": 8,
+    "one_liner": "EXERKINEMAP 是一个结合基因组/蛋白质语言模型与单细胞/空间组学、面向运动响应信号传导的虚拟细胞世界模型框架，核心聚焦细胞状态转换与跨组织映射，与课题高度匹配。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "yiyun-li/CellBench-scFM",
+    "score": 8,
+    "one_liner": "CellBench 是一个对 13 个单细胞基座模型进行冻结骨干基准测试的代码库，提供模型适配器、下游评估头和数据集清单，直接服务于单细胞基座模型的系统评估与比较。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "pleiadian53/ssl-lab",
+    "score": 8,
+    "one_liner": "ssl-lab 开发基于 JEPA 的生成式自监督模型，核心目标是单细胞扰动数据生成与虚拟细胞建模，方法上实现条件流先验与解码器，与课题高度匹配。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "teslajoy/omicstra",
+    "score": 8,
+    "one_liner": "omicstra 是一个面向空间生物学（H&E 与空间转录组）的多智能体 MCP 服务器，实现跨模态嵌入对齐与基于证据的路由，核心涉及细胞/组织微环境表征与基座模型集成，与虚拟细胞/器官建模方向高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "r-andrese/terra-ligand-perturbation",
+    "score": 8,
+    "one_liner": "基于空间转录组基座模型TERRA，对肿瘤微环境中成纤维细胞配体CSF1进行零样本扰动模拟，评估巨噬细胞状态表征变化，属于虚拟细胞/器官建模方向的高价值应用仓库。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "zhyzhy12512/DyMoE-Pert",
+    "score": 8,
+    "one_liner": "DyMoE-Pert 是基于单细胞扰动数据、融合知识图谱与scGPT基座表征的动态混合专家模型，用于预测基因扰动对细胞表达的影响，属于细胞系统建模与基座模型应用方向。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "submitted"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "articlesmli/omniSpatial_multiscale",
+    "score": 8,
+    "one_liner": "这是一个多尺度生物数字孪生框架，结合单细胞空间转录组、结构生物学和代谢建模，通过条件扩散模型预测细胞扰动状态，与虚拟细胞建模方向高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "snap-stanford/Biomni",
+    "score": 7,
+    "one_liner": "Biomni 是一个通用生物医学 AI Agent，集成 LLM 推理与代码执行，支持 scRNA-seq 注释等任务，但非专用于单细胞基座模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "ok",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Lotfollahi-lab/nichecompass",
+    "score": 7,
+    "one_liner": "NicheCompass 是基于图神经网络的空间多组学分析工具，用于细胞生态位识别、细胞通讯推断和空间参考映射，虽非基座模型或大语言模型，但其细胞图嵌入和空间建模方法对虚拟细胞/器官的空间表征具有可迁移价值。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "theislab/ReconEval",
+    "score": 7,
+    "one_liner": "ReconEval 是一个从单细胞潜在表征重建基因表达的基准，评估多种基座模型（如 scGPT、scConcept）的细胞表征质量，与细胞基座模型评估高度相关，但非直接构建虚拟细胞或Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "databricks-industry-solutions/genesis-workbench",
+    "score": 7,
+    "one_liner": "Databricks 上的生命科学工作台，封装 scGPT、SCimilarity 等单细胞基座模型与工作流，支持细胞注释、相似性搜索、扰动预测，但侧重平台集成而非虚拟细胞/器官建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Luosanj/VOICE_HE_ST_Pred",
+    "score": 7,
+    "one_liner": "VOICE 是一个从 H&E 图像预测原位单细胞基因表达的视觉-组学基础模型，结合检索与融合，虽非直接面向虚拟细胞/器官或生物大语言模型，但其单细胞空间组学基础建模方法可迁移。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Lotfollahi-lab/squint",
+    "score": 7,
+    "one_liner": "SQUINT 是一个基于图向量量化的变分自编码器，从空间转录组数据中学习离散的细胞身份编码和空间生态位编码，并支持基因表达插补，属于面向空间组学的细胞表征建模方法，但未涉及生物基座模型或大语言模型。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "marakeby/scfm-benchscope",
+    "score": 7,
+    "one_liner": "这是一个单细胞基座模型评估框架，用于评测scGPT、Geneformer等模型的嵌入与下游分类性能，虽不直接构建基座模型，但为细胞表征模型提供标准化评测，与课题高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Rishabh-bgp/building-a-virtual-cell-in-python",
+    "score": 7,
+    "one_liner": "该仓库用ESM2基因嵌入和神经网络构建虚拟细胞模型，预测基因敲除后的表达变化，核心面向虚拟细胞建模，但仅用伪数据且模型较简单。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "athenabio/athenabio-technical-brief",
+    "score": 7,
+    "one_liner": "该仓库是卵巢生物学多模态数据与基准构建项目，面向单细胞/空间组学并计划预训练卵巢衰老基座模型，但当前仅为技术简报，无模型或训练代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "maiziezhoulab/interpreTFM",
+    "score": 7,
+    "one_liner": "interpreTFM 是一个用稀疏自编码器逐层评估转录组基础模型（scGPT、Geneformer、C2S-Scale）可解释性的框架，面向单细胞和空间转录组数据，虽不直接构建基座模型或Agent，但为细胞表征建模提供深度评估工具，与课题方向高度相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "IlariaPapillo/scgpt-zero-shot-evaluation",
+    "score": 7,
+    "one_liner": "该仓库评估scGPT-spatial在空间转录组上的零样本性能，虽非新模型开发，但直接面向空间组学基座模型的应用与验证，具有可迁移的建模思路。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "nyanovsky/scfm-perturbation-failure-modes",
+    "score": 7,
+    "one_liner": "该仓库评估单细胞基座模型（scGPT、scPRINT、TranscriptFormer）的扰动查询预测基因敲低响应的能力，发现静态基因嵌入优于模拟扰动响应，属于对细胞基座模型能力的批判性验证，与虚拟细胞建模方向相关但非直接构建模型。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "wgsim/biology-foundation-model-learning",
+    "score": 7,
+    "one_liner": "这是一个面向中级到专家水平的生物学基础模型学习路线图，包含单细胞FM模块和批判性评估，但主要是教学资源而非可直接使用的模型或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "nikhildehariya/cellrank-lineage-benchmark",
+    "score": 7,
+    "one_liner": "该仓库是一个基于CellRank的scRNA-seq细胞命运动力学AI推理基准测试，用于评估大语言模型和Agent在细胞状态转换推理上的能力，与课题方向高度相关但本身不提供模型训练或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "IngenixAI/Thalamus-Decision",
+    "score": 7,
+    "one_liner": "Thalamus-Decision 是一个基于表达谱（含单细胞）的决策模型推理引擎，面向细胞状态判别与Agent决策，但非基座模型训练代码，且未聚焦虚拟细胞/类器官建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "AttieLab-Systems-Genetics/Heureka",
+    "score": 7,
+    "one_liner": "HeurekaBench 是一个面向单细胞生物学、用于评估 AI 共科学家（科学 Agent）的基准测试框架，与生物 Agent 方向相关，但本身不提供模型训练或推理实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "theislab/single-cell-transformer-papers",
+    "score": 6,
+    "one_liner": "该仓库是单细胞组学Transformer论文的综述与资源列表，虽聚焦于单细胞基座模型方向，但仅提供文献汇总而无模型或代码实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "ratschlab/DeepSpot",
+    "score": 6,
+    "one_liner": "DeepSpot 从 H&E 图像预测空间转录组，属于虚拟空间转录组建模，但非单细胞基座模型或生物大语言模型，与课题核心方向部分相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "the-omics-os/lobster",
+    "score": 6,
+    "one_liner": "Lobster AI 是一个面向多组学（含单细胞转录组）的多智能体分析系统，通过 LLM 编排 Scanpy 等工具完成聚类、注释和轨迹推断，属于生物 Agent 方向但未涉及基座模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "uhlerlab/spatialfusion",
+    "score": 6,
+    "one_liner": "SpatialFusion 是一个整合空间转录组与H&E病理图像的多模态深度学习框架，利用scGPT等基座模型生成细胞嵌入并映射到空间生态位，虽非虚拟细胞/器官基座模型，但方法可迁移至细胞系统建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-",
+    "score": 6,
+    "one_liner": "这是一个面向生物医学的Agent技能库与运行时平台，涵盖单细胞/空间组学技能及单细胞基座模型（如TranscriptFormer），但核心是通用生物医学Agent编排而非虚拟细胞/器官建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "ok"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "ratschlab/aestetik",
+    "score": 6,
+    "one_liner": "AESTETIK 是一个面向空间转录组的多模态自编码器表征学习工具，整合转录组、形态和拓扑信息，但主要聚焦于表征学习与聚类，而非虚拟细胞/器官基座模型或生物大语言模型。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "ok",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "theislab/embpy",
+    "score": 6,
+    "one_liner": "embpy 是一个统一 API 的生物实体嵌入工具包，支持单细胞、基因、蛋白等嵌入生成与比较，但主要聚焦嵌入工具而非虚拟细胞/基座模型训练或 Agent 建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "score": 6,
+    "one_liner": "该仓库是NicheJEPA的可复现性代码，专注于单细胞/空间转录组数据的tokenization和数据集构建，为细胞基座模型提供数据预处理，但本身不包含模型训练或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "MMatinGerami/zero-shot-perturbation",
+    "score": 6,
+    "one_liner": "该仓库是虚拟细胞挑战赛的零样本扰动响应预测基线，基于CRISPRi Perturb-seq数据跨细胞系迁移，虽涉及单细胞和细胞状态预测，但方法为简单线性迁移基线而非基座模型或Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "CHENyiru3/Awesome-single-cell-JEPA-model",
+    "score": 6,
+    "one_liner": "这是一个单细胞/空间组学JEPA模型的论文与资源清单，虽聚焦于细胞表征与基座建模，但本身不提供模型训练或Agent实现代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "bahattinyunus/hacettepe-stem-cell",
+    "score": 6,
+    "one_liner": "该仓库是Hacettepe大学干细胞计算生物学平台，涵盖Waddington表观遗传景观、scRNA-seq轨迹推断、表观遗传时钟及全细胞数字孪生愿景，但核心是教学/研讨会配套工具，缺乏可用的生物基座模型或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "chitra-lab/SAFFRON",
+    "score": 6,
+    "one_liner": "SAFFRON 是一个用于评估空间转录组基础模型嵌入是否捕获已知空间变异来源的可解释性框架，通过稀疏自编码器分解嵌入，与虚拟细胞/器官建模方向相关但侧重于模型评估而非构建。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "databio/awesome-bio-foundation-models",
+    "score": 6,
+    "one_liner": "这是一个生物基础模型资源清单，涵盖DNA、RNA、蛋白质及单细胞转录组等模型，其中单细胞部分与课题相关，但整体为列表汇总，缺乏模型实现深度。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "EnuhBlaise/Foundational_BioAI_Model",
+    "score": 6,
+    "one_liner": "这是一个单细胞转录组基座模型的训练与严格评估框架，强调防泄漏和公平基准，但更偏评估工具而非直接可用的细胞大模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Virelion-Biotech/Virelion-CardiLearn",
+    "score": 6,
+    "one_liner": "CardiLearn 是一个面向心脏转录组的表征学习研究代码库，采用程序级Transformer和共享/私有潜在表征建模，但尚未验证为心脏基座模型，且未涉及单细胞/空间组学基座模型或生物Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "leelieber2025/AnnoTuneAgent",
+    "score": 6,
+    "one_liner": "AnnoTuneAgent 是一个基于微调大语言模型（Qwen3.5-4B + LoRA）的 scRNA-seq 细胞类型注释工具，面向单细胞数据并应用了生物大语言模型方法，但聚焦于注释而非虚拟细胞/器官建模或基座模型训练。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "mims-harvard/SEMPER",
+    "score": 6,
+    "one_liner": "SEMPER 是一个多模态蛋白质表征模型，将蛋白质语言模型与442个人脑细胞类型的PPI网络对齐，生成细胞类型特异的蛋白质表征，可用于细胞状态相关靶点预测，但核心是蛋白质而非单细胞转录组或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "fym0503/SMITH",
+    "score": 6,
+    "one_liner": "SMITH是一个面向空间组学panel设计的工具，利用多任务学习从单细胞/空间参考数据中选择基因靶标，并集成Agent工作流，虽涉及细胞状态与发育信号但核心是panel选择而非细胞基座模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "YankongSJTU/scSet",
+    "score": 6,
+    "one_liner": "scSet 是一个基于单细胞基础模型嵌入的集合编码器与基准测试仓库，聚焦跨队列样本表征的可迁移性，虽涉及细胞表征建模但非基座模型或Agent，且偏向基准评估而非虚拟细胞/器官建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "andreaalvarezp3/andreaalvarezp3",
+    "score": 6,
+    "one_liner": "该仓库是研究者个人主页，展示其利用scGPT等基座模型进行单细胞网络医学与药物重定位研究，虽涉及单细胞和基座模型但非完整可用的模型/代码仓库。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "TK13-lab/BreMAP",
+    "score": 6,
+    "one_liner": "BReMAP 是一个可配置的单细胞参考映射与基因程序分析工具，支持 scGPT/Geneformer 嵌入和教师-学生蒸馏，但核心是参考映射而非虚拟细胞/器官基座模型或 Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "sarwanpasha/fm_transfer-",
+    "score": 6,
+    "one_liner": "该仓库用核岭回归预测单细胞CRISPR筛选中的遗传互作残差，并分析scGPT/Geneformer/scVI等基座模型嵌入的几何性质，虽涉及细胞表征与基座模型嵌入，但核心是遗传互作预测而非虚拟细胞/器官或细胞状态建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "JimYuhaoWu/eCR_navigator",
+    "score": 6,
+    "one_liner": "该仓库是MEF→iPSC重编程中区域驱动评分与靶点提名的前端工具，基于多种基因组基础模型（如ChromBERT、GET）的嵌入差异来识别细胞状态转换的驱动区域，与细胞状态转换建模相关，但非单细胞/空间组学数据，且不直接构建细胞基座模型或Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "jam-sudo/vcc2026-writeup",
+    "score": 6,
+    "one_liner": "该仓库记录作者在2026年虚拟细胞挑战赛中的尝试，通过跨细胞系迁移CRISPRi扰动效应来预测单细胞RNA计数，涉及细胞状态响应建模，但未提供通用基座模型或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "haotian-zhuang/BCRFoundation",
+    "score": 6,
+    "one_liner": "BCRFoundation 是一个基于单细胞基因表达与BCR序列配对数据的多模态基座模型，支持B细胞特性预测和零样本BCR到RNA预测，与细胞基座建模方向相关但聚焦B细胞而非虚拟细胞/器官。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Khachdallak02/Khachdallak02",
+    "score": 6,
+    "one_liner": "个人学术主页，展示单细胞基座模型、多模态虚拟细胞等研究方向，但无具体代码或模型实现，仅提供背景与思路。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "tom-snir/bmfm-rna-zero-shot",
+    "score": 6,
+    "one_liner": "该仓库是IBM BMFM-RNA单细胞基座模型的零样本应用与评估示例，验证了模型在细胞类型注释和克隆邻近性上的表现，但本身不提供新模型或训练代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "iandriver/actinn-jax-benchmark",
+    "score": 6,
+    "one_liner": "这是一个单细胞标签映射方法的基准测试仓库，比较了多种方法（含基座模型scPRINT）的准确率、速度和内存，并提出了两阶段分层标注思路，但本身不提供基座模型或Agent训练代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Kays3/Kays3",
+    "score": 6,
+    "one_liner": "个人研究主页，展示基于Geneformer的单细胞基座模型微调与扰动工作流，但缺乏完整模型/Agent实现，偏向方法记录与教程。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "helicalAI/heli-plugin",
+    "score": 6,
+    "one_liner": "这是一个Claude Code/Codex插件，用于通过MCP远程调用Helical平台，提供单细胞数据基础模型嵌入计算、微调和虚拟扰动技能，与课题方向相关但本身不包含模型实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "VincenzoJust/lung-cell-annotation-benchmark",
+    "score": 6,
+    "one_liner": "该仓库比较了经典方法与Geneformer/scGPT等基座模型在COVID-19肺细胞标签转移上的表现，聚焦单细胞数据与基座模型评估，但非模型开发或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "stefaniazoibb/neurobridge",
+    "score": 6,
+    "one_liner": "NeuroBridge 是一个面向胶质母细胞瘤的多模态生物医学发现 Agent 平台，整合单细胞与空间转录组分析，但核心是假设检验与证据报告，而非细胞基座模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "ZhaoXM-Lab/BrainTwin",
+    "score": 6,
+    "one_liner": "BrainTwin 是一个面向脑科学的多模态知识图谱与文献检索 Agent，包含单细胞案例，但核心是知识检索而非细胞基座模型或虚拟细胞建模。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "eersin1/virtual-cell",
+    "score": 6,
+    "one_liner": "该仓库用基因描述和蛋白序列预测未见过基因敲低后的转录组响应，虽涉及细胞状态预测但非单细胞基座模型，方法为传统机器学习集成，与虚拟细胞/基座模型方向部分相关。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "chengwang96/Awesome-World-Models-for-Healthcare",
+    "score": 5,
+    "one_liner": "这是一个医疗健康领域世界模型的论文与资源清单，涵盖细胞动态与转录组建模，但仅为综述汇总，无模型训练或Agent实现代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "AntoineCollin/scMusketeers",
+    "score": 5,
+    "one_liner": "scMusketeers是一个模块化自编码器，用于单细胞数据的不平衡细胞类型注释和批次效应校正，虽涉及细胞表征但非基座模型或Agent，建模能力偏弱。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Steven51516/awesome-unified-bio-fm",
+    "score": 5,
+    "one_liner": "这是一个统一生物基座模型的论文/资源清单，涵盖多模态（DNA、RNA、蛋白、细胞等）基座模型，与课题方向相关但仅为汇总，无模型实现代码。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Liatir/liatir-app",
+    "score": 5,
+    "one_liner": "Liatir 是一个本地优先的生物信息学桌面环境，包含单细胞基座模型（Geneformer、scGPT）与基线方法的基准对比，但核心是通用工具平台而非面向虚拟细胞/器官的建模或Agent实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "Kays3/geneformer-vs-brainiac",
+    "score": 5,
+    "one_liner": "该仓库对比Geneformer（单细胞基座模型）与BrainIAC（脑MRI模型），并启动斑马鱼脑单细胞基座模型项目，但当前以比较、计划和初步实验为主，缺乏完整模型实现。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  },
+  {
+    "full_name": "gm-oogway/geneformer-tcga-hnsc",
+    "score": 5,
+    "one_liner": "该仓库将单细胞预训练基座模型Geneformer零样本应用于TCGA头颈癌bulk RNA-seq，评估其聚类与临床关联，虽涉及细胞基座模型迁移，但对象为bulk转录组而非单细胞/空间组学，且未构建新模型或Agent。",
+    "copy_ok": true,
+    "wikis": {
+      "deepwiki": "not_indexed",
+      "codewiki": "not_indexed",
+      "zread": "not_indexed"
+    },
+    "copy": "code"
+  }
+]

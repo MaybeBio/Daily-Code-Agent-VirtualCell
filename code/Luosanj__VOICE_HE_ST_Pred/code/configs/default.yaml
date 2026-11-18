@@ -1,0 +1,7 @@
+paths:
+  hf_home: null
+  ckpt_dir: null
+  data_root: null
+  scf_dir: null
+  v2_root: null
+  testset_root: null

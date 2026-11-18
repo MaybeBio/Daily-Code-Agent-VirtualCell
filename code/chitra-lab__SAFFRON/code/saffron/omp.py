@@ -1,0 +1,123 @@
+"""
+saffron.omp
+===========
+Identify a minimal set of features (from any (N, M) feature matrix) that linearly
+reconstruct a known measure of spatial variation, via orthogonal matching pursuit (OMP).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+from sklearn.linear_model import OrthogonalMatchingPursuit, RidgeCV
+from sklearn.metrics import r2_score
+from sklearn.model_selection import KFold, cross_val_predict
+from sklearn.preprocessing import StandardScaler
+
+
+@dataclass
+class OMPCurveResult:
+    k_values: np.ndarray          # (max_features,) number of features, 1..max_features
+    r2: np.ndarray                # (max_features,) cross-validated R2 at each k
+    ridge_r2: float                # cross-validated R2 using all M features (RidgeCV reference)
+
+
+@dataclass
+class OMPSelection:
+    selected_features: list[int]   # feature indices in the order OMP added them
+    coefficients: np.ndarray       # (len(selected_features),) coefficient for each, same order
+    r2: float                      # in-sample R2 of the final fit at max_features
+
+
+@dataclass
+class OMPReconstruction:
+    selected_features: list[int]   # the k feature indices OMP chose
+    coefficients: np.ndarray       # (k,) coefficient for each, same order
+    r2: float                      # in-sample R2 of this k-feature fit
+    reconstructed: np.ndarray      # (N,) predicted tau from these k features, in tau's original units
+
+
+def _standardize(H: np.ndarray, tau: np.ndarray):
+    Hs = StandardScaler().fit_transform(np.asarray(H, dtype=np.float64))
+    ts = np.asarray(tau, dtype=np.float64)
+    ts = (ts - ts.mean()) / (ts.std() + 1e-12)
+    return Hs, ts
+
+
+def omp_r2_curve(
+    H: np.ndarray,
+    tau: np.ndarray,
+    max_features: int = 20,
+    cv_folds: int = 5,
+    seed: int = 0,
+) -> OMPCurveResult:
+    """Cross-validated R^2 of OMP reconstruction of τ from H, for k=1..max_features.
+
+    Also fits a RidgeCV model using all M features as a dense reference.
+    """
+    Hs, ts = _standardize(H, tau)
+    max_features = min(max_features, Hs.shape[1])
+    kf = KFold(n_splits=cv_folds, shuffle=True, random_state=seed)
+
+    def cv_r2(model):
+        return r2_score(ts, cross_val_predict(model, Hs, ts, cv=kf))
+
+    r2_values = np.array([
+        cv_r2(OrthogonalMatchingPursuit(n_nonzero_coefs=k))
+        for k in range(1, max_features + 1)
+    ])
+    ridge_r2 = cv_r2(RidgeCV(alphas=np.logspace(-2, 6, 20)))
+
+    return OMPCurveResult(k_values=np.arange(1, max_features + 1), r2=r2_values, ridge_r2=ridge_r2)
+
+
+def omp_select(H: np.ndarray, tau: np.ndarray, max_features: int = 20) -> OMPSelection:
+    """Fit OMP once at `max_features` and recover the greedy feature-selection order."""
+    Hs, ts = _standardize(H, tau)
+    max_features = min(max_features, Hs.shape[1])
+
+    selected_at: dict[int, list[int]] = {}
+    for k in range(1, max_features + 1):
+        omp = OrthogonalMatchingPursuit(n_nonzero_coefs=k, fit_intercept=True)
+        omp.fit(Hs, ts)
+        selected_at[k] = list(np.where(omp.coef_ != 0)[0])
+
+    ordered: list[int] = []
+    prev: list[int] = []
+    for k in range(1, max_features + 1):
+        new = [f for f in selected_at[k] if f not in prev]
+        if new:
+            ordered.append(new[0])
+        prev = selected_at[k]
+
+    final_omp = OrthogonalMatchingPursuit(n_nonzero_coefs=len(ordered) or 1, fit_intercept=True)
+    final_omp.fit(Hs, ts)
+    coef = final_omp.coef_[ordered]
+    r2 = float(r2_score(ts, final_omp.predict(Hs)))
+
+    return OMPSelection(selected_features=ordered, coefficients=coef, r2=r2)
+
+
+def omp_reconstruct(H: np.ndarray, tau: np.ndarray, k: int) -> OMPReconstruction:
+    """Fit OMP with exactly `k` features and reconstruct tau in its original units."""
+    tau = np.asarray(tau, dtype=np.float64)
+    Hs, ts = _standardize(H, tau)
+    k = min(k, Hs.shape[1])
+
+    omp = OrthogonalMatchingPursuit(n_nonzero_coefs=k, fit_intercept=True)
+    omp.fit(Hs, ts)
+    pred_std = omp.predict(Hs)
+
+    selected = list(np.where(omp.coef_ != 0)[0])
+    coef = omp.coef_[selected]
+    r2 = float(r2_score(ts, pred_std))
+    reconstructed = pred_std * (tau.std() + 1e-12) + tau.mean()
+
+    return OMPReconstruction(selected_features=selected, coefficients=coef, r2=r2, reconstructed=reconstructed)
+
+
+def omp_active_mask(H: np.ndarray, selected_features: list[int]) -> np.ndarray:
+    """Boolean mask, True where at least one of `selected_features` is nonzero in `H`."""
+    H = np.asarray(H)
+    return (H[:, selected_features] != 0).any(axis=1)

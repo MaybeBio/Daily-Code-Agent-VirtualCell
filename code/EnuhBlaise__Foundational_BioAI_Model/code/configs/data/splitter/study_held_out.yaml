@@ -1,0 +1,9 @@
+# Hardest standard regime: generalization to an unseen dataset / protocol.
+name: study_held_out
+val: 0.15
+test: 0.2
+seed: ${seed}
+stratify_key: cell_type
+min_groups: 3
+min_labels_in_test: 2
+allow_fabricated: false

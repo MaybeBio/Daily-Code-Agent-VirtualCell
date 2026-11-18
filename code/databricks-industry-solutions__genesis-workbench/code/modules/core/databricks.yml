@@ -1,0 +1,61 @@
+bundle:
+  name: genesis_workbench_core
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/jobs/*.yml
+  - resources/app.yml
+  - resources/mcp_app.yml
+  - resources/volumes/*.yml
+  - resources/experiments/*.yml
+  - resources/dashboards/*.yml
+
+sync:
+  paths:
+    - .
+  include:
+    # The React frontend's dist/ is gitignored (build artifact), but the
+    # genesis_workbench_app resource needs it uploaded so the FastAPI app
+    # can serve the SPA at /. core/deploy.sh runs `npm run build` before
+    # `bundle deploy`, so this directory is fresh when bundle sync picks it up.
+    - app/frontend/dist/**
+    # The genesis_workbench wheel is also gitignored in app/backend/lib/, but
+    # the app's requirements.txt references it by filename. core/deploy.sh
+    # copies the freshly-built wheel here before bundle deploy.
+    - app/backend/lib/*.whl
+    # Same for the sibling MCP app — its requirements.txt references the wheel
+    # under mcp_app/backend/lib/ (gitignored), so force it into the sync.
+    - mcp_app/backend/lib/*.whl
+
+targets:
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}

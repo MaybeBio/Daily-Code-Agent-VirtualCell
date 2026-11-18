@@ -1,0 +1,56 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+"""Test the standard tests on the custom chat model in the docs."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+import pytest
+
+from langchain_tests.integration_tests import ChatModelIntegrationTests
+from langchain_tests.unit_tests import ChatModelUnitTests
+
+from .custom_chat_model import ChatParrotLink
+
+if TYPE_CHECKING:
+    from langchain_core.language_models.chat_models import BaseChatModel
+
+
+class TestChatParrotLinkUnit(ChatModelUnitTests):
+    @property
+    def chat_model_class(self) -> type[ChatParrotLink]:
+        return ChatParrotLink
+
+    @property
+    def chat_model_params(self) -> dict[str, Any]:
+        return {"model": "bird-brain-001", "temperature": 0, "parrot_buffer_length": 50}
+
+
+class TestChatParrotLinkIntegration(ChatModelIntegrationTests):
+    @property
+    def chat_model_class(self) -> type[ChatParrotLink]:
+        return ChatParrotLink
+
+    @property
+    def chat_model_params(self) -> dict[str, Any]:
+        return {"model": "bird-brain-001", "temperature": 0, "parrot_buffer_length": 50}
+
+    @pytest.mark.xfail(reason="ChatParrotLink doesn't implement bind_tools method")
+    def test_unicode_tool_call_integration(
+        self,
+        model: BaseChatModel,
+        tool_choice: str | None = None,  # noqa: PT028
+        force_tool_call: bool = True,  # noqa: FBT001, FBT002, PT028
+    ) -> None:
+        """Expected failure as ChatParrotLink doesn't support tool calling yet."""
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

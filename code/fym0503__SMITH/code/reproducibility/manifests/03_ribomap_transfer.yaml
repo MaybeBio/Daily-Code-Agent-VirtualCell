@@ -1,0 +1,62 @@
+id: 03_ribomap_transfer
+order: 3
+title: Cross-study and cross-modality RIBOMap transfer
+manuscript_section: SMITH Transfers Panel Design to Spatial Translatome Profiling
+figure: Figure 4c-h
+runtime: About 10-60 minutes depending on hardware and dataset size.
+data_access: H5AD inputs listed in reproducibility/data_manifest.yaml.
+summary: Trains four recorded SMITH configurations and evaluates cell-type and region
+  predictions over five target splits. The notebook also plots the saved multi-method
+  overlap table and computes expression-bias groups from the current panels.
+claim: Deep-RIBOmap and STARmap provide complementary references for designing panels
+  for RIBOMap.
+inputs:
+- path: ribomap_transfer/ribomap/deep_brain_ribomap.h5ad
+  kind: data
+  bytes: 142886875
+  sha256: c27939e85d6a0e958e09b07807c7d721f8b993b392a444e3140a296f5dd56afc
+- path: ribomap_transfer/ribomap/mouse_brain_ribomap_rep1.h5ad
+  kind: data
+  bytes: 90291819
+  sha256: 4551431e38ff5dac9746f4e1495997dc9c4a88c5715b87f244e55b4a1d012b40
+- path: ribomap_transfer/ribomap/mouse_brain_ribomap_rep2.h5ad
+  kind: data
+  bytes: 72496557
+  sha256: 601b83c65a392865d8a82f9d4fbed00f7bdbf7ccb52426191b838c96b3d5456d
+- path: ribomap_transfer/ribomap/mouse_brain_starmap_rep2.h5ad
+  kind: data
+  bytes: 94653631
+  sha256: ac8e5a427e4c06b321614f628a84275539fa223428ee48ccc59e8ab09d952aea
+outputs:
+- figure_data/figure4_c_f_values.tsv
+- figure_data/figure4_training_comparison.tsv
+- figure_data/figure4_g_jaccard.tsv
+- figure_data/figure4_h_ribomap_bias.tsv
+- figure_data/figure4_h_pairwise_tests.tsv
+- run_manifest.json
+full_workflow:
+  availability: published
+  data_ids:
+  - mouse_brain_ribomap_rep1
+  - mouse_brain_ribomap_rep2
+  - mouse_brain_starmap_rep2
+  - ribomap_deep_brain
+  - starmap_deep_brain
+  source_scripts:
+  - reproducibility/workflows/ribomap_transfer/run_tutorial.py
+  - reproducibility/workflows/ribomap_transfer/evaluate_outputs.py
+related_panels:
+- Figure 4c-f
+- Figure 4g
+- Figure 4h
+training_config: reproducibility/configs/ribomap_paper.json
+training_backend: src/smith
+analysis_scope:
+  training_method: SMITH
+  accuracy_endpoints: 12
+  max_absolute_accuracy_difference: 0.0001533350370559
+  pairwise_overlap_rows: 45
+figure_coverage:
+- Figure 4c-f
+- Figure 4g
+- Figure 4h

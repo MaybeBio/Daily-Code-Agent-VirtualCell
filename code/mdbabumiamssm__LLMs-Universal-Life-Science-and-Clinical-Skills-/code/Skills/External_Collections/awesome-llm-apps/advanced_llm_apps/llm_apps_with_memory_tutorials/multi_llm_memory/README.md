@@ -1,0 +1,55 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+## 🧠 Multi-LLM App with Shared Memory
+This Streamlit application demonstrates a multi-LLM system with a shared memory layer, allowing users to interact with different language models while maintaining conversation history and context across sessions.
+
+### Features
+
+- Support for multiple LLMs:
+    - OpenAI's GPT-4o
+    - Anthropic's Claude 3.5 Sonnet
+
+- Persistent memory using Qdrant vector store
+- User-specific conversation history
+- Memory retrieval for contextual responses
+- User-friendly interface with LLM selection
+
+### How to get Started?
+
+1. Clone the GitHub repository
+```bash
+git clone https://github.com/Shubhamsaboo/awesome-llm-apps.git
+cd awesome-llm-apps/llm_apps_with_memory_tutorials/multi_llm_memory
+```
+
+2. Install the required dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Ensure Qdrant is running:
+The app expects Qdrant to be running on localhost:6333. Adjust the configuration in the code if your setup is different.
+
+```bash
+docker pull qdrant/qdrant
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+4. Run the Streamlit App
+```bash
+streamlit run multi_llm_memory.py
+```
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

@@ -1,0 +1,4 @@
+# Control: no discretization at all. Pair with model=continuous.
+name: continuous
+max_genes: 512
+nonzero_only: true

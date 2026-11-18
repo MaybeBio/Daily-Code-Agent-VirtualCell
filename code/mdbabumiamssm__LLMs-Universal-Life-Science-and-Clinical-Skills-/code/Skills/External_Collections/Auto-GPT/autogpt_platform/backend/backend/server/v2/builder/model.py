@@ -1,0 +1,89 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+from typing import Literal
+
+from pydantic import BaseModel
+
+import backend.server.v2.library.model as library_model
+import backend.server.v2.store.model as store_model
+from backend.data.block import BlockInfo
+from backend.integrations.providers import ProviderName
+from backend.util.models import Pagination
+
+FilterType = Literal[
+    "blocks",
+    "integrations",
+    "marketplace_agents",
+    "my_agents",
+]
+
+BlockType = Literal["all", "input", "action", "output"]
+
+
+class SearchEntry(BaseModel):
+    search_query: str | None = None
+    filter: list[FilterType] | None = None
+    by_creator: list[str] | None = None
+    search_id: str | None = None
+
+
+# Suggestions
+class SuggestionsResponse(BaseModel):
+    otto_suggestions: list[str]
+    recent_searches: list[SearchEntry]
+    providers: list[ProviderName]
+    top_blocks: list[BlockInfo]
+
+
+# All blocks
+class BlockCategoryResponse(BaseModel):
+    name: str
+    total_blocks: int
+    blocks: list[BlockInfo]
+
+    model_config = {"use_enum_values": False}  # Use enum names like "AI"
+
+
+# Input/Action/Output and see all for block categories
+class BlockResponse(BaseModel):
+    blocks: list[BlockInfo]
+    pagination: Pagination
+
+
+# Providers
+class Provider(BaseModel):
+    name: ProviderName
+    description: str
+    integration_count: int
+
+
+class ProviderResponse(BaseModel):
+    providers: list[Provider]
+    pagination: Pagination
+
+
+class SearchResponse(BaseModel):
+    items: list[BlockInfo | library_model.LibraryAgent | store_model.StoreAgent]
+    search_id: str
+    total_items: dict[FilterType, int]
+    pagination: Pagination
+
+
+class CountResponse(BaseModel):
+    all_blocks: int
+    input_blocks: int
+    action_blocks: int
+    output_blocks: int
+    integrations: int
+    marketplace_agents: int
+    my_agents: int
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

@@ -1,0 +1,55 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Agent Skills
+
+Agent Skills are folders of instructions, scripts, and resources that AI agents can discover and use to perform at specific tasks. Write once, use everywhere.
+
+Codex uses skills to help package capabilities that teams and individuals can use to complete specific tasks in a repeatable way. This repository catalogs skills for use and distribution with Codex.
+
+Learn more:
+- [Using skills in Codex](https://developers.openai.com/codex/skills)
+- [Agent Skills open standard](https://agentskills.io)
+
+## Installing a skill
+
+Skills in [`.system`](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/Babu_OpenAI_skills-main%20%282%29/skills/.system) are automatically installed in the latest version of Codex.
+
+To install [curated](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/Babu_OpenAI_skills-main%20%282%29/skills/.curated) or [experimental](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/Babu_OpenAI_skills-main%20%282%29/skills/.experimental) skills, you can use the `$skill-installer` inside Codex.
+
+Curated skills can be installed by name (defaults to `skills/.curated`):
+
+```
+$skill-installer gh-address-comments
+```
+
+For experimental skills, specify the skill folder. For example:
+
+```
+$skill-installer install the create-plan skill from the .experimental folder
+```
+
+Or provide the GitHub directory URL:
+
+```
+$skill-installer install https://github.com/openai/skills/tree/main/skills/.experimental/create-plan
+```
+
+After installing a skill, restart Codex to pick up new skills.
+
+## License
+
+The license of an individual skill can be found directly inside the skill's directory inside the `LICENSE.txt` file.
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

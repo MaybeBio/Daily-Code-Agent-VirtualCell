@@ -1,0 +1,258 @@
+###############################################################################
+# Install with uv (recommended):
+#
+#   cd squint                             # repository root
+#   uv venv .venv --python 3.10           # create the venv
+#   source .venv/bin/activate
+#   uv sync                                # resolves + installs everything
+#
+# uv reads the [tool.uv.*] sections at the bottom of this file, which:
+#   - point torch / torchvision / torchaudio at PyTorch's CUDA-12.1 wheels
+#   - add data.pyg.org as a find-links source for the precompiled
+#     pyg-lib / torch-cluster / torch-scatter / torch-sparse / torch-spline-conv
+#     wheels that match torch 2.2.x + CUDA 12.1
+#
+# CPU-only install:
+#   - in [tool.uv] below, change find-links URL to torch-2.2.0+cpu.html
+#   - in [tool.uv.sources] below, change `pytorch-cu121` to `pytorch-cpu`
+#   - remove the pinned pyg-lib / torch-cluster / torch-scatter / torch-sparse /
+#     torch-spline-conv lines (those are optional companion libs that
+#     torch_geometric will fall back from in pure-Python).
+###############################################################################
+
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling" ]
+
+[project]
+name = "squint"
+version = "0.0.1"
+description = "SQUINT -- Tokenization for Tissue Sections"
+readme = "README.md"
+license = { file = "LICENSE" }
+maintainers = [
+  { name = "Lloyd Steele", email = "ls34@sanger.ac.uk" },
+  { name = "Arpit Merchant", email = "am84@sanger.ac.uk" },
+]
+authors = [
+  { name = "Lloyd Steele" },
+  { name = "Arpit Merchant" },
+]
+requires-python = ">=3.10,<3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    # ---- PyTorch (pinned to match the prebuilt PyG companion wheels) ----
+    "torch==2.2.0",
+    "torchvision==0.17.0",
+    "torchaudio==2.2.0",
+
+    # ---- PyTorch Lightning ----
+    "pytorch-lightning>=2.2,<2.5",
+    "torchmetrics>=1.2,<2.0",
+
+    # ---- PyTorch Geometric core + companion wheels ----
+    "torch-geometric>=2.5,<2.7",
+    "pyg-lib==0.4.0",
+    "torch-cluster==1.6.3",
+    "torch-scatter==2.1.2",
+    "torch-sparse==0.6.18",
+    "torch-spline-conv==1.2.2",
+
+    # ---- vector-quantize / einops ----
+    "vector-quantize-pytorch>=1.14",
+    "einops>=0.7",
+
+    # ---- single-cell + spatial ----
+    "anndata>=0.10",
+    "scanpy>=1.10",
+    "squidpy>=1.5",
+    "scib-metrics>=0.5",
+    "h5py>=3.10",
+    # scanpy.pp.highly_variable_genes(flavor="seurat_v3") loads this lazily.
+    "scikit-misc>=0.3",
+
+    # ---- general data science ----
+    "numpy>=1.24,<2",
+    "pandas>=2.0",
+    "scipy>=1.11",
+    "scikit-learn>=1.3",
+    "networkx>=3.0",
+
+    # ---- plotting ----
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "umap-learn>=0.5",
+
+    # ---- experiment logging / IO ----
+    "wandb>=0.17",
+    "pyyaml>=6.0",
+    "tabulate>=0.9",
+    "tqdm>=4.66",
+    # for debug logging (referenced from the issue template)
+    "session-info>=1.0",
+
+    # `xarray_schema` (a transitive dep of spatialdata / squidpy) still does
+    # `from pkg_resources import ...`, which lives in setuptools. uv doesn't
+    # ship setuptools by default, AND recent setuptools (80+) has started
+    # omitting `pkg_resources` in some installs, so we pin to the version
+    # used by the original conda environment, which ships pkg_resources.
+    "setuptools>=68,<76",
+]
+
+# docs/conf.py reads the "Source" entry from the installed package metadata.
+[project.urls]
+Source = "https://github.com/Lotfollahi-lab/squint"
+Home-page = "https://github.com/Lotfollahi-lab/squint"
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "twine>=4.0.2",
+]
+doc = [
+    "docutils>=0.8,!=0.18.*,!=0.19.*",
+    "sphinx>=4",
+    "sphinx-book-theme>=1.0.0",
+    "myst-nb",
+    "sphinxcontrib-bibtex>=1.0.0",
+    "sphinx-autodoc-typehints",
+    "sphinxext-opengraph",
+    # For notebooks
+    "ipykernel",
+    "ipython",
+    "sphinx-copybutton",
+    "pandas",
+]
+test = [
+    "pytest",
+    "coverage",
+]
+# Extra packages used by the squint-reproducibility data-prep scripts only.
+data-prep = [
+    "pyensembl>=2.3",
+    "requests>=2.31",
+]
+# Optional baseline implementation imported by analysis/banksy_train.py.
+banksy = [
+    "banksy-py",
+]
+
+###############################################################################
+#                                  uv config
+###############################################################################
+
+[tool.uv]
+# data.pyg.org publishes a single HTML file per (torch, cuda) combination that
+# acts as a find-links index for the companion wheels. For CPU-only or a
+# different CUDA version, change the URL below to one of:
+#   https://data.pyg.org/whl/torch-2.2.0+cpu.html
+#   https://data.pyg.org/whl/torch-2.2.0+cu118.html
+#   https://data.pyg.org/whl/torch-2.2.0+cu121.html      <-- default
+find-links = ["https://data.pyg.org/whl/torch-2.2.0+cu121.html"]
+
+[tool.uv.sources]
+# Pull torch/torchvision/torchaudio from the PyTorch CUDA 12.1 index
+# (replace with `pytorch-cpu` for a CPU-only environment).
+torch       = [{ index = "pytorch-cu121" }]
+torchvision = [{ index = "pytorch-cu121" }]
+torchaudio  = [{ index = "pytorch-cu121" }]
+
+[[tool.uv.index]]
+name     = "pytorch-cu121"
+url      = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[[tool.uv.index]]
+name     = "pytorch-cpu"
+url      = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+###############################################################################
+
+[tool.coverage.run]
+source = ["squint"]
+omit = [
+    "**/test_*.py",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+xfail_strict = true
+addopts = [
+    "--import-mode=importlib",  # allow using test files with same name
+]
+
+[tool.ruff]
+line-length = 120
+src = ["src"]
+extend-include = ["*.ipynb"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "F",  # Errors detected by Pyflakes
+    "E",  # Error detected by Pycodestyle
+    "W",  # Warning detected by Pycodestyle
+    "I",  # isort
+    "D",  # pydocstyle
+    "B",  # flake8-bugbear
+    "TID",  # flake8-tidy-imports
+    "C4",  # flake8-comprehensions
+    "BLE",  # flake8-blind-except
+    "UP",  # pyupgrade
+    "RUF100",  # Report unused noqa directives
+]
+ignore = [
+    # line too long -> we accept long comment lines; formatter gets rid of long code lines
+    "E501",
+    # Do not assign a lambda expression, use a def -> lambda expression assignments are convenient
+    "E731",
+    # allow I, O, l as variable names -> I is the identity matrix
+    "E741",
+    # Missing docstring in public package
+    "D104",
+    # Missing docstring in public module
+    "D100",
+    # Missing docstring in __init__
+    "D107",
+    # Errors from function calls in argument defaults. These are fine when the result is immutable.
+    "B008",
+    # __magic__ methods are are often self-explanatory, allow missing docstrings
+    "D105",
+    # first line should end with a period [Bug: doesn't work with single-line docstrings]
+    "D400",
+    # First line should be in imperative mood; try rephrasing
+    "D401",
+    ## Disable one in each pair of mutually incompatible rules
+    # We don’t want a blank line before a class docstring
+    "D203",
+    # We want docstrings to start immediately after the opening triple quote
+    "D213",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"docs/*" = ["I"]
+"tests/*" = ["D"]
+"*/__init__.py" = ["F401"]
+
+[tool.cruft]
+skip = [
+    "tests",
+    "src/**/__init__.py",
+    "src/**/basic.py",
+    "docs/api.md",
+    "docs/changelog.md",
+    "docs/references.bib",
+    "docs/references.md",
+    "docs/notebooks/example.ipynb",
+]

@@ -1,0 +1,35 @@
+experiment:
+  name: mhl17-2b_1p
+  description: MERSCOPE Human Lung Cancer (dataset-id 17) | 2 batch | 1 panel | Preprocess to silver
+  study: MERSCOPE_FFPE_Human_Immuno-Oncology (https://info.vizgen.com/ffpe-showcase?submissionGuid=d4f4d370-4578-40fe-99ca-4325d6e2dfd0)
+
+paths:
+  data_directory_path: /lustre/scratch126/cellgen/team361/DATASETS
+
+dataset:
+  overwrite: false
+  source: offline
+  download_params:
+    redownload: false
+    urls: []
+  file_names:
+    - MERSCOPE_Human_Lung_Cancer_Patient1
+    - MERSCOPE_Human_Lung_Cancer_Patient2
+
+harmonization:
+  uns:
+    dataset_id: 17
+    assay: merfish
+    species: homo_sapiens
+    tissue: lung
+    sample_condition_map: {
+      'MERSCOPE_Human_Lung_Cancer_Patient1': 'nonsmall_cell_lung_carcinoma', # lung_cancer
+      'MERSCOPE_Human_Lung_Cancer_Patient2': 'nonsmall_cell_lung_carcinoma', # lung_cancer
+      }
+  batch:
+    split_by_batch: false
+    sample_batch_map: {}
+  key_mappings: {}
+  misc:
+    min_genes: 10
+

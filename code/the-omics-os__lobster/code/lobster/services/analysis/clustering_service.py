@@ -1,0 +1,3399 @@
+"""
+Clustering service for single-cell RNA-seq data.
+
+This service provides methods for clustering single-cell RNA-seq data
+and generating visualizations of the results.
+"""
+
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import anndata
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+import scanpy as sc
+from scipy import sparse
+from sklearn.metrics import (
+    calinski_harabasz_score,
+    davies_bouldin_score,
+    silhouette_samples,
+    silhouette_score,
+)
+
+from lobster.core.provenance.analysis_ir import AnalysisStep, ParameterSpec
+from lobster.core.utils.cluster_keys import resolve_cluster_key
+from lobster.utils.deviance import calculate_deviance
+from lobster.utils.logger import get_logger
+from lobster.utils.progress_wrapper import with_periodic_progress
+
+logger = get_logger(__name__)
+
+
+class ClusteringError(Exception):
+    """Base exception for clustering operations."""
+
+    pass
+
+
+class ClusteringService:
+    """
+    Stateless service for clustering single-cell RNA-seq data.
+
+    This class provides methods to perform clustering and dimensionality
+    reduction on single-cell RNA-seq data and generate visualizations.
+    """
+
+    def __init__(self, config=None, **kwargs):
+        """
+        Initialize the clustering service.
+
+        Args:
+            config: Optional configuration dict (ignored, for backward compatibility)
+            **kwargs: Additional arguments (ignored, for backward compatibility)
+
+        This service is stateless and doesn't require a data manager instance.
+        """
+        logger.debug("Initializing stateless ClusteringService")
+        self.config = config or {}
+        self.default_cluster_resolution = 1.0  # Scanpy standard, balances granularity
+        self.progress_callback = None
+        self.current_progress = 0
+        self.total_steps = 0
+        logger.debug("ClusteringService initialized successfully")
+
+    def set_progress_callback(self, callback: Callable[[int, str], None]) -> None:
+        """
+        Set a callback function to report progress.
+
+        The callback function should accept two parameters:
+        - progress: int (0-100 percentage)
+        - message: str (description of current operation)
+
+        Args:
+            callback: Callable function to receive progress updates
+        """
+        self.progress_callback = callback
+        logger.debug("Progress callback set")
+
+    def _update_progress(self, step_name: str) -> None:
+        """
+        Update progress and call the progress callback if set.
+
+        Args:
+            step_name: Name of the current processing step
+        """
+        self.current_progress += 1
+        if self.progress_callback is not None:
+            progress_percent = int((self.current_progress / self.total_steps) * 100)
+            self.progress_callback(progress_percent, step_name)
+            logger.debug(f"Progress updated: {progress_percent}% - {step_name}")
+
+    def _create_progress_callback(self):
+        """
+        Create a progress callback wrapper for use with with_periodic_progress.
+
+        Returns:
+            Callable that adapts with_periodic_progress messages to the existing callback system
+        """
+
+        def progress_callback_wrapper(message: str):
+            if self.progress_callback:
+                self.progress_callback(None, message)
+
+        return progress_callback_wrapper
+
+    @staticmethod
+    def _resolve_dimension(requested, default, maximum, name, minimum=1):
+        """Resolve an omitted dimension; never silently change an explicit one."""
+        if maximum < minimum:
+            raise ClusteringError(f"Insufficient data for {name}: maximum {maximum}")
+        if requested is not None:
+            if isinstance(requested, (bool, np.bool_)) or not isinstance(
+                requested, (int, np.integer)
+            ):
+                raise ClusteringError(f"{name} must be an integer")
+            if not minimum <= requested <= maximum:
+                raise ClusteringError(
+                    f"Explicit {name}={requested} cannot be honored; "
+                    f"supported range is {minimum}..{maximum}"
+                )
+            return int(requested), []
+        effective = min(default, maximum)
+        adjustments = []
+        if effective != default:
+            adjustments.append(
+                {
+                    "parameter": name,
+                    "requested": None,
+                    "default": default,
+                    "effective": effective,
+                    "reason": "available data dimensions",
+                }
+            )
+        return effective, adjustments
+
+    @staticmethod
+    def _validate_representation(adata, use_rep):
+        """Mechanical compatibility only, not scientific freshness certification."""
+        if not isinstance(use_rep, str) or not use_rep or use_rep not in adata.obsm:
+            raise ClusteringError(
+                f"Representation {use_rep!r} not found; prepare and name it explicitly"
+            )
+        values = adata.obsm[use_rep]
+        if (
+            len(values.shape) != 2
+            or values.shape[0] != adata.n_obs
+            or values.shape[1] < 1
+        ):
+            raise ClusteringError(
+                "Representation must be aligned, nonempty and two-dimensional"
+            )
+        data = values.data if sparse.issparse(values) else np.asarray(values)
+        if not np.issubdtype(data.dtype, np.number) or np.iscomplexobj(data):
+            raise ClusteringError("Representation must contain real numeric values")
+        if not np.isfinite(data).all():
+            raise ClusteringError("Representation must contain finite values")
+        return int(values.shape[1])
+
+    @staticmethod
+    def _validate_feature_request(
+        use_rep, method, n_features, flavor, resolutions=None
+    ):
+        if use_rep is not None and resolutions is not None:
+            raise ClusteringError(
+                "Prepared representations do not support resolutions lists; request one resolution"
+            )
+        if use_rep is None and (
+            flavor is not None or (method == "hvg" and n_features is not None)
+        ):
+            raise ClusteringError(
+                "Exact n_features/flavor requests are not supported by the full HVG pipeline. "
+                "Select features explicitly, run_pca, then use_rep='X_pca'."
+            )
+
+    @staticmethod
+    def _clustering_ir_prelude():
+        """Replay the same ordered sampling and existing correction routine."""
+        return """{% if subsample_size %}
+if adata.n_obs > {{ subsample_size }}:
+    sc.pp.subsample(adata, n_obs={{ subsample_size }}, random_state={{ subsample_seed }})
+{% endif %}
+{% if batch_correction_attempted %}
+adata = ClusteringService()._perform_batch_correction(adata, {{ batch_key | repr }})
+{% endif %}
+"""
+
+    def _create_clustering_ir(
+        self,
+        resolution: float,
+        n_neighbors: int = 15,
+        n_pcs: int = 20,
+        feature_selection_method: str = "deviance",
+        n_features: int = 4000,
+        min_mean: float = 0.0125,
+        max_mean: float = 3.0,
+        min_disp: float = 0.5,
+        resolutions: Optional[list] = None,
+        algorithm: str = "leiden",
+        find_markers: bool = True,
+        demo_mode: bool = False,
+        subsample_size: Optional[int] = None,
+        batch_correction_attempted: bool = False,
+        batch_key: Optional[str] = None,
+    ) -> AnalysisStep:
+        """
+        Create Intermediate Representation for full clustering pipeline.
+
+        Args:
+            resolution: Clustering resolution parameter
+            n_neighbors: Number of neighbors for graph construction
+            n_pcs: Number of principal components to use
+            feature_selection_method: 'deviance' or 'hvg'
+            n_features: Number of features to select (for deviance method)
+            min_mean: Minimum mean for HVG selection (for hvg method)
+            max_mean: Maximum mean for HVG selection (for hvg method)
+            min_disp: Minimum dispersion for HVG selection (for hvg method)
+            algorithm: Clustering algorithm - 'leiden' or 'louvain'
+
+        Returns:
+            AnalysisStep with full clustering pipeline code template
+        """
+        # The template calls sc.tl.<algorithm>, so it must be a known name.
+        if str(algorithm).lower() not in ("leiden", "louvain"):
+            raise ValueError(f"Unknown clustering algorithm {algorithm!r}")
+        # Parameter schema
+        parameter_schema = {
+            "resolution": ParameterSpec(
+                param_type="float",
+                papermill_injectable=True,
+                default_value=resolution,
+                required=False,
+                validation_rule="resolution > 0",
+                description="Resolution parameter for Leiden clustering",
+            ),
+            "resolutions": ParameterSpec(
+                param_type="List[float]",
+                papermill_injectable=True,
+                default_value=resolutions if resolutions else [],
+                required=False,
+                validation_rule=(
+                    "all(r > 0 for r in resolutions)" if resolutions else None
+                ),
+                description="List of resolution parameters for multi-resolution testing",
+            ),
+            "n_neighbors": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_neighbors,
+                required=False,
+                validation_rule="n_neighbors > 0",
+                description="Number of neighbors for graph construction",
+            ),
+            "n_pcs": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_pcs,
+                required=False,
+                validation_rule="n_pcs > 0",
+                description="Number of principal components to use",
+            ),
+        }
+
+        # Jinja2 template with branching logic for feature selection
+        if feature_selection_method == "deviance":
+            code_template = """# Single-cell clustering pipeline with deviance-based feature selection
+# Using deviance (binomial from multinomial null) - works on raw counts, no normalization bias
+from lobster.utils.deviance import calculate_deviance
+
+# 1. Feature selection BEFORE normalization (deviance method)
+deviance_scores = calculate_deviance(adata.X)
+n_features_to_select = min({{ n_features }}, len(deviance_scores))
+top_deviance_idx = np.argsort(deviance_scores)[::-1][:n_features_to_select]
+
+adata.var['highly_deviant'] = False
+adata.var.iloc[top_deviance_idx, adata.var.columns.get_loc('highly_deviant')] = True
+adata.var['deviance_score'] = deviance_scores
+
+n_selected = sum(adata.var['highly_deviant'])
+print(f"Selected {n_selected} highly deviant genes (deviance method)")
+
+# 2. Normalize AFTER feature selection
+sc.pp.normalize_total(adata, target_sum=1e4)
+sc.pp.log1p(adata)
+print("Normalization complete")
+
+# 3. Store raw data and subset to selected features
+#    Bind the subset to a SEPARATE name. Rebinding `adata` here left the
+#    notebook's `adata` as the subset for every later cell, which the service
+#    never does — it keeps the full object and transfers results back (step 9).
+adata.raw = adata.copy()
+adata_selected = adata[:, adata.var['highly_deviant']].copy()
+
+# 4. Scale data
+sc.pp.scale(adata_selected, max_value=10)
+print("Scaling complete")
+
+# 5. PCA dimensionality reduction
+# n_comps is explicit: without it scanpy defaults to 50 while the service
+# computes n_pcs (30), so the exported notebook summed 50 components and
+# reported a different variance ratio than the session it came from.
+sc.tl.pca(adata_selected, svd_solver='arpack', n_comps={{ n_pcs }})
+print(f"PCA complete (using { {{ n_pcs | repr }} } components)")
+
+# 6. Compute neighborhood graph
+sc.pp.neighbors(adata_selected, n_neighbors={{ n_neighbors }}, n_pcs={{ n_pcs }})
+print("Neighborhood graph computed")
+
+# 7. {{ algorithm | capitalize | repr }} clustering
+# The column name matches the service's algorithm/resolution convention.
+cluster_key = {{ (algorithm ~ '_res' ~ resolution | string | replace(".", "_")) | repr }}
+sc.tl.{{ algorithm | lower }}(adata_selected, resolution={{ resolution }}, key_added=cluster_key)
+adata_selected.obs[{{ algorithm | string | repr }}] = adata_selected.obs[cluster_key]
+n_clusters = len(adata_selected.obs[cluster_key].unique())
+print(f"{ {{ algorithm | capitalize | repr }} } clustering complete: {n_clusters} clusters (resolution={ {{ resolution | repr }} })")
+
+# 8. UMAP visualization
+sc.tl.umap(adata_selected)
+print("UMAP coordinates computed")
+
+# Transfer results back onto the full object, exactly as the service does. The
+# notebook must retain the full modality for subsequent analysis steps.
+adata.obs[cluster_key] = adata_selected.obs[cluster_key]
+adata.obs[{{ algorithm | string | repr }}] = adata_selected.obs[{{ algorithm | string | repr }}]
+adata.obsm['X_umap'] = adata_selected.obsm['X_umap']
+if 'X_pca' in adata_selected.obsm:
+    adata.obsm['X_pca'] = adata_selected.obsm['X_pca'].copy()
+if 'pca' in adata_selected.uns:
+    adata.uns['pca'] = adata_selected.uns['pca'].copy()
+if 'neighbors' in adata_selected.uns:
+    adata.uns['neighbors'] = adata_selected.uns['neighbors'].copy()
+if 'distances' in adata_selected.obsp:
+    adata.obsp['distances'] = adata_selected.obsp['distances'].copy()
+if 'connectivities' in adata_selected.obsp:
+    adata.obsp['connectivities'] = adata_selected.obsp['connectivities'].copy()
+adata.uns['resolutions_tested'] = [{{ resolution }}]
+adata.uns['clustering_results'] = {
+    {{ resolution }}: {
+        'resolution': {{ resolution }},
+        'n_clusters': n_clusters,
+        'key_name': cluster_key,
+    }
+}
+adata.uns['umap_distance_warning'] = (
+    "Distances between clusters in UMAP are not biologically meaningful. "
+    "UMAP is optimized for local neighborhood preservation, not global distance relationships."
+)
+
+# 10. Marker genes — the service runs this as part of the same call
+#     (clustering_service.py:1611), so a replay without it lacked
+#     uns['rank_genes_groups'] entirely.
+try:
+    sc.tl.rank_genes_groups(adata, {{ algorithm | string | repr }}, method='wilcoxon')
+    print("Marker genes identified")
+except ValueError as e:
+    # High resolution can produce singleton clusters, for which
+    # rank_genes_groups cannot compute statistics. The service skips these too.
+    print(f"Skipping marker gene identification: {e}")
+
+print(f"Clustering pipeline complete: {adata.n_obs} cells in {n_clusters} clusters")
+"""
+            pipeline_steps = [
+                "deviance_selection",
+                "normalize",
+                "scale",
+                "pca",
+                "neighbors",
+                algorithm,
+                "umap",
+            ]
+            description_method = "deviance"
+            imports = [
+                "import scanpy as sc",
+                "import numpy as np",
+                "from lobster.utils.deviance import calculate_deviance",
+            ]
+            parameters = {
+                "resolution": resolution,
+                "n_neighbors": n_neighbors,
+                "n_pcs": n_pcs,
+                "n_features": n_features,
+                "feature_selection_method": feature_selection_method,
+                "algorithm": algorithm,
+            }
+        else:  # hvg method
+            code_template = """# Single-cell clustering pipeline with HVG feature selection
+# Using HVG (Seurat method) - works on normalized data
+
+# 1. Normalize BEFORE feature selection (HVG method requires normalized data)
+sc.pp.normalize_total(adata, target_sum=1e4)
+sc.pp.log1p(adata)
+print("Normalization complete")
+
+# 2. Find highly variable genes AFTER normalization
+sc.pp.highly_variable_genes(
+    adata,
+    min_mean={{ min_mean }},
+    max_mean={{ max_mean }},
+    min_disp={{ min_disp }},
+    flavor='seurat'
+)
+n_hvg = sum(adata.var.highly_variable)
+print(f"Identified {n_hvg} highly variable genes (HVG method)")
+
+# 3. Store raw data and subset to HVG
+#    Bind the subset to a SEPARATE name — see step 9. Rebinding `adata` left
+#    every later cell running on the HVG subset, which the service never does.
+adata.raw = adata.copy()
+adata_selected = adata[:, adata.var.highly_variable].copy()
+
+# 4. Scale data
+sc.pp.scale(adata_selected, max_value=10)
+print("Scaling complete")
+
+# 5. PCA dimensionality reduction
+# n_comps is explicit: without it scanpy defaults to 50 while the service
+# computes n_pcs (30), so the exported notebook summed 50 components and
+# reported a different variance ratio than the session it came from.
+sc.tl.pca(adata_selected, svd_solver='arpack', n_comps={{ n_pcs }})
+print(f"PCA complete (using { {{ n_pcs | repr }} } components)")
+
+# 6. Compute neighborhood graph
+sc.pp.neighbors(adata_selected, n_neighbors={{ n_neighbors }}, n_pcs={{ n_pcs }})
+print("Neighborhood graph computed")
+
+# 7. {{ algorithm | capitalize | repr }} clustering
+# The column name matches the service's algorithm/resolution convention.
+cluster_key = {{ (algorithm ~ '_res' ~ resolution | string | replace(".", "_")) | repr }}
+sc.tl.{{ algorithm | lower }}(adata_selected, resolution={{ resolution }}, key_added=cluster_key)
+adata_selected.obs[{{ algorithm | string | repr }}] = adata_selected.obs[cluster_key]
+n_clusters = len(adata_selected.obs[cluster_key].unique())
+print(f"{ {{ algorithm | capitalize | repr }} } clustering complete: {n_clusters} clusters (resolution={ {{ resolution | repr }} })")
+
+# 8. UMAP visualization
+sc.tl.umap(adata_selected)
+print("UMAP coordinates computed")
+
+# Transfer results back onto the full object, exactly as the service does. The
+# notebook must retain the full modality for subsequent analysis steps.
+adata.obs[cluster_key] = adata_selected.obs[cluster_key]
+adata.obs[{{ algorithm | string | repr }}] = adata_selected.obs[{{ algorithm | string | repr }}]
+adata.obsm['X_umap'] = adata_selected.obsm['X_umap']
+if 'X_pca' in adata_selected.obsm:
+    adata.obsm['X_pca'] = adata_selected.obsm['X_pca'].copy()
+if 'pca' in adata_selected.uns:
+    adata.uns['pca'] = adata_selected.uns['pca'].copy()
+if 'neighbors' in adata_selected.uns:
+    adata.uns['neighbors'] = adata_selected.uns['neighbors'].copy()
+if 'distances' in adata_selected.obsp:
+    adata.obsp['distances'] = adata_selected.obsp['distances'].copy()
+if 'connectivities' in adata_selected.obsp:
+    adata.obsp['connectivities'] = adata_selected.obsp['connectivities'].copy()
+adata.uns['resolutions_tested'] = [{{ resolution }}]
+adata.uns['clustering_results'] = {
+    {{ resolution }}: {
+        'resolution': {{ resolution }},
+        'n_clusters': n_clusters,
+        'key_name': cluster_key,
+    }
+}
+adata.uns['umap_distance_warning'] = (
+    "Distances between clusters in UMAP are not biologically meaningful. "
+    "UMAP is optimized for local neighborhood preservation, not global distance relationships."
+)
+
+# 10. Marker genes — the service runs this as part of the same call
+#     (clustering_service.py:1611), so a replay without it lacked
+#     uns['rank_genes_groups'] entirely.
+try:
+    sc.tl.rank_genes_groups(adata, {{ algorithm | string | repr }}, method='wilcoxon')
+    print("Marker genes identified")
+except ValueError as e:
+    # High resolution can produce singleton clusters, for which
+    # rank_genes_groups cannot compute statistics. The service skips these too.
+    print(f"Skipping marker gene identification: {e}")
+
+print(f"Clustering pipeline complete: {adata.n_obs} cells in {n_clusters} clusters")
+"""
+            pipeline_steps = [
+                "normalize",
+                "hvg",
+                "scale",
+                "pca",
+                "neighbors",
+                algorithm,
+                "umap",
+            ]
+            description_method = "HVG"
+            imports = ["import scanpy as sc", "import numpy as np"]
+            parameters = {
+                "resolution": resolution,
+                "n_neighbors": n_neighbors,
+                "n_pcs": n_pcs,
+                "min_mean": min_mean,
+                "max_mean": max_mean,
+                "min_disp": min_disp,
+                "feature_selection_method": feature_selection_method,
+                "algorithm": algorithm,
+            }
+
+        # Both legacy branch templates share these operations. Bind the graph
+        # explicitly to computed PCs even when Scanpy would otherwise select X
+        # for <=50 selected genes, and replay the actual marker-skip branch.
+        code_template = code_template.replace(
+            "sc.pp.neighbors(adata_selected, n_neighbors={{ n_neighbors }}, n_pcs={{ n_pcs }})",
+            "sc.pp.neighbors(adata_selected, n_neighbors={{ n_neighbors }}, n_pcs={{ n_pcs }}, use_rep='X_pca')",
+        )
+        marker_start = code_template.index("# 10. Marker genes")
+        marker_end = code_template.index('print(f"Clustering pipeline complete:')
+        code_template = (
+            code_template[:marker_start]
+            + "{% if find_markers %}\n"
+            + code_template[marker_start:marker_end]
+            + "{% endif %}\n"
+            + code_template[marker_end:]
+        )
+        code_template = (
+            code_template.replace(
+                "adata_selected = adata[:, adata.var['highly_deviant']].copy()",
+                """{% if demo_mode %}
+if int(adata.var['highly_deviant'].sum()) > 1000:
+    selected_genes = adata.var.sort_values('deviance_score', ascending=False).head(1000).index
+    adata_selected = adata[:, selected_genes].copy()
+else:
+    adata_selected = adata[:, adata.var['highly_deviant']].copy()
+{% else %}
+adata_selected = adata[:, adata.var['highly_deviant']].copy()
+{% endif %}""",
+            )
+            .replace(
+                "adata_selected = adata[:, adata.var.highly_variable].copy()",
+                """{% if demo_mode %}
+if int(adata.var.highly_variable.sum()) > 1000:
+    selected_genes = adata.var.sort_values('dispersions_norm', ascending=False).head(1000).index
+    adata_selected = adata[:, selected_genes].copy()
+else:
+    adata_selected = adata[:, adata.var.highly_variable].copy()
+{% else %}
+adata_selected = adata[:, adata.var.highly_variable].copy()
+{% endif %}""",
+            )
+            .replace(
+                "sc.tl.umap(adata_selected)",
+                """{% if demo_mode %}
+sc.tl.umap(adata_selected, min_dist=0.5, spread=1.5)
+{% else %}
+sc.tl.umap(adata_selected)
+{% endif %}""",
+            )
+        )
+        # Replay every resolution on the same graph, retaining actual primary
+        # and all resolution-suffixed columns on the full object.
+        loop_start = code_template.index("cluster_key = ")
+        loop_end = code_template.index("# 8. UMAP visualization")
+        code_template = (
+            code_template[:loop_start]
+            + """resolutions_to_test = {{ resolutions | repr }}
+clustering_results = {}
+for res in resolutions_to_test:
+    cluster_key = f"{ {{ algorithm | repr }} }_res{res}".replace('.', '_')
+    sc.tl.{{ algorithm | lower }}(adata_selected, resolution=res, key_added=cluster_key)
+    clustering_results[res] = {'resolution': res, 'n_clusters': adata_selected.obs[cluster_key].nunique(), 'key_name': cluster_key}
+primary_key = f"{ {{ algorithm | repr }} }_res{resolutions_to_test[0]}".replace('.', '_')
+adata_selected.obs[{{ algorithm | repr }}] = adata_selected.obs[primary_key]
+n_clusters = adata_selected.obs[primary_key].nunique()
+
+"""
+            + code_template[loop_end:]
+        )
+        code_template = code_template.replace(
+            "adata.obs[cluster_key] = adata_selected.obs[cluster_key]",
+            """for res in resolutions_to_test:
+    key = f"{ {{ algorithm | repr }} }_res{res}".replace('.', '_')
+    adata.obs[key] = adata_selected.obs[key]""",
+        )
+        summary_start = code_template.index("adata.uns['resolutions_tested'] = ")
+        summary_end = code_template.index("adata.uns['umap_distance_warning'] = ")
+        code_template = (
+            code_template[:summary_start]
+            + "adata.uns['resolutions_tested'] = resolutions_to_test\nadata.uns['clustering_results'] = clustering_results\n"
+            + code_template[summary_end:]
+        )
+        parameters.update(
+            {
+                "find_markers": find_markers,
+                "use_rep": "X_pca",
+                "demo_mode": demo_mode,
+                "resolutions": (
+                    list(resolutions) if resolutions is not None else [resolution]
+                ),
+                "subsample_size": subsample_size,
+                "subsample_seed": 42,
+                "batch_correction_attempted": batch_correction_attempted,
+                "batch_key": batch_key,
+            }
+        )
+        code_template = self._clustering_ir_prelude() + code_template
+        if batch_correction_attempted:
+            imports.append(
+                "from lobster.services.analysis.clustering_service import ClusteringService"
+            )
+        return AnalysisStep(
+            operation=f"scanpy.tl.{algorithm}",
+            tool_name="cluster_and_visualize",
+            description=f"Full clustering pipeline: {description_method} + PCA + neighbors + {algorithm.capitalize()} (res={resolution}) + UMAP",
+            library="scanpy",
+            code_template=code_template,
+            imports=imports,
+            parameters=parameters,
+            parameter_schema=parameter_schema,
+            input_entities=["adata"],
+            output_entities=["adata"],
+            execution_context={
+                "operation_type": "clustering",
+                "algorithm": algorithm,
+                "pipeline_steps": pipeline_steps,
+                "feature_selection_method": feature_selection_method,
+                "resolution": resolution,
+            },
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    # =========================================================================
+    # COMPOSABLE PIPELINE METHODS
+    # =========================================================================
+
+    def run_pca(
+        self,
+        adata: anndata.AnnData,
+        n_comps: Optional[int] = None,
+        scale_data: bool = True,
+        use_highly_variable: bool = True,
+        svd_solver: str = "arpack",
+    ) -> Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Run PCA dimensionality reduction as a standalone step.
+
+        This method performs scaling (optional) and PCA on the input data.
+        It stores adata.raw BEFORE scaling so that downstream tools like
+        find_marker_genes_for_clusters can access unscaled expression values
+        for fold-change calculations.
+
+        Args:
+            adata: AnnData object (should have feature selection applied, e.g. highly_variable)
+            n_comps: Number of principal components to compute (default: 30)
+            scale_data: Whether to scale data before PCA (default: True)
+            use_highly_variable: Whether to subset to highly variable/deviant genes (default: True)
+            svd_solver: SVD solver for PCA ('arpack', 'randomized', 'auto')
+
+        Returns:
+            Tuple[AnnData, Dict, AnalysisStep]:
+                - AnnData with X_pca in obsm and pca info in uns
+                - Statistics dictionary
+                - AnalysisStep IR for notebook export
+
+        Raises:
+            ClusteringError: If PCA fails
+        """
+        try:
+            logger.info(
+                f"Running standalone PCA (n_comps={n_comps}, scale={scale_data}, "
+                f"use_highly_variable={use_highly_variable})"
+            )
+
+            # Determine dimensional capacity before copying/scaling. Preserve
+            # feature choice, but never silently clamp an explicit component request.
+            count = adata.n_vars
+            if use_highly_variable:
+                for column in ("highly_variable", "highly_deviant"):
+                    if column in adata.var:
+                        count = int(adata.var[column].astype(bool).sum())
+                        break
+            actual_n_comps, adjustments = self._resolve_dimension(
+                n_comps, 30, min(adata.n_obs - 1, count - 1), "n_comps"
+            )
+            adata_processed = adata.copy()
+
+            # Determine which features to use
+            feature_col = None
+            if use_highly_variable:
+                if "highly_variable" in adata_processed.var.columns:
+                    feature_col = "highly_variable"
+                elif "highly_deviant" in adata_processed.var.columns:
+                    feature_col = "highly_deviant"
+                else:
+                    logger.warning(
+                        "No 'highly_variable' or 'highly_deviant' column found in var. "
+                        "Using all genes for PCA."
+                    )
+
+            # Store raw data BEFORE scaling — required for downstream
+            # find_marker_genes_for_clusters which uses adata.raw for fold-change
+            adata_processed.raw = adata_processed.copy()
+
+            # Subset to selected features for PCA computation
+            if feature_col is not None:
+                try:
+                    n_selected = int(
+                        adata_processed.var[feature_col].astype(bool).sum()
+                    )
+                except (TypeError, ValueError):
+                    n_selected = 0
+                if n_selected == 0:
+                    raise ClusteringError(
+                        f"No features selected by '{feature_col}'. "
+                        "Run feature selection first."
+                    )
+                adata_selected = adata_processed[
+                    :, adata_processed.var[feature_col]
+                ].copy()
+                logger.info(f"Subset to {n_selected} features via '{feature_col}'")
+            else:
+                adata_selected = adata_processed.copy()
+
+            # Scale data
+            if scale_data:
+                logger.info("Scaling data (max_value=10)")
+                sc.pp.scale(adata_selected, max_value=10)
+
+            # Component count has already been resolved against this feature
+            # mask before any scaling. Explicit requests are not adjusted.
+
+            # Run PCA
+            logger.info(f"Computing PCA with {actual_n_comps} components")
+            sc.tl.pca(adata_selected, svd_solver=svd_solver, n_comps=actual_n_comps)
+
+            # Transfer PCA results back to full adata
+            adata_processed.obsm["X_pca"] = adata_selected.obsm["X_pca"]
+            if "pca" in adata_selected.uns:
+                adata_processed.uns["pca"] = adata_selected.uns["pca"]
+
+            # Compute statistics
+            variance_ratio = adata_processed.uns.get("pca", {}).get(
+                "variance_ratio", []
+            )
+            total_variance = (
+                float(np.sum(variance_ratio) * 100) if len(variance_ratio) > 0 else 0.0
+            )
+
+            stats = {
+                "analysis_type": "pca",
+                "n_comps_requested": n_comps,
+                "n_comps_computed": actual_n_comps,
+                "variance_explained": round(total_variance, 2),
+                "n_features_used": adata_selected.n_vars,
+                "scaled": scale_data,
+                "feature_column": feature_col,
+                "svd_solver": svd_solver,
+                "requested_parameters": {"n_comps": n_comps},
+                "applied_parameters": {
+                    "n_comps": actual_n_comps,
+                    "n_features_used": int(adata_selected.n_vars),
+                    "scale_data": scale_data,
+                    "feature_column": feature_col,
+                },
+                "parameter_adjustments": adjustments,
+            }
+
+            logger.info(
+                f"PCA completed: {actual_n_comps} components, "
+                f"{total_variance:.1f}% variance explained"
+            )
+
+            ir = self._create_pca_ir(
+                n_comps=actual_n_comps,
+                scale_data=scale_data,
+                use_highly_variable=use_highly_variable,
+                svd_solver=svd_solver,
+            )
+
+            return adata_processed, stats, ir
+
+        except ClusteringError:
+            raise
+        except Exception as e:
+            logger.exception(f"Error in PCA: {e}")
+            raise ClusteringError(f"PCA failed: {str(e)}")
+
+    def _create_embedding_clustering_ir(
+        self,
+        use_rep: str,
+        resolution: float,
+        algorithm: str,
+        demo_mode: bool,
+        find_markers: bool,
+        n_neighbors: int = 15,
+        n_pcs: int = 30,
+        subsample_size: Optional[int] = None,
+    ) -> AnalysisStep:
+        """IR for clustering on an existing embedding (``use_rep``).
+
+        Mirrors the ``use_rep`` branch of ``_perform_clustering``: no
+        normalization, feature selection or PCA.
+        """
+        algorithm = str(algorithm).lower()
+        if algorithm not in ("leiden", "louvain"):
+            raise ValueError(f"Unknown clustering algorithm {algorithm!r}")
+        code_template = """# Clustering on the existing embedding (no normalization or PCA)
+adata.raw = adata.copy()
+n_neighbors = {{ n_neighbors }}
+sc.pp.neighbors(adata, use_rep={{ use_rep | repr }}, n_neighbors=n_neighbors, n_pcs={{ n_pcs }})
+sc.tl.{{ algorithm }}(adata, resolution={{ resolution }}, key_added={{ algorithm | repr }})
+{% if demo_mode %}
+sc.tl.umap(adata, min_dist=0.5, spread=1.5)
+{% else %}
+sc.tl.umap(adata)
+{% endif %}
+{% if find_markers %}
+try:
+    sc.tl.rank_genes_groups(adata, {{ algorithm | repr }}, method={{ marker_method | repr }})
+except ValueError as e:
+    print(f"Skipping marker gene identification: {e}")
+{% endif %}
+print(f"Clustering complete: {adata.obs[{{ algorithm | repr }}].nunique()} clusters")
+"""
+        parameters = {
+            "use_rep": use_rep,
+            "resolution": resolution,
+            "n_neighbors": n_neighbors,
+            "n_pcs": n_pcs,
+            "algorithm": algorithm,
+            "demo_mode": demo_mode,
+            "find_markers": find_markers,
+            "marker_method": "t-test" if demo_mode else "wilcoxon",
+            "subsample_size": subsample_size,
+            "subsample_seed": 42,
+            "batch_correction_attempted": False,
+            "batch_key": None,
+        }
+        code_template = self._clustering_ir_prelude() + code_template
+        return AnalysisStep(
+            operation=f"scanpy.tl.{algorithm}",
+            tool_name="cluster_and_visualize",
+            description=(
+                f"{algorithm.capitalize()} clustering on existing embedding "
+                f"'{use_rep}' (res={resolution})"
+            ),
+            library="scanpy",
+            code_template=code_template,
+            imports=["import scanpy as sc"],
+            parameters=parameters,
+            parameter_schema={},
+            input_entities=["adata"],
+            output_entities=["adata"],
+            execution_context={
+                "operation_type": "clustering",
+                "algorithm": algorithm,
+                "use_rep": use_rep,
+                "resolution": resolution,
+            },
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    def _create_pca_ir(
+        self,
+        n_comps: int,
+        scale_data: bool,
+        use_highly_variable: bool,
+        svd_solver: str,
+    ) -> AnalysisStep:
+        """Create IR for standalone PCA operation."""
+        parameter_schema = {
+            "n_comps": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_comps,
+                required=False,
+                validation_rule="n_comps > 0",
+                description="Number of principal components",
+            ),
+            "scale_data": ParameterSpec(
+                param_type="bool",
+                papermill_injectable=True,
+                default_value=scale_data,
+                required=False,
+                validation_rule=None,
+                description="Whether to scale data before PCA",
+            ),
+        }
+
+        code_template = """# PCA dimensionality reduction
+# Store raw data before scaling (needed for marker gene fold-change)
+adata.raw = adata.copy()
+
+{% if use_highly_variable %}# Subset to selected features
+if 'highly_variable' in adata.var.columns:
+    adata_pca = adata[:, adata.var['highly_variable']].copy()
+elif 'highly_deviant' in adata.var.columns:
+    adata_pca = adata[:, adata.var['highly_deviant']].copy()
+else:
+    adata_pca = adata.copy()
+{% else %}adata_pca = adata.copy()
+{% endif %}
+{% if scale_data %}# Scale data
+sc.pp.scale(adata_pca, max_value=10)
+{% endif %}
+# Run PCA
+sc.tl.pca(adata_pca, svd_solver={{ svd_solver | string | repr }}, n_comps={{ n_comps }})
+
+# Transfer PCA results back
+adata.obsm['X_pca'] = adata_pca.obsm['X_pca']
+if 'pca' in adata_pca.uns:
+    adata.uns['pca'] = adata_pca.uns['pca']
+
+variance_explained = sum(adata.uns['pca']['variance_ratio']) * 100
+print(f"PCA complete: { {{ n_comps | repr }} } components, {variance_explained:.1f}% variance explained")
+"""
+
+        return AnalysisStep(
+            operation="scanpy.tl.pca",
+            tool_name="run_pca",
+            description=f"PCA with {n_comps} components (scaled={scale_data})",
+            library="scanpy",
+            code_template=code_template,
+            imports=["import scanpy as sc", "import numpy as np"],
+            parameters={
+                "n_comps": n_comps,
+                "scale_data": scale_data,
+                "use_highly_variable": use_highly_variable,
+                "svd_solver": svd_solver,
+            },
+            parameter_schema=parameter_schema,
+            input_entities=["adata"],
+            output_entities=["adata"],
+            execution_context={
+                "operation_type": "dimensionality_reduction",
+                "method": "pca",
+            },
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    def compute_neighbors_and_embed(
+        self,
+        adata: anndata.AnnData,
+        n_neighbors: Optional[int] = None,
+        n_pcs: Optional[int] = None,
+        embedding_method: str = "umap",
+        use_rep: Optional[str] = None,
+    ) -> Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Compute neighborhood graph and embedding (UMAP or tSNE) as a standalone step.
+
+        Args:
+            adata: AnnData object with PCA computed (X_pca in obsm)
+            n_neighbors: Number of neighbors for KNN graph (default: 15)
+            n_pcs: Number of PCs to use for neighbor computation (default: 30)
+            embedding_method: Embedding method ('umap' or 'tsne', default: 'umap')
+            use_rep: Representation key in obsm to use (default: None = 'X_pca')
+
+        Returns:
+            Tuple[AnnData, Dict, AnalysisStep]:
+                - AnnData with embedding coordinates in obsm and neighbor graph
+                - Statistics dictionary
+                - AnalysisStep IR for notebook export
+
+        Raises:
+            ClusteringError: If computation fails
+        """
+        try:
+            logger.info(
+                f"Computing neighbors and {embedding_method} embedding "
+                f"(n_neighbors={n_neighbors}, n_pcs={n_pcs})"
+            )
+
+            rep_key = "X_pca" if use_rep is None else use_rep
+            available_pcs = self._validate_representation(adata, rep_key)
+            neighbor_max = (
+                adata.n_obs if n_neighbors is not None else max(2, adata.n_obs - 1)
+            )
+            actual_n_neighbors, neighbor_adjustments = self._resolve_dimension(
+                n_neighbors, 15, neighbor_max, "n_neighbors", minimum=2
+            )
+            actual_n_pcs, pc_adjustments = self._resolve_dimension(
+                n_pcs, 30, available_pcs, "n_pcs"
+            )
+            embedding_method_lower = embedding_method.lower()
+            if embedding_method_lower not in ("umap", "tsne"):
+                raise ClusteringError("Embedding method must be 'umap' or 'tsne'")
+            adata_processed = adata.copy()
+
+            # Compute neighborhood graph
+            logger.info("Computing neighborhood graph")
+            sc.pp.neighbors(
+                adata_processed,
+                n_neighbors=actual_n_neighbors,
+                n_pcs=actual_n_pcs,
+                use_rep=rep_key,
+            )
+
+            # Compute embedding
+            embedding_method_lower = embedding_method.lower()
+            if embedding_method_lower == "umap":
+                logger.info("Computing UMAP embedding")
+                sc.tl.umap(adata_processed)
+                embedding_key = "X_umap"
+            elif embedding_method_lower == "tsne":
+                logger.info("Computing tSNE embedding")
+                sc.tl.tsne(adata_processed, use_rep=rep_key, n_pcs=actual_n_pcs)
+                embedding_key = "X_tsne"
+            else:
+                raise ClusteringError(
+                    f"Unknown embedding method: '{embedding_method}'. "
+                    "Use 'umap' or 'tsne'."
+                )
+
+            # Compute statistics
+            embedding_shape = adata_processed.obsm[embedding_key].shape
+
+            stats = {
+                "analysis_type": "neighbors_and_embed",
+                "n_neighbors_used": actual_n_neighbors,
+                "n_pcs_used": actual_n_pcs,
+                "embedding_method": embedding_method_lower,
+                "embedding_key": embedding_key,
+                "embedding_shape": list(embedding_shape),
+                "use_rep": rep_key,
+                "requested_parameters": {
+                    "n_neighbors": n_neighbors,
+                    "n_pcs": n_pcs,
+                    "use_rep": use_rep,
+                },
+                "applied_parameters": {
+                    "n_neighbors": actual_n_neighbors,
+                    "n_pcs": actual_n_pcs,
+                    "use_rep": rep_key,
+                    "embedding_method": embedding_method_lower,
+                },
+                "parameter_adjustments": neighbor_adjustments + pc_adjustments,
+            }
+
+            logger.info(
+                f"Neighbors + {embedding_method_lower} completed: "
+                f"embedding shape {embedding_shape}"
+            )
+
+            ir = self._create_neighbors_embed_ir(
+                n_neighbors=actual_n_neighbors,
+                n_pcs=actual_n_pcs,
+                embedding_method=embedding_method_lower,
+                use_rep=rep_key,
+            )
+
+            return adata_processed, stats, ir
+
+        except ClusteringError:
+            raise
+        except Exception as e:
+            logger.exception(f"Error in neighbors/embedding: {e}")
+            raise ClusteringError(f"Neighbors/embedding failed: {str(e)}")
+
+    def _create_neighbors_embed_ir(
+        self,
+        n_neighbors: int,
+        n_pcs: int,
+        embedding_method: str,
+        use_rep: str,
+    ) -> AnalysisStep:
+        """Create IR for neighborhood graph and embedding computation."""
+        parameter_schema = {
+            "n_neighbors": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_neighbors,
+                required=False,
+                validation_rule="n_neighbors > 0",
+                description="Number of neighbors for KNN graph",
+            ),
+            "n_pcs": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_pcs,
+                required=False,
+                validation_rule="n_pcs > 0",
+                description="Number of PCs for neighbor computation",
+            ),
+        }
+
+        if embedding_method == "umap":
+            embed_code = """# Compute UMAP embedding
+sc.tl.umap(adata)
+print(f"UMAP computed: {adata.obsm['X_umap'].shape}")
+"""
+        else:
+            embed_code = """# Compute tSNE embedding
+sc.tl.tsne(adata, use_rep={{ use_rep | string | repr }}, n_pcs={{ n_pcs }})
+print(f"tSNE computed: {adata.obsm['X_tsne'].shape}")
+"""
+
+        code_template = f"""# Compute neighborhood graph and embedding
+sc.pp.neighbors(adata, n_neighbors={{{{ n_neighbors }}}}, n_pcs={{{{ n_pcs }}}}, use_rep={{{{ use_rep | string | repr }}}})
+print(f"Neighborhood graph computed (n_neighbors={{ {{{{ n_neighbors | repr }}}} }}, n_pcs={{ {{{{ n_pcs | repr }}}} }})")
+
+{embed_code}"""
+
+        return AnalysisStep(
+            operation=f"scanpy.pp.neighbors+scanpy.tl.{embedding_method}",
+            tool_name="compute_neighbors_and_embed",
+            description=f"Compute KNN graph (k={n_neighbors}) and {embedding_method.upper()} embedding",
+            library="scanpy",
+            code_template=code_template,
+            imports=["import scanpy as sc"],
+            parameters={
+                "n_neighbors": n_neighbors,
+                "n_pcs": n_pcs,
+                "embedding_method": embedding_method,
+                "use_rep": use_rep,
+            },
+            parameter_schema=parameter_schema,
+            input_entities=["adata"],
+            output_entities=["adata"],
+            execution_context={
+                "operation_type": "embedding",
+                "method": embedding_method,
+            },
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    def cluster_and_visualize(
+        self,
+        adata: anndata.AnnData,
+        resolution: Optional[float] = None,
+        resolutions: Optional[list] = None,
+        use_rep: Optional[str] = None,
+        batch_correction: bool = False,
+        batch_key: Optional[str] = None,
+        demo_mode: bool = False,
+        subsample_size: Optional[int] = None,
+        skip_steps: Optional[list] = None,
+        feature_selection_method: str = "deviance",
+        n_features: Optional[int] = None,
+        algorithm: str = "leiden",
+        n_neighbors: Optional[int] = None,
+        n_pcs: Optional[int] = None,
+        flavor: Optional[str] = None,
+    ) -> Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Perform clustering and UMAP visualization on single-cell RNA-seq data.
+
+        Args:
+            adata: AnnData object to cluster
+            resolution: Resolution parameter for clustering (single value)
+            resolutions: List of resolution parameters for multi-resolution testing
+            use_rep: Representation to use for clustering (e.g., 'X_scvi', 'X_pca').
+                    If None, uses standard PCA workflow. If specified, uses the
+                    custom embedding from adata.obsm[use_rep] for neighbor calculation.
+            batch_correction: Whether to perform batch correction
+            batch_key: Column name for batch information
+            demo_mode: Whether to run in demo mode (faster processing with reduced quality)
+            subsample_size: Maximum number of cells to include (subsamples if larger)
+            skip_steps: List of steps to skip in demo mode (e.g. ['marker_genes'])
+            feature_selection_method: Method for feature selection ('deviance' or 'hvg').
+                                     'deviance': Binomial deviance from multinomial null (default, recommended)
+                                     'hvg': Traditional highly variable genes (Seurat method)
+            n_features: Number of features to select (default: 4000)
+            algorithm: Clustering algorithm - 'leiden' (default) or 'louvain'
+
+        Returns:
+            Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]: Clustered AnnData, clustering stats, and IR
+
+        Raises:
+            ClusteringError: If clustering fails
+            TypeError: If adata is not an AnnData object
+            ValueError: If resolution is invalid
+        """
+        # Input validation (outside try/except - these are caller errors, not clustering errors)
+        if not isinstance(adata, anndata.AnnData):
+            raise TypeError(f"Expected AnnData object, got {type(adata).__name__}")
+
+        # The first requested resolution is the actual primary result.
+        requested_resolution = resolution
+        if resolutions is not None:
+            if not resolutions:
+                raise ValueError("resolutions must not be empty")
+            resolution = resolutions[0]
+        elif resolution is None:
+            resolution = self.default_cluster_resolution
+
+        if resolution is not None and resolution <= 0:
+            raise ValueError(f"Resolution must be positive, got {resolution}")
+        if use_rep is not None:
+            self._validate_representation(adata, use_rep)
+            if batch_correction:
+                raise ClusteringError(
+                    "Prepared representation and explicit batch correction cannot "
+                    "be combined; correct batches before preparing the representation"
+                )
+        self._validate_feature_request(
+            use_rep, feature_selection_method, n_features, flavor, resolutions
+        )
+        execution_details = {
+            "requested_parameters": {
+                "n_neighbors": n_neighbors,
+                "n_pcs": n_pcs,
+                "resolution": requested_resolution,
+                "resolutions": resolutions,
+                "use_rep": use_rep,
+                "n_features": n_features,
+                "flavor": flavor,
+                "batch_correction": batch_correction,
+                "subsample_size": subsample_size,
+                "demo_mode": demo_mode,
+            },
+            "applied_parameters": {},
+            "parameter_adjustments": [],
+            "skipped_steps": [],
+            "features_marked": None,
+            "features_used": None,
+        }
+
+        try:
+            logger.debug("Starting clustering and visualization pipeline")
+
+            # Initialize progress tracking
+            self.current_progress = 0
+            skip_steps = list(skip_steps or [])
+            # Calculate total steps based on what will be performed
+            self.total_steps = 7  # Base steps: subsample, batch check, normalize, hvg, scale, pca, neighbors, leiden, umap
+            if batch_correction:
+                self.total_steps += 1
+            if "marker_genes" not in skip_steps:
+                self.total_steps += 1
+
+            logger.debug(f"Performing clustering with resolution {resolution}")
+
+            # Create working copy
+            adata_clustered = adata.copy()
+            original_shape = adata_clustered.shape
+
+            logger.debug(
+                f"Input data dimensions: {original_shape[0]} cells × {original_shape[1]} genes"
+            )
+
+            # Handle demo mode settings
+            if demo_mode:
+                logger.debug("Running in demo mode (faster processing)")
+                if "marker_genes" not in skip_steps:
+                    skip_steps.append("marker_genes")
+                if not subsample_size:
+                    subsample_size = min(
+                        1000, original_shape[0]
+                    )  # Default to 1000 cells in demo mode
+
+            subsample_status = {
+                "target": subsample_size,
+                "seed": 42,
+                "performed": False,
+                "input_n_obs": int(original_shape[0]),
+                "result_n_obs": int(original_shape[0]),
+            }
+            # Subsample if needed
+            if subsample_size and adata_clustered.n_obs > subsample_size:
+                # Preserve observation columns during subsampling
+                original_obs_cols = set(adata_clustered.obs.columns)
+                logger.debug(
+                    f"Subsampling data to {subsample_size} cells (from {adata_clustered.n_obs})"
+                )
+                sc.pp.subsample(adata_clustered, n_obs=subsample_size, random_state=42)
+                subsample_status["performed"] = True
+                subsample_status["result_n_obs"] = int(adata_clustered.n_obs)
+                logger.debug(
+                    f"Data subsampled: {adata_clustered.n_obs} cells remaining"
+                )
+
+                # Verify metadata preservation
+                new_obs_cols = set(adata_clustered.obs.columns)
+                if original_obs_cols != new_obs_cols:
+                    lost_cols = original_obs_cols - new_obs_cols
+                    logger.warning(
+                        f"Subsampling lost {len(lost_cols)} obs columns: {lost_cols}"
+                    )
+
+            self._update_progress("Data preparation completed")
+
+            batch_status = {
+                "attempted": False,
+                "applied": False,
+                "failed": False,
+                "effective_key": None,
+                "reason": "not requested",
+            }
+            # Check for batch information if batch correction requested
+            if batch_correction:
+                if batch_key is None:
+                    # Auto-detect batch key
+                    for potential_key in ["Patient_ID", "patient", "batch", "sample"]:
+                        if potential_key in adata_clustered.obs.columns:
+                            batch_key = potential_key
+                            logger.info(f"Auto-detected batch key: {batch_key}")
+                            break
+
+                if batch_key and batch_key in adata_clustered.obs.columns:
+                    unique_batches = adata_clustered.obs[batch_key].unique()
+                    if len(unique_batches) > 1:
+                        logger.info(
+                            f"Found {len(unique_batches)} batches for correction: {list(unique_batches)}"
+                        )
+                        before_correction = adata_clustered
+                        batch_status.update(
+                            {"attempted": True, "effective_key": batch_key}
+                        )
+                        adata_clustered = self._perform_batch_correction(
+                            adata_clustered, batch_key
+                        )
+                        # This is the existing helper's execution branch, NOT a
+                        # claim of biological efficacy/freshness of the correction.
+                        batch_correction = adata_clustered is not before_correction
+                        batch_status.update(
+                            {
+                                "applied": batch_correction,
+                                "failed": not batch_correction,
+                                "reason": (
+                                    "helper returned corrected object"
+                                    if batch_correction
+                                    else "helper returned unchanged object"
+                                ),
+                            }
+                        )
+                    else:
+                        logger.info(
+                            "Only one batch found - proceeding without batch correction"
+                        )
+                        batch_correction = False
+                        batch_status["reason"] = "only one batch"
+                else:
+                    logger.warning(
+                        "Batch correction requested but no valid batch key found"
+                    )
+                    batch_correction = False
+                    batch_status["reason"] = "no valid batch key"
+
+            self._update_progress(
+                "Batch correction completed"
+                if batch_correction
+                else "Batch check completed"
+            )
+
+            # Perform clustering
+            adata_clustered = self._perform_clustering(
+                adata_clustered,
+                resolution,
+                use_rep,
+                demo_mode,
+                skip_steps,
+                feature_selection_method,
+                n_features,
+                resolutions,
+                algorithm,
+                n_neighbors=n_neighbors,
+                n_pcs=n_pcs,
+                execution_details=execution_details,
+            )
+
+            # Compile clustering statistics
+            cluster_col = algorithm
+            n_clusters = len(adata_clustered.obs[cluster_col].unique())
+            cluster_counts = adata_clustered.obs[cluster_col].value_counts().to_dict()
+
+            clustering_stats = {
+                "analysis_type": "clustering",
+                "algorithm": algorithm,
+                "resolution": resolution,
+                "n_clusters": n_clusters,
+                "batch_correction": batch_correction,
+                "batch_key": batch_key if batch_correction else None,
+                "demo_mode": demo_mode,
+                "subsample_size": subsample_size if subsample_size else None,
+                "subsample_status": subsample_status,
+                "batch_correction_status": batch_status,
+                "original_shape": original_shape,
+                "final_shape": adata_clustered.shape,
+                "cluster_counts": cluster_counts,
+                "cluster_sizes": {
+                    str(cluster): int(count)
+                    for cluster, count in cluster_counts.items()
+                },
+                "has_umap": "X_umap" in adata_clustered.obsm,
+                "has_marker_genes": "names"
+                in adata_clustered.uns.get("rank_genes_groups", {}),
+                **execution_details,
+                "batch_correction_reason": (
+                    f"using your prepared {use_rep}; batch correction not applied"
+                    if use_rep is not None
+                    else None
+                ),
+            }
+            clustering_stats["applied_parameters"].update(
+                {
+                    "batch_correction": bool(batch_correction),
+                    "algorithm": algorithm,
+                    "resolution": resolution,
+                    "flavor": (
+                        "seurat"
+                        if use_rep is None and feature_selection_method == "hvg"
+                        else None
+                    ),
+                    "resolutions": (
+                        list(resolutions) if resolutions is not None else [resolution]
+                    ),
+                    "demo_mode": demo_mode,
+                    "subsample_size": subsample_size,
+                    "batch_key": batch_status["effective_key"],
+                }
+            )
+
+            # Add multi-resolution info if available
+            if "clustering_results" in adata_clustered.uns:
+                clustering_stats["clustering_results"] = adata_clustered.uns[
+                    "clustering_results"
+                ]
+                clustering_stats["resolutions_tested"] = adata_clustered.uns[
+                    "resolutions_tested"
+                ]
+                clustering_stats["n_resolutions"] = len(
+                    adata_clustered.uns["resolutions_tested"]
+                )
+
+                # Add summary of clusters per resolution
+                if len(adata_clustered.uns["resolutions_tested"]) > 1:
+                    clustering_stats["multi_resolution_summary"] = {
+                        res: adata_clustered.uns["clustering_results"][res][
+                            "n_clusters"
+                        ]
+                        for res in adata_clustered.uns["resolutions_tested"]
+                    }
+                    # Add explicit column name mapping for downstream tools
+                    clustering_stats["resolution_columns"] = {
+                        res: f"{algorithm}_res{res}".replace(".", "_")
+                        for res in adata_clustered.uns["resolutions_tested"]
+                    }
+
+            # Add UMAP distance warning to stats
+            if "umap_distance_warning" in adata_clustered.uns:
+                clustering_stats["umap_distance_warning"] = adata_clustered.uns[
+                    "umap_distance_warning"
+                ]
+
+            # Add batch information if available
+            if batch_correction and batch_key:
+                batch_counts = adata_clustered.obs[batch_key].value_counts().to_dict()
+                clustering_stats["batch_counts"] = batch_counts
+                clustering_stats["n_batches"] = len(batch_counts)
+
+            # Add marker gene information if available
+            rgg = adata_clustered.uns.get("rank_genes_groups", {})
+            if "names" in rgg and "marker_genes" not in skip_steps:
+                marker_genes = {}
+                for cluster in adata_clustered.obs[cluster_col].unique():
+                    genes = rgg["names"][cluster]
+                    scores = rgg["scores"][cluster]
+                    marker_genes[str(cluster)] = [
+                        {"gene": str(gene), "score": float(score)}
+                        for gene, score in zip(genes[:10], scores[:10])
+                    ]
+                clustering_stats["top_marker_genes"] = marker_genes
+
+            logger.info(f"Clustering completed: {n_clusters} clusters identified")
+
+            # Create IR for notebook export
+            if use_rep is not None:
+                # Explicit, mechanically validated embedding; never a suffix inference.
+                ir = self._create_embedding_clustering_ir(
+                    use_rep=use_rep,
+                    resolution=resolution,
+                    algorithm=algorithm,
+                    demo_mode=demo_mode,
+                    find_markers="marker_genes" not in skip_steps,
+                    n_neighbors=execution_details["applied_parameters"]["n_neighbors"],
+                    n_pcs=execution_details["applied_parameters"]["n_pcs"],
+                    subsample_size=subsample_size,
+                )
+                ir.parameters.update(
+                    {
+                        "features_marked": execution_details["features_marked"],
+                        "features_used": execution_details["features_used"],
+                        "skipped_steps": list(execution_details["skipped_steps"]),
+                        "batch_correction_status": batch_status,
+                        "subsample_status": subsample_status,
+                    }
+                )
+                return adata_clustered, clustering_stats, ir
+
+            ir = self._create_clustering_ir(
+                resolution=(
+                    resolution if resolution else self.default_cluster_resolution
+                ),
+                n_neighbors=execution_details["applied_parameters"]["n_neighbors"],
+                n_pcs=execution_details["applied_parameters"]["n_pcs"],
+                feature_selection_method=feature_selection_method,
+                n_features=4000 if n_features is None else n_features,
+                resolutions=resolutions,
+                algorithm=algorithm,
+                find_markers="marker_genes" not in skip_steps,
+                demo_mode=demo_mode,
+                subsample_size=subsample_size,
+                batch_correction_attempted=batch_status["attempted"],
+                batch_key=batch_status["effective_key"],
+            )
+            ir.parameters.update(
+                {
+                    "features_marked": execution_details["features_marked"],
+                    "features_used": execution_details["features_used"],
+                    "skipped_steps": list(execution_details["skipped_steps"]),
+                    "batch_correction_status": batch_status,
+                    "subsample_status": subsample_status,
+                }
+            )
+
+            return adata_clustered, clustering_stats, ir
+
+        except Exception as e:
+            logger.exception(f"Error during clustering: {e}")
+            raise ClusteringError(f"Clustering failed: {str(e)}")
+
+    def _perform_batch_correction(
+        self, adata: anndata.AnnData, batch_key: str
+    ) -> anndata.AnnData:
+        """
+        Perform simple batch correction on the data.
+
+        Args:
+            adata: AnnData object with batch information
+            batch_key: Column name containing batch labels
+
+        Returns:
+            anndata.AnnData: Batch-corrected AnnData object
+        """
+        logger.info(f"Performing batch correction using batch key: {batch_key}")
+
+        try:
+            # Track original observation columns for verification
+            original_obs_cols = set(adata.obs.columns)
+
+            # Simple batch correction by normalizing each batch separately
+            unique_batches = adata.obs[batch_key].unique()
+            batch_list = []
+
+            for batch in unique_batches:
+                batch_mask = adata.obs[batch_key] == batch
+                batch_adata = adata[batch_mask].copy()
+
+                # Normalize each batch separately
+                sc.pp.normalize_total(batch_adata, target_sum=1e4)
+                sc.pp.log1p(batch_adata)
+
+                batch_list.append(batch_adata)
+
+            # Concatenate corrected batches
+            adata_corrected = anndata.concat(
+                batch_list, label=batch_key, keys=unique_batches
+            )
+
+            # Verify metadata preservation after batch correction
+            corrected_obs_cols = set(adata_corrected.obs.columns)
+            lost_cols = original_obs_cols - corrected_obs_cols
+            if lost_cols:
+                logger.warning(
+                    f"Batch correction lost {len(lost_cols)} obs columns: {lost_cols}"
+                )
+
+            logger.info(f"Batch correction completed for {len(unique_batches)} batches")
+            return adata_corrected
+
+        except Exception as e:
+            logger.warning(
+                f"Batch correction failed, proceeding without correction: {e}"
+            )
+            return adata
+
+    def _run_clustering_algorithm(
+        self,
+        adata: anndata.AnnData,
+        resolution: float,
+        key_added: str,
+        algorithm: str = "leiden",
+    ) -> None:
+        """
+        Dispatch clustering to the specified algorithm.
+
+        Args:
+            adata: AnnData object with computed neighbor graph
+            resolution: Clustering resolution parameter
+            key_added: Key name to store cluster assignments in adata.obs
+            algorithm: Clustering algorithm - 'leiden' (default) or 'louvain'
+
+        Raises:
+            ClusteringError: If algorithm is unknown or required package is missing
+        """
+        algorithm = algorithm.lower()
+        if algorithm == "louvain":
+            try:
+                sc.tl.louvain(adata, resolution=resolution, key_added=key_added)
+            except (AttributeError, ImportError) as e:
+                from lobster.core.component_registry import get_install_command
+
+                install_cmd = get_install_command("louvain")
+                raise ClusteringError(
+                    "Louvain clustering requires the 'louvain' package.\n"
+                    f"Install with: {install_cmd}\n"
+                    "Or use algorithm='leiden' (recommended, generally faster with better resolution limit)."
+                ) from e
+        elif algorithm == "leiden":
+            sc.tl.leiden(adata, resolution=resolution, key_added=key_added)
+        else:
+            raise ClusteringError(
+                f"Unknown clustering algorithm '{algorithm}'. Use 'leiden' or 'louvain'."
+            )
+
+    def _perform_clustering(
+        self,
+        adata: sc.AnnData,
+        resolution: float,
+        use_rep: Optional[str] = None,
+        demo_mode: bool = False,
+        skip_steps: Optional[list] = None,
+        feature_selection_method: str = "deviance",
+        n_features: Optional[int] = None,
+        resolutions: Optional[list] = None,
+        algorithm: str = "leiden",
+        n_neighbors: Optional[int] = None,
+        n_pcs: Optional[int] = None,
+        execution_details: Optional[dict] = None,
+    ) -> sc.AnnData:
+        """
+        Perform clustering on the AnnData object with configurable feature selection.
+
+        Feature selection methods:
+        - 'deviance': Selects features BEFORE normalization using binomial deviance (recommended)
+        - 'hvg': Selects features AFTER normalization using Seurat HVG method (traditional)
+
+        Args:
+            adata: AnnData object
+            resolution: Clustering resolution parameter
+            use_rep: Representation to use for clustering (e.g., 'X_scvi', 'X_pca').
+                    If None, uses standard PCA workflow. If specified, uses the
+                    custom embedding from adata.obsm[use_rep] for neighbor calculation.
+            demo_mode: Whether to run in demo mode (faster with reduced quality)
+            skip_steps: List of steps to skip (e.g., 'marker_genes')
+            feature_selection_method: 'deviance' (default) or 'hvg'
+            n_features: Number of features to select (default: 4000)
+            algorithm: Clustering algorithm - 'leiden' (default) or 'louvain'
+
+        Returns:
+            sc.AnnData: AnnData object with clustering results
+        """
+        logger.info("Performing clustering pipeline based on publication workflow")
+        skip_steps = skip_steps or []
+        start_time = time.time()
+        details = (
+            execution_details
+            if execution_details is not None
+            else {
+                "applied_parameters": {},
+                "parameter_adjustments": [],
+                "skipped_steps": [],
+            }
+        )
+        requested_pcs = n_pcs
+        if "marker_genes" in skip_steps:
+            details["skipped_steps"].append("marker_genes")
+        neighbor_max = (
+            adata.n_obs if n_neighbors is not None else max(2, adata.n_obs - 1)
+        )
+        n_neighbors, neighbor_adjustments = self._resolve_dimension(
+            n_neighbors, 15, neighbor_max, "n_neighbors", minimum=2
+        )
+        details["parameter_adjustments"].extend(neighbor_adjustments)
+        if use_rep is not None:
+            width = self._validate_representation(adata, use_rep)
+            n_pcs, pc_adjustments = self._resolve_dimension(n_pcs, 30, width, "n_pcs")
+            details["parameter_adjustments"].extend(pc_adjustments)
+        elif feature_selection_method == "hvg" and n_features is not None:
+            raise ClusteringError(
+                "Exact n_features is not supported by the full HVG pipeline"
+            )
+        n_features = 4000 if n_features is None else n_features
+
+        # Check if using caller-selected embeddings (e.g., scVI)
+        if use_rep is not None:
+            logger.info(f"Using custom embedding '{use_rep}' for clustering")
+
+            # Validate custom embedding
+            embedding_shape = adata.obsm[use_rep].shape
+            logger.info(
+                f"Custom embedding shape: {embedding_shape[0]} cells × {embedding_shape[1]} dimensions"
+            )
+
+            # Store raw data for marker gene analysis
+            adata.raw = adata.copy()
+            self._update_progress(
+                "Using custom embeddings (skipping normalization/PCA)"
+            )
+
+            # Compute neighborhood graph using custom embedding
+            logger.info("Computing neighborhood graph from custom embedding")
+            details["skipped_steps"].extend(
+                ["normalize", "feature_selection", "scale", "pca"]
+            )
+            details["applied_parameters"].update(
+                {
+                    "n_neighbors": n_neighbors,
+                    "n_pcs": n_pcs,
+                    "use_rep": use_rep,
+                    "feature_selection_method": None,
+                    "n_features_selected": None,
+                }
+            )
+
+            with with_periodic_progress(
+                "Computing neighborhood graph from custom embedding",
+                self._create_progress_callback(),
+                update_interval=10,
+                show_elapsed=True,
+            ):
+                sc.pp.neighbors(
+                    adata, use_rep=use_rep, n_neighbors=n_neighbors, n_pcs=n_pcs
+                )
+
+            self._update_progress("Neighborhood graph computed from custom embedding")
+
+            # Run clustering
+            logger.info(f"Running {algorithm} clustering with resolution {resolution}")
+
+            with with_periodic_progress(
+                f"Running {algorithm} clustering (resolution={resolution})",
+                self._create_progress_callback(),
+                update_interval=10,
+                show_elapsed=True,
+            ):
+                self._run_clustering_algorithm(
+                    adata, resolution, key_added=algorithm, algorithm=algorithm
+                )
+
+            self._update_progress(f"{algorithm.capitalize()} clustering completed")
+            cluster_col = algorithm
+
+            # UMAP for visualization using custom embedding
+            logger.info("Computing UMAP coordinates from custom embedding")
+
+            with with_periodic_progress(
+                "Computing UMAP coordinates from custom embedding",
+                self._create_progress_callback(),
+                update_interval=15,
+                show_elapsed=True,
+            ):
+                if demo_mode:
+                    sc.tl.umap(adata, min_dist=0.5, spread=1.5)
+                else:
+                    sc.tl.umap(adata)
+
+            self._update_progress("UMAP coordinates computed from custom embedding")
+
+        else:
+            # Standard workflow when no custom embedding specified
+            if use_rep:
+                logger.warning(
+                    f"Custom embedding '{use_rep}' not found in adata.obsm, using standard PCA workflow"
+                )
+
+            # Feature selection: deviance (recommended) or HVG (traditional)
+            logger.info(
+                f"Using '{feature_selection_method}' feature selection method with n_features={n_features}"
+            )
+
+            if feature_selection_method == "deviance":
+                # DEVIANCE-BASED FEATURE SELECTION (BEFORE NORMALIZATION)
+                # Step 1: Select features on raw counts using deviance
+                logger.info(
+                    "Selecting features using deviance (on raw counts, before normalization)"
+                )
+                deviance_scores = calculate_deviance(adata.X)
+
+                # Select top n_features by deviance
+                n_features_to_select = min(n_features, len(deviance_scores))
+                top_deviance_idx = np.argsort(deviance_scores)[::-1][
+                    :n_features_to_select
+                ]
+
+                # Mark selected features
+                adata.var["highly_deviant"] = False
+                adata.var.iloc[
+                    top_deviance_idx, adata.var.columns.get_loc("highly_deviant")
+                ] = True
+                adata.var["deviance_score"] = deviance_scores
+
+                n_selected = sum(adata.var["highly_deviant"])
+                logger.info(f"Selected {n_selected} highly deviant genes")
+                self._update_progress(
+                    f"Deviance-based feature selection completed ({n_selected} genes)"
+                )
+
+                # Step 2: Normalize data (AFTER feature selection)
+                logger.info("Normalizing data (after feature selection)")
+                sc.pp.normalize_total(adata, target_sum=1e4)
+                sc.pp.log1p(adata)
+                self._update_progress("Normalization completed")
+
+                # Store raw data before scaling
+                adata.raw = adata.copy()
+
+                # Step 3: Subset to selected features
+                if n_selected == 0:
+                    raise ClusteringError(
+                        "No highly deviant genes detected. This typically indicates:\n"
+                        "1. Data has very low variance (all genes have similar expression)\n"
+                        "2. Dataset is too small or uniform for feature selection\n"
+                        "3. Data may need quality filtering before clustering\n\n"
+                        "Suggestions:\n"
+                        "- Check data quality (use quality_service for QC metrics)\n"
+                        "- Ensure data is raw counts (not already normalized/log-transformed)\n"
+                        "- Try filtering out low-quality cells/genes first"
+                    )
+
+                # Validate that selected features have sufficient variance
+                selected_deviance = adata.var.loc[
+                    adata.var["highly_deviant"], "deviance_score"
+                ]
+                if len(selected_deviance) > 0:
+                    deviance_range = selected_deviance.max() - selected_deviance.min()
+                    deviance_mean = selected_deviance.mean()
+                    deviance_max = selected_deviance.max()
+
+                    # Two-tier validation (either condition indicates problematic data):
+                    # 1. Check if max deviance is extremely low (< 0.5) - catches Poisson(1) + noise type data
+                    # 2. Check if all selected genes have nearly identical deviance (CV < 0.02)
+                    is_too_low_variance = deviance_max < 0.5
+                    is_too_uniform = (
+                        deviance_mean > 0 and (deviance_range / deviance_mean) < 0.02
+                    )
+
+                    if is_too_low_variance or is_too_uniform:
+                        raise ClusteringError(
+                            "Insufficient features for clustering: selected features have very uniform variance.\n"
+                            "This typically indicates:\n"
+                            "1. Data has very low variance (all genes have similar expression)\n"
+                            "2. Dataset may be too homogeneous for clustering\n"
+                            "3. Data may need quality filtering before clustering\n\n"
+                            "Suggestions:\n"
+                            "- Check data quality (variance should differ between genes)\n"
+                            "- Filter out low-quality or uninformative cells/genes\n"
+                            "- Verify this is raw count data, not pre-processed"
+                        )
+
+                # In demo mode, further restrict features
+                if demo_mode and n_selected > 1000:
+                    logger.info("Demo mode: Restricting to top 1000 deviant genes")
+                    most_deviant_genes = (
+                        adata.var.sort_values("deviance_score", ascending=False)
+                        .head(1000)
+                        .index
+                    )
+                    adata_selected = adata[:, most_deviant_genes]
+                else:
+                    adata_selected = adata[:, adata.var["highly_deviant"]]
+
+            elif feature_selection_method == "hvg":
+                # TRADITIONAL HVG FEATURE SELECTION (AFTER NORMALIZATION)
+                # Step 1: Normalize FIRST (required for HVG method)
+                logger.info("Normalizing data (before HVG selection)")
+                sc.pp.normalize_total(adata, target_sum=1e4)
+                sc.pp.log1p(adata)
+                self._update_progress("Normalization completed")
+
+                # Step 2: Find highly variable genes on normalized data
+                logger.info("Finding highly variable genes (after normalization)")
+                sc.pp.highly_variable_genes(
+                    adata, min_mean=0.0125, max_mean=3, min_disp=0.5, flavor="seurat"
+                )
+                self._update_progress("Highly variable genes identified")
+
+                # Store raw data before scaling
+                adata.raw = adata.copy()
+
+                # Step 3: Subset to selected features
+                n_hvg = sum(adata.var.highly_variable)
+                logger.info(f"Using {n_hvg} highly variable genes")
+
+                if n_hvg == 0:
+                    raise ClusteringError(
+                        "No highly variable genes detected. This typically indicates:\n"
+                        "1. Data has very low variance (all genes have similar expression)\n"
+                        "2. Dataset is too small or uniform for HVG detection\n"
+                        "3. Data may need quality filtering before clustering\n\n"
+                        "Suggestions:\n"
+                        "- Check data quality (use quality_service for QC metrics)\n"
+                        "- Ensure data is raw counts (not already normalized/log-transformed)\n"
+                        "- Try filtering out low-quality cells/genes first\n"
+                        "- Consider using 'deviance' method instead (works on raw counts, no normalization bias)"
+                    )
+
+                # Validate that selected features have sufficient variance spread
+                if "dispersions_norm" in adata.var.columns:
+                    selected_dispersion = adata.var.loc[
+                        adata.var.highly_variable, "dispersions_norm"
+                    ]
+                    if len(selected_dispersion) > 0:
+                        disp_range = (
+                            selected_dispersion.max() - selected_dispersion.min()
+                        )
+                        disp_mean = selected_dispersion.mean()
+                        # Check if variance is too uniform (very lenient threshold - catches only degenerate data)
+                        if disp_mean > 0 and (disp_range / disp_mean) < 0.01:
+                            raise ClusteringError(
+                                "Selected features have insufficient variance spread. This typically indicates:\n"
+                                "1. Data has very uniform expression across all genes\n"
+                                "2. Dataset may be too homogeneous for clustering\n"
+                                "3. Data may need quality filtering before clustering\n\n"
+                                "Suggestions:\n"
+                                "- Check data quality (variance should differ between genes)\n"
+                                "- Filter out low-quality or uninformative cells/genes\n"
+                                "- Consider using 'deviance' method for better feature detection"
+                            )
+
+                # In demo mode, further restrict features
+                if demo_mode and n_hvg > 1000:
+                    logger.info("Demo mode: Restricting to top 1000 variable genes")
+                    most_variable_genes = (
+                        adata.var.sort_values("dispersions_norm", ascending=False)
+                        .head(1000)
+                        .index
+                    )
+                    adata_selected = adata[:, most_variable_genes]
+                else:
+                    adata_selected = adata[:, adata.var.highly_variable]
+
+            else:
+                raise ClusteringError(
+                    f"Unknown feature_selection_method: '{feature_selection_method}'. "
+                    f"Must be 'deviance' or 'hvg'."
+                )
+
+            # Distinguish the marked mask from the actual demo PCA subset.
+            marked_column = (
+                "highly_deviant"
+                if feature_selection_method == "deviance"
+                else "highly_variable"
+            )
+            details["features_marked"] = int(adata.var[marked_column].sum())
+            details["features_used"] = int(adata_selected.n_vars)
+            # Validate against the selected data BEFORE scaling/PCA. An omitted
+            # ordinary30 can adjust; an explicit request is never demo-capped.
+            n_pcs, pc_adjustments = self._resolve_dimension(
+                requested_pcs,
+                30,
+                min(adata_selected.n_obs - 1, adata_selected.n_vars - 1),
+                "n_pcs",
+            )
+            details["parameter_adjustments"].extend(pc_adjustments)
+            details["applied_parameters"].update(
+                {
+                    "n_neighbors": n_neighbors,
+                    "n_pcs": n_pcs,
+                    "use_rep": "X_pca",
+                    "feature_selection_method": feature_selection_method,
+                    "n_features_selected": int(adata_selected.n_vars),
+                }
+            )
+            # Preserve the existing numerical algorithm and scaling policy.
+            logger.info("Scaling data")
+            sc.pp.scale(adata_selected, max_value=10)
+            self._update_progress("Data scaling completed")
+            logger.info(f"Using {n_pcs} principal components for neighborhood graph")
+
+            # PCA (using 'arpack' SVD solver for better performance with sparse matrices)
+            logger.info("Running PCA")
+            sc.tl.pca(adata_selected, svd_solver="arpack", n_comps=n_pcs)
+            self._update_progress("PCA completed")
+
+            # Compute neighborhood graph
+            logger.info("Computing neighborhood graph")
+            with with_periodic_progress(
+                "Computing neighborhood graph",
+                self._create_progress_callback(),
+                update_interval=10,
+                show_elapsed=True,
+            ):
+                sc.pp.neighbors(
+                    adata_selected,
+                    n_neighbors=n_neighbors,
+                    n_pcs=n_pcs,
+                    use_rep="X_pca",
+                )
+
+            self._update_progress("Neighborhood graph computed")
+
+            # Run clustering - support multi-resolution testing
+            # Determine which resolutions to test
+            if resolutions is not None:
+                # Multi-resolution testing mode
+                resolutions_to_test = resolutions
+                logger.info(f"Testing {len(resolutions)} resolutions: {resolutions}")
+            elif resolution is not None:
+                # Single resolution mode (backward compatible)
+                resolutions_to_test = [resolution]
+            else:
+                # Default resolution
+                resolutions_to_test = [self.default_cluster_resolution]
+
+            # Run clustering for each resolution
+            clustering_results = {}
+            for res in resolutions_to_test:
+                # Create descriptive key name: leiden_res0_25, louvain_res0_5, etc.
+                key_name = f"{algorithm}_res{res}".replace(".", "_")
+
+                logger.info(
+                    f"Running {algorithm} clustering at resolution {res} (key: {key_name})"
+                )
+
+                with with_periodic_progress(
+                    f"Running {algorithm} clustering (resolution={res})",
+                    self._create_progress_callback(),
+                    update_interval=10,
+                    show_elapsed=True,
+                ):
+                    self._run_clustering_algorithm(
+                        adata_selected, res, key_added=key_name, algorithm=algorithm
+                    )
+
+                # Track cluster counts for this resolution
+                n_clusters = adata_selected.obs[key_name].nunique()
+                clustering_results[res] = {
+                    "resolution": res,
+                    "n_clusters": n_clusters,
+                    "key_name": key_name,
+                }
+                logger.info(f"  → {n_clusters} clusters identified")
+
+            # Store clustering results for stats
+            adata_selected.uns["clustering_results"] = clustering_results
+            adata_selected.uns["resolutions_tested"] = resolutions_to_test
+
+            # For backward compatibility, also create a column with the algorithm name pointing to primary resolution
+            primary_resolution = resolutions_to_test[0]
+            primary_key = f"{algorithm}_res{primary_resolution}".replace(".", "_")
+            adata_selected.obs[algorithm] = adata_selected.obs[primary_key]
+            cluster_col = algorithm
+
+            self._update_progress(f"{algorithm.capitalize()} clustering completed")
+
+            # UMAP for visualization
+            logger.info("Computing UMAP coordinates")
+
+            with with_periodic_progress(
+                "Computing UMAP coordinates",
+                self._create_progress_callback(),
+                update_interval=15,
+                show_elapsed=True,
+            ):
+                if demo_mode:
+                    # Use faster UMAP settings in demo mode
+                    sc.tl.umap(adata_selected, min_dist=0.5, spread=1.5)
+                else:
+                    sc.tl.umap(adata_selected)
+
+            # IMPORTANT WARNING about UMAP distances
+            logger.warning(
+                "UMAP visualization computed. IMPORTANT: Distances between clusters in UMAP "
+                "space are NOT biologically meaningful. UMAP preserves local structure but "
+                "distorts global distances. Use for visual exploration only, not quantitative analysis."
+            )
+
+            # Store warning in adata for downstream tools
+            adata_selected.uns["umap_distance_warning"] = (
+                "Distances between clusters in UMAP are not biologically meaningful. "
+                "UMAP is optimized for local neighborhood preservation, not global distance relationships."
+            )
+
+            self._update_progress("UMAP coordinates computed")
+
+            # Transfer clustering results and UMAP coordinates back to the original object
+            adata.obs[algorithm] = adata_selected.obs[algorithm]
+            adata.obsm["X_umap"] = adata_selected.obsm["X_umap"]
+
+            # Preserve X_pca for downstream quality evaluation
+            if "X_pca" in adata_selected.obsm:
+                adata.obsm["X_pca"] = adata_selected.obsm["X_pca"].copy()
+
+            # Transfer PCA variance information for elbow plots
+            if "pca" in adata_selected.uns:
+                adata.uns["pca"] = adata_selected.uns["pca"].copy()
+
+            # Transfer neighbor graph information for trajectory analysis
+            if "neighbors" in adata_selected.uns:
+                adata.uns["neighbors"] = adata_selected.uns["neighbors"].copy()
+            if hasattr(adata_selected, "obsp"):
+                if "distances" in adata_selected.obsp:
+                    adata.obsp["distances"] = adata_selected.obsp["distances"].copy()
+                if "connectivities" in adata_selected.obsp:
+                    adata.obsp["connectivities"] = adata_selected.obsp[
+                        "connectivities"
+                    ].copy()
+
+            # Transfer multi-resolution results if available
+            if "clustering_results" in adata_selected.uns:
+                adata.uns["clustering_results"] = adata_selected.uns[
+                    "clustering_results"
+                ]
+                adata.uns["resolutions_tested"] = adata_selected.uns[
+                    "resolutions_tested"
+                ]
+                # Transfer all resolution columns to main adata
+                for res in adata_selected.uns["resolutions_tested"]:
+                    key_name = f"{algorithm}_res{res}".replace(".", "_")
+                    if key_name in adata_selected.obs.columns:
+                        adata.obs[key_name] = adata_selected.obs[key_name]
+
+            # Transfer UMAP warning
+            if "umap_distance_warning" in adata_selected.uns:
+                adata.uns["umap_distance_warning"] = adata_selected.uns[
+                    "umap_distance_warning"
+                ]
+
+        # Find marker genes for each cluster, unless skipped
+        if "marker_genes" not in skip_steps:
+            logger.info("Finding marker genes for clusters")
+            method = (
+                "t-test" if demo_mode else "wilcoxon"
+            )  # t-test is faster than wilcoxon
+
+            # Wrap the slow marker gene operation with progress updates
+            operation_name = f"Finding marker genes using {method}"
+
+            try:
+                with with_periodic_progress(
+                    operation_name,
+                    self._create_progress_callback(),
+                    update_interval=15,
+                    show_elapsed=True,
+                ):
+                    sc.tl.rank_genes_groups(adata, cluster_col, method=method)
+
+                self._update_progress("Marker genes identified")
+            except ValueError as e:
+                # High resolution clustering can produce singleton clusters (1 cell each),
+                # for which rank_genes_groups cannot compute statistics. Skip gracefully.
+                logger.warning(
+                    f"Skipping marker gene identification: {e}. "
+                    "This is expected when high resolution produces singleton clusters."
+                )
+        else:
+            logger.info("Skipping marker gene identification (demo mode)")
+
+        n_clusters = len(adata.obs[cluster_col].unique())
+        logger.info(f"Identified {n_clusters} clusters")
+
+        elapsed = time.time() - start_time
+        logger.info(f"Clustering completed in {elapsed:.2f} seconds")
+
+        return adata
+
+    def compute_clustering_quality(
+        self,
+        adata: anndata.AnnData,
+        # Resolve the cluster key from adata.obs when omitted.
+        # and for resolution-suffixed columns, not only a literal 'leiden'.
+        cluster_key: Optional[str] = None,
+        use_rep: str = "X_pca",
+        n_pcs: Optional[int] = None,
+        metrics: Optional[List[str]] = None,
+    ) -> Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Compute clustering quality metrics for evaluation and resolution selection.
+
+        Calculates multiple metrics to assess clustering quality:
+        - Silhouette score: How well-separated clusters are (-1 to 1, higher better)
+        - Davies-Bouldin index: Ratio of intra/inter-cluster distances (lower better)
+        - Calinski-Harabasz score: Ratio of between/within variance (higher better)
+
+        These metrics help answer:
+        - "Is my clustering good?"
+        - "Which resolution gives the best separation?"
+        - "Am I over-clustering or under-clustering?"
+
+        Args:
+            adata: AnnData object with clustering results
+            cluster_key: Key in adata.obs containing cluster labels (default: "leiden")
+            use_rep: Representation to use for distance calculations (default: "X_pca")
+            n_pcs: Number of PCs to use (default: None = use all available)
+            metrics: List of metrics to compute (default: None = all metrics)
+                    Options: ["silhouette", "davies_bouldin", "calinski_harabasz"]
+
+        Returns:
+            Tuple of (adata, stats_dict, analysis_step_ir)
+
+            stats_dict contains:
+            - silhouette_score: Overall score (-1 to 1)
+            - davies_bouldin_index: Overall index (lower better)
+            - calinski_harabasz_score: Overall score (higher better)
+            - n_clusters: Number of clusters evaluated
+            - cluster_sizes: Dict mapping cluster ID to cell count
+            - interpretation: Human-readable quality assessment
+            - recommendations: Suggested next steps based on metrics
+
+        Examples:
+            # Evaluate single clustering result
+            result, stats, ir = service.compute_clustering_quality(adata, cluster_key="leiden")
+
+            # Compare multiple resolutions
+            for res in [0.25, 0.5, 1.0]:
+                result, stats, ir = service.compute_clustering_quality(
+                    adata, cluster_key=f"leiden_res{str(res).replace('.', '_')}"
+                )
+                print(f"Resolution {res}: Silhouette={stats['silhouette_score']:.3f}")
+        """
+        try:
+            # Step 1: Copy input
+            adata = adata.copy()
+
+            # Step 2: Resolve and validate the cluster column.
+            # resolve_cluster_key raises ClusterKeyError (a ValueError) listing
+            # the candidates, which replaces the old bespoke check.
+            cluster_key = resolve_cluster_key(adata, cluster_key)
+
+            logger.info(f"Computing clustering quality metrics for '{cluster_key}'")
+            start_time = time.time()
+
+            # Validate representation exists
+            if use_rep == "X_pca" and "X_pca" not in adata.obsm:
+                raise ValueError("X_pca not found in adata.obsm. Run PCA first.")
+            elif use_rep != "X_pca" and use_rep not in adata.obsm:
+                raise ValueError(
+                    f"Representation '{use_rep}' not found in adata.obsm. "
+                    f"Available representations: {list(adata.obsm.keys())}"
+                )
+
+            # Get cluster labels
+            labels = adata.obs[cluster_key].values
+
+            # Validate we have at least 2 clusters
+            n_clusters = len(np.unique(labels))
+            if n_clusters < 2:
+                raise ValueError(
+                    f"Need at least 2 clusters for quality metrics, found {n_clusters}. "
+                    f"Consider using a higher resolution parameter."
+                )
+
+            logger.info(
+                f"Evaluating quality for {n_clusters} clusters using '{use_rep}' representation"
+            )
+
+            # Get data representation
+            if n_pcs is not None:
+                X = adata.obsm[use_rep][:, :n_pcs]
+                logger.info(f"Using first {n_pcs} components from '{use_rep}'")
+            else:
+                X = adata.obsm[use_rep]
+                logger.info(f"Using all {X.shape[1]} components from '{use_rep}'")
+
+            # Step 3: Determine which metrics to compute
+            if metrics is None:
+                metrics_to_compute = [
+                    "silhouette",
+                    "davies_bouldin",
+                    "calinski_harabasz",
+                ]
+            else:
+                metrics_to_compute = metrics
+                # Validate metric names
+                valid_metrics = ["silhouette", "davies_bouldin", "calinski_harabasz"]
+                invalid = set(metrics_to_compute) - set(valid_metrics)
+                if invalid:
+                    raise ValueError(
+                        f"Invalid metrics: {invalid}. Valid options: {valid_metrics}"
+                    )
+
+            logger.info(f"Computing metrics: {metrics_to_compute}")
+
+            # Step 4: Compute Metrics
+            results = {}
+
+            # Silhouette score (-1 to 1, higher better)
+            if "silhouette" in metrics_to_compute:
+                logger.info("Computing silhouette score...")
+                results["silhouette_score"] = float(
+                    silhouette_score(X, labels, metric="euclidean")
+                )
+                logger.info(f"  → Silhouette score: {results['silhouette_score']:.4f}")
+
+            # Davies-Bouldin index (0 to ∞, lower better)
+            if "davies_bouldin" in metrics_to_compute:
+                logger.info("Computing Davies-Bouldin index...")
+                results["davies_bouldin_index"] = float(davies_bouldin_score(X, labels))
+                logger.info(
+                    f"  → Davies-Bouldin index: {results['davies_bouldin_index']:.4f}"
+                )
+
+            # Calinski-Harabasz score (0 to ∞, higher better)
+            if "calinski_harabasz" in metrics_to_compute:
+                logger.info("Computing Calinski-Harabasz score...")
+                results["calinski_harabasz_score"] = float(
+                    calinski_harabasz_score(X, labels)
+                )
+                logger.info(
+                    f"  → Calinski-Harabasz score: {results['calinski_harabasz_score']:.2f}"
+                )
+
+            # Step 5: Compute Per-Cluster Statistics
+            cluster_sizes = dict(adata.obs[cluster_key].value_counts().sort_index())
+            cluster_sizes = {str(k): int(v) for k, v in cluster_sizes.items()}
+
+            # Per-cluster silhouette scores (for detailed analysis)
+            per_cluster_silhouette = {}
+            if "silhouette" in metrics_to_compute:
+                logger.info("Computing per-cluster silhouette scores...")
+                silhouette_vals = silhouette_samples(X, labels, metric="euclidean")
+                for cluster_id in np.unique(labels):
+                    mask = labels == cluster_id
+                    per_cluster_silhouette[str(cluster_id)] = float(
+                        np.mean(silhouette_vals[mask])
+                    )
+
+            # Step 6: Generate Interpretation
+            interpretation = []
+
+            # Silhouette interpretation
+            if "silhouette" in metrics_to_compute:
+                sil = results["silhouette_score"]
+                if sil > 0.7:
+                    interpretation.append(
+                        f"Silhouette score {sil:.3f}: EXCELLENT cluster separation"
+                    )
+                elif sil > 0.5:
+                    interpretation.append(
+                        f"Silhouette score {sil:.3f}: GOOD cluster separation"
+                    )
+                elif sil > 0.25:
+                    interpretation.append(
+                        f"Silhouette score {sil:.3f}: MODERATE cluster separation"
+                    )
+                else:
+                    interpretation.append(
+                        f"Silhouette score {sil:.3f}: POOR cluster separation (consider different resolution)"
+                    )
+
+            # Davies-Bouldin interpretation
+            if "davies_bouldin" in metrics_to_compute:
+                db = results["davies_bouldin_index"]
+                if db < 1.0:
+                    interpretation.append(
+                        f"Davies-Bouldin index {db:.3f}: GOOD cluster compactness"
+                    )
+                elif db < 2.0:
+                    interpretation.append(
+                        f"Davies-Bouldin index {db:.3f}: MODERATE cluster compactness"
+                    )
+                else:
+                    interpretation.append(
+                        f"Davies-Bouldin index {db:.3f}: POOR cluster compactness"
+                    )
+
+            # Calinski-Harabasz interpretation
+            if "calinski_harabasz" in metrics_to_compute:
+                ch = results["calinski_harabasz_score"]
+                if ch > 1000:
+                    interpretation.append(
+                        f"Calinski-Harabasz score {ch:.1f}: HIGH variance ratio"
+                    )
+                elif ch > 100:
+                    interpretation.append(
+                        f"Calinski-Harabasz score {ch:.1f}: MODERATE variance ratio"
+                    )
+                else:
+                    interpretation.append(
+                        f"Calinski-Harabasz score {ch:.1f}: LOW variance ratio"
+                    )
+
+            # Step 7: Generate Recommendations
+            recommendations = []
+
+            # Overall quality assessment
+            if "silhouette" in metrics_to_compute:
+                sil = results["silhouette_score"]
+                if sil < 0.25:
+                    recommendations.append(
+                        "⚠️ Low silhouette score suggests over-clustering. Try lower resolution."
+                    )
+                elif sil > 0.7:
+                    recommendations.append(
+                        "✓ Excellent separation. This resolution works well."
+                    )
+
+            # Cluster count check
+            if n_clusters > 50:
+                recommendations.append(
+                    "⚠️ Very high cluster count. Consider using lower resolution or sub-clustering specific populations."
+                )
+            elif n_clusters < 5:
+                recommendations.append(
+                    "ℹ️ Low cluster count. Consider higher resolution for finer-grained analysis."
+                )
+
+            # Cluster size balance
+            min_size = min(cluster_sizes.values())
+            max_size = max(cluster_sizes.values())
+            if max_size / min_size > 100:
+                recommendations.append(
+                    "⚠️ Highly imbalanced cluster sizes. Smallest clusters may be artifacts or rare populations."
+                )
+
+            # If no recommendations, provide positive feedback
+            if not recommendations:
+                recommendations.append(
+                    "✓ Clustering quality looks reasonable. Proceed with downstream analysis."
+                )
+
+            # Step 8: Store Metrics in AnnData
+            quality_key = f"{cluster_key}_quality"
+            adata.uns[quality_key] = {
+                "silhouette_score": results.get("silhouette_score"),
+                "davies_bouldin_index": results.get("davies_bouldin_index"),
+                "calinski_harabasz_score": results.get("calinski_harabasz_score"),
+                "n_clusters": n_clusters,
+                "cluster_sizes": cluster_sizes,
+                "per_cluster_silhouette": per_cluster_silhouette,
+                "interpretation": interpretation,
+                "recommendations": recommendations,
+                "use_rep": use_rep,
+                "n_pcs_used": n_pcs,
+            }
+
+            logger.info(f"Quality metrics stored in adata.uns['{quality_key}']")
+
+            # Step 9: Build Stats Dict
+            execution_time = time.time() - start_time
+
+            stats = {
+                "cluster_key": cluster_key,
+                "n_clusters": n_clusters,
+                "n_cells": adata.n_obs,
+                "use_rep": use_rep,
+                "n_pcs_used": n_pcs if n_pcs else adata.obsm[use_rep].shape[1],
+                "cluster_sizes": cluster_sizes,
+                "interpretation": "\n".join(interpretation),
+                "recommendations": recommendations,
+                "execution_time_seconds": round(execution_time, 2),
+                "metrics": metrics_to_compute,  # Add metrics list for agent
+            }
+
+            # Add metrics
+            for metric_name, value in results.items():
+                stats[metric_name] = value
+
+            # Add per-cluster silhouette
+            if per_cluster_silhouette:
+                stats["per_cluster_silhouette"] = per_cluster_silhouette
+
+            logger.info(
+                f"Clustering quality metrics computed successfully in {execution_time:.2f}s"
+            )
+
+            # Step 10: Create IR
+            ir = self._create_quality_metrics_ir(
+                cluster_key=cluster_key,
+                use_rep=use_rep,
+                n_pcs=n_pcs,
+                metrics=metrics_to_compute,
+            )
+
+            return adata, stats, ir
+
+        except Exception as e:
+            logger.exception(f"Error computing clustering quality metrics: {e}")
+            raise ClusteringError(f"Quality metrics computation failed: {str(e)}")
+
+    def _create_quality_metrics_ir(
+        self,
+        cluster_key: str,
+        use_rep: str,
+        n_pcs: Optional[int],
+        metrics: List[str],
+    ) -> AnalysisStep:
+        """
+        Create IR for clustering quality metrics.
+
+        Args:
+            cluster_key: Key in adata.obs containing cluster labels
+            use_rep: Representation used for distance calculations
+            n_pcs: Number of PCs used (None = all)
+            metrics: List of metrics computed
+
+        Returns:
+            AnalysisStep with reproducible code for quality metrics
+        """
+        parameter_schema = {
+            "cluster_key": ParameterSpec(
+                param_type="str",
+                papermill_injectable=True,
+                default_value=cluster_key,
+                required=True,
+                description="Key in adata.obs containing cluster labels",
+            ),
+            "use_rep": ParameterSpec(
+                param_type="str",
+                papermill_injectable=True,
+                default_value=use_rep,
+                required=False,
+                validation_rule="use_rep in adata.obsm.keys()",
+                description="Representation to use for distance calculations",
+            ),
+            "n_pcs": ParameterSpec(
+                param_type="Optional[int]",
+                papermill_injectable=True,
+                default_value=n_pcs,
+                required=False,
+                validation_rule="n_pcs > 0 if n_pcs else True",
+                description="Number of PCs to use for calculations",
+            ),
+            "metrics": ParameterSpec(
+                param_type="List[str]",
+                papermill_injectable=True,
+                default_value=metrics,
+                required=False,
+                description="List of metrics to compute",
+            ),
+        }
+
+        code_template = """# Compute clustering quality metrics
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+import numpy as np
+
+# Get cluster labels
+labels = adata.obs[{{ cluster_key | string | repr }}].values
+
+# Get data representation
+{% if n_pcs %}
+X = adata.obsm[{{ use_rep | string | repr }}][:, :{{ n_pcs }}]
+{% else %}
+X = adata.obsm[{{ use_rep | string | repr }}]
+{% endif %}
+
+# Compute metrics
+quality_results = {}
+
+{% if "silhouette" in metrics %}
+quality_results["silhouette_score"] = silhouette_score(X, labels, metric="euclidean")
+print(f"Silhouette score: {quality_results['silhouette_score']:.4f}")
+{% endif %}
+
+{% if "davies_bouldin" in metrics %}
+quality_results["davies_bouldin_index"] = davies_bouldin_score(X, labels)
+print(f"Davies-Bouldin index: {quality_results['davies_bouldin_index']:.4f}")
+{% endif %}
+
+{% if "calinski_harabasz" in metrics %}
+quality_results["calinski_harabasz_score"] = calinski_harabasz_score(X, labels)
+print(f"Calinski-Harabasz score: {quality_results['calinski_harabasz_score']:.2f}")
+{% endif %}
+
+# Store results
+adata.uns[{{ (cluster_key ~ '_quality') | repr }}] = quality_results
+print(f"Quality metrics computed for {len(np.unique(labels))} clusters")
+"""
+
+        return AnalysisStep(
+            operation="sklearn.metrics.clustering_quality",
+            tool_name="compute_clustering_quality",
+            description=f"Compute clustering quality metrics for {cluster_key}",
+            library="sklearn.metrics",
+            code_template=code_template,
+            imports=[
+                "from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score",
+                "import numpy as np",
+            ],
+            parameters={
+                "cluster_key": cluster_key,
+                "use_rep": use_rep,
+                "n_pcs": n_pcs,
+                "metrics": metrics,
+            },
+            parameter_schema=parameter_schema,
+            input_entities=["clustered_data"],
+            output_entities=["quality_metrics"],
+            execution_context={"method": "clustering_quality_assessment"},
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    def _create_umap_plot(
+        self, adata: sc.AnnData, cluster_key: str = "leiden"
+    ) -> go.Figure:
+        """
+        Create high-quality UMAP plot from clustering results.
+
+        Args:
+            adata: AnnData object with clustering results
+            cluster_key: Column in adata.obs containing cluster assignments
+
+        Returns:
+            go.Figure: Plotly figure with UMAP plot
+        """
+        logger.info("Creating high-quality UMAP visualization")
+
+        umap_coords = adata.obsm["X_umap"]
+        clusters = adata.obs[cluster_key].astype(str)
+        n_cells = len(clusters)
+
+        # Create a colormap similar to those in the publication
+        n_clusters = len(adata.obs[cluster_key].unique())
+        if n_clusters <= 10:
+            color_map = px.colors.qualitative.Set1
+        elif n_clusters <= 20:
+            color_map = px.colors.qualitative.Dark24
+        else:
+            color_map = px.colors.qualitative.Alphabet
+
+        # Dynamic marker sizing based on number of cells for optimal visibility
+        if n_cells < 1000:
+            marker_size = 8
+        elif n_cells < 5000:
+            marker_size = 6
+        elif n_cells < 10000:
+            marker_size = 5
+        else:
+            marker_size = 4
+
+        fig = px.scatter(
+            x=umap_coords[:, 0],
+            y=umap_coords[:, 1],
+            color=clusters,
+            title=f"UMAP Visualization with {cluster_key.replace('_', ' ').title()} Clusters",
+            labels={"x": "UMAP_1", "y": "UMAP_2", "color": "Cluster"},
+            width=1200,  # Increased from 800
+            height=1000,  # Increased from 700
+            color_discrete_sequence=color_map,
+        )
+
+        fig.update_traces(
+            marker=dict(
+                size=marker_size,
+                opacity=0.7,
+                line=dict(width=0.5, color="rgba(50,50,50,0.4)"),  # Add subtle borders
+            )
+        )
+
+        fig.update_layout(
+            title=dict(
+                text=f"UMAP Visualization with {cluster_key.replace('_', ' ').title()} Clusters",
+                font=dict(size=20, family="Arial, sans-serif"),
+                x=0.5,  # Center the title
+                xanchor="center",
+            ),
+            legend_title=dict(
+                text="Cluster", font=dict(size=16, family="Arial, sans-serif")
+            ),
+            font=dict(size=14, family="Arial, sans-serif"),
+            margin=dict(l=80, r=150, t=80, b=80),  # Increased margins
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.98,
+                xanchor="left",
+                x=1.02,
+                itemsizing="constant",
+                font=dict(size=14),
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="rgba(0,0,0,0.2)",
+                borderwidth=1,
+            ),
+            xaxis=dict(
+                title=dict(text="UMAP_1", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+            ),
+            yaxis=dict(
+                title=dict(text="UMAP_2", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+            ),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+        )
+
+        return fig
+
+    def _create_batch_umap(self, adata: sc.AnnData, batch_key: str) -> go.Figure:
+        """
+        Create high-quality UMAP plot colored by batch.
+
+        Args:
+            adata: AnnData object with clustering results
+            batch_key: Key in adata.obs containing batch information
+
+        Returns:
+            go.Figure: Plotly figure with batch-colored UMAP plot
+        """
+        logger.info(
+            f"Creating high-quality batch-colored UMAP visualization using {batch_key}"
+        )
+
+        umap_coords = adata.obsm["X_umap"]
+        batches = adata.obs[batch_key].astype(str)
+        n_cells = len(batches)
+
+        # Create color map
+        n_batches = len(adata.obs[batch_key].unique())
+        if n_batches <= 10:
+            color_map = px.colors.qualitative.Set2
+        else:
+            color_map = px.colors.qualitative.Alphabet
+
+        # Dynamic marker sizing based on number of cells for optimal visibility
+        if n_cells < 1000:
+            marker_size = 8
+        elif n_cells < 5000:
+            marker_size = 6
+        elif n_cells < 10000:
+            marker_size = 5
+        else:
+            marker_size = 4
+
+        fig = px.scatter(
+            x=umap_coords[:, 0],
+            y=umap_coords[:, 1],
+            color=batches,
+            title=f"UMAP Visualization by {batch_key}",
+            labels={"x": "UMAP_1", "y": "UMAP_2", "color": batch_key},
+            width=1200,  # Increased from 800
+            height=1000,  # Increased from 700
+            color_discrete_sequence=color_map,
+        )
+
+        fig.update_traces(
+            marker=dict(
+                size=marker_size,
+                opacity=0.7,
+                line=dict(width=0.5, color="rgba(50,50,50,0.4)"),  # Add subtle borders
+            )
+        )
+
+        fig.update_layout(
+            title=dict(
+                text=f"UMAP Visualization by {batch_key}",
+                font=dict(size=20, family="Arial, sans-serif"),
+                x=0.5,  # Center the title
+                xanchor="center",
+            ),
+            legend_title=dict(
+                text=batch_key, font=dict(size=16, family="Arial, sans-serif")
+            ),
+            font=dict(size=14, family="Arial, sans-serif"),
+            margin=dict(l=80, r=150, t=80, b=80),  # Increased margins
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=0.98,
+                xanchor="left",
+                x=1.02,
+                itemsizing="constant",
+                font=dict(size=14),
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="rgba(0,0,0,0.2)",
+                borderwidth=1,
+            ),
+            xaxis=dict(
+                title=dict(text="UMAP_1", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+            ),
+            yaxis=dict(
+                title=dict(text="UMAP_2", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+            ),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+        )
+
+        return fig
+
+    def _create_cluster_distribution_plot(
+        self, adata: sc.AnnData, cluster_key: str = "leiden"
+    ) -> go.Figure:
+        """
+        Create a high-quality cluster size distribution plot.
+
+        Args:
+            adata: AnnData object with clustering results
+            cluster_key: Column in adata.obs containing cluster assignments
+
+        Returns:
+            go.Figure: Plotly figure with cluster distribution plot
+        """
+        logger.info("Creating high-quality cluster size distribution plot")
+
+        # Get cluster counts
+        cluster_counts = adata.obs[cluster_key].value_counts().sort_index()
+
+        # Create gradient colors for better visual appeal
+        n_clusters = len(cluster_counts)
+        colors = px.colors.sample_colorscale(
+            "viridis",
+            (
+                [i / (n_clusters - 1) for i in range(n_clusters)]
+                if n_clusters > 1
+                else [0]
+            ),
+        )
+
+        # Create bar plot
+        fig = go.Figure()
+        fig.add_trace(
+            go.Bar(
+                x=cluster_counts.index.astype(str),
+                y=cluster_counts.values,
+                marker=dict(
+                    color=colors, line=dict(color="rgba(50,50,50,0.8)", width=1)
+                ),
+                text=cluster_counts.values,
+                textposition="outside",
+                textfont=dict(size=12, color="black"),
+                hovertemplate="<b>Cluster %{x}</b><br>"
+                + "Cells: %{y}<br>"
+                + "Percentage: %{customdata:.1f}%<extra></extra>",
+                customdata=[
+                    (count / cluster_counts.sum() * 100)
+                    for count in cluster_counts.values
+                ],
+            )
+        )
+
+        fig.update_layout(
+            title=dict(
+                text="Cluster Size Distribution",
+                font=dict(size=20, family="Arial, sans-serif"),
+                x=0.5,
+                xanchor="center",
+            ),
+            xaxis=dict(
+                title=dict(text="Cluster", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+            ),
+            yaxis=dict(
+                title=dict(text="Number of Cells", font=dict(size=16)),
+                tickfont=dict(size=14),
+                gridcolor="rgba(200,200,200,0.3)",
+                type=(
+                    "log"
+                    if max(cluster_counts) / min(cluster_counts) > 100
+                    else "linear"
+                ),
+            ),
+            width=1000,  # Increased from 800
+            height=700,  # Increased from 500
+            font=dict(size=14, family="Arial, sans-serif"),
+            margin=dict(l=80, r=80, t=80, b=80),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            showlegend=False,
+        )
+
+        return fig
+
+    def subcluster_cells(
+        self,
+        adata: anndata.AnnData,
+        cluster_key: str = "leiden",
+        clusters_to_refine: Optional[List[str]] = None,
+        resolution: float = 0.5,
+        resolutions: Optional[List[float]] = None,
+        n_pcs: int = 20,
+        n_neighbors: int = 15,
+        batch_key: Optional[str] = None,
+        demo_mode: bool = False,
+        algorithm: str = "leiden",
+    ) -> Tuple[anndata.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Re-cluster specific cell subsets for finer-grained population identification.
+
+        Sub-clustering is useful when:
+        - Initial clustering groups heterogeneous populations
+        - You want to refine specific clusters without affecting others
+        - You need higher resolution for specific cell types
+
+        Args:
+            adata: AnnData object with existing clustering results
+            cluster_key: Key in adata.obs containing cluster assignments (default: "leiden")
+            clusters_to_refine: List of cluster IDs to re-cluster (e.g., ["0", "3", "5"])
+                               If None, re-clusters ALL cells (full re-clustering)
+            resolution: Single resolution for sub-clustering (default: 0.5)
+            resolutions: List of resolutions for multi-resolution sub-clustering
+            n_pcs: Number of PCs for sub-clustering (default: 20, fewer than full clustering)
+            n_neighbors: Number of neighbors for KNN graph (default: 15)
+            batch_key: Optional batch correction key for sub-clustering
+            demo_mode: If True, uses faster parameters for testing
+
+        Returns:
+            Tuple of (processed_adata, stats_dict, analysis_step_ir)
+
+        Raises:
+            ValueError: If cluster_key not found or invalid cluster IDs provided
+            ClusteringError: If sub-clustering fails
+        """
+        try:
+            logger.info("Starting sub-clustering pipeline")
+            start_time = time.time()
+
+            # Create working copy
+            adata = adata.copy()
+
+            # Step 1: Validation
+            if cluster_key not in adata.obs.columns:
+                raise ValueError(
+                    f"Cluster key '{cluster_key}' not found in adata.obs. "
+                    f"Available keys: {list(adata.obs.columns)}"
+                )
+
+            # Get unique clusters
+            all_clusters = set(adata.obs[cluster_key].astype(str).unique())
+            logger.info(
+                f"Found {len(all_clusters)} clusters in '{cluster_key}': {sorted(all_clusters)}"
+            )
+
+            # Validate clusters_to_refine if provided
+            if clusters_to_refine is not None and len(clusters_to_refine) > 0:
+                clusters_to_refine = [
+                    str(c) for c in clusters_to_refine
+                ]  # Ensure string type
+                invalid_clusters = set(clusters_to_refine) - all_clusters
+                if invalid_clusters:
+                    raise ValueError(
+                        f"Invalid cluster IDs: {sorted(invalid_clusters)}. "
+                        f"Valid clusters: {sorted(all_clusters)}"
+                    )
+                logger.info(
+                    f"Sub-clustering {len(clusters_to_refine)} parent clusters: {clusters_to_refine}"
+                )
+            else:
+                # Re-cluster all cells (None or empty list)
+                clusters_to_refine = sorted(all_clusters)
+                logger.info("No specific clusters provided - re-clustering ALL cells")
+
+            # Check for PCA results
+            if "X_pca" not in adata.obsm:
+                raise ValueError(
+                    "PCA results not found in adata.obsm['X_pca']. "
+                    "Please run clustering first to generate PCA coordinates."
+                )
+
+            # Demo mode adjustments
+            if demo_mode:
+                n_pcs = min(n_pcs, 10)
+                n_neighbors = min(n_neighbors, 10)
+                logger.info(
+                    f"Demo mode: Using n_pcs={n_pcs}, n_neighbors={n_neighbors}"
+                )
+
+            # Step 2: Subset Selection
+            subset_mask = adata.obs[cluster_key].astype(str).isin(clusters_to_refine)
+            n_cells_to_subcluster = subset_mask.sum()
+            logger.info(
+                f"Selected {n_cells_to_subcluster} cells from {len(clusters_to_refine)} clusters for sub-clustering"
+            )
+
+            if n_cells_to_subcluster == 0:
+                raise ValueError(
+                    "No cells selected for sub-clustering - check cluster IDs"
+                )
+
+            # Create subset
+            adata_subset = adata[subset_mask].copy()
+
+            # Compute PCA on subset (required for sc.pp.neighbors)
+            logger.info(f"Computing PCA on subset (n_comps={n_pcs})")
+            sc.tl.pca(adata_subset, n_comps=n_pcs)
+
+            # Step 3: Sub-clustering Execution
+            logger.info(
+                f"Computing neighbors on subset (n_neighbors={n_neighbors}, n_pcs={n_pcs})"
+            )
+            sc.pp.neighbors(adata_subset, n_neighbors=n_neighbors, n_pcs=n_pcs)
+
+            # Determine resolutions to test
+            if resolutions is not None:
+                resolutions_to_test = resolutions
+                logger.info(f"Testing {len(resolutions)} resolutions: {resolutions}")
+            elif resolution is not None:
+                resolutions_to_test = [resolution]
+                logger.info(f"Using single resolution: {resolution}")
+            else:
+                resolutions_to_test = [0.5]  # Default
+                logger.info("Using default resolution: 0.5")
+
+            # Run clustering for each resolution
+            subclustering_results = {}
+            for res in resolutions_to_test:
+                # Create key name
+                if len(resolutions_to_test) == 1:
+                    key_name = f"{algorithm}_subcluster"
+                else:
+                    key_name = f"{algorithm}_sub_res{res}".replace(".", "_")
+
+                logger.info(
+                    f"Running {algorithm} sub-clustering at resolution {res} (key: {key_name})"
+                )
+                self._run_clustering_algorithm(
+                    adata_subset, res, key_added=key_name, algorithm=algorithm
+                )
+
+                # Convert categorical to string to allow new categories
+                adata_subset.obs[key_name] = adata_subset.obs[key_name].astype(str)
+
+                # Add parent cluster prefix to sub-cluster labels
+                for parent_cluster in clusters_to_refine:
+                    parent_mask = (
+                        adata_subset.obs[cluster_key].astype(str) == parent_cluster
+                    )
+                    if parent_mask.sum() > 0:
+                        # Get sub-cluster assignments for this parent
+                        sub_labels = adata_subset.obs.loc[parent_mask, key_name]
+                        # Add prefix: parent_cluster + "." + sub_label
+                        prefixed_labels = sub_labels.apply(
+                            lambda x: f"{parent_cluster}.{x}"
+                        )
+                        adata_subset.obs.loc[parent_mask, key_name] = prefixed_labels
+
+                # Count sub-clusters per parent
+                n_subclusters_per_parent = {}
+                for parent_cluster in clusters_to_refine:
+                    parent_mask = (
+                        adata_subset.obs[cluster_key].astype(str) == parent_cluster
+                    )
+                    if parent_mask.sum() > 0:
+                        subclusters = adata_subset.obs.loc[
+                            parent_mask, key_name
+                        ].nunique()
+                        n_subclusters_per_parent[parent_cluster] = subclusters
+
+                total_subclusters = adata_subset.obs[key_name].nunique()
+                subclustering_results[res] = {
+                    "resolution": res,
+                    "key_name": key_name,
+                    "n_total_subclusters": total_subclusters,
+                    "n_subclusters_per_parent": n_subclusters_per_parent,
+                }
+                logger.info(f"  → {total_subclusters} total sub-clusters identified")
+
+            # Step 4: Merge Back to Original AnnData
+            logger.info("Merging sub-cluster results back to original AnnData")
+
+            for res_key, res_data in subclustering_results.items():
+                key_name = res_data["key_name"]
+                # Create new column in original adata
+                adata.obs[key_name] = adata.obs[cluster_key].astype(str)
+
+                # Update cells that were sub-clustered
+                adata.obs.loc[subset_mask, key_name] = adata_subset.obs[key_name]
+
+            # Step 5: Statistics and IR
+            execution_time = time.time() - start_time
+
+            # Primary key (for backward compatibility)
+            primary_key = subclustering_results[resolutions_to_test[0]]["key_name"]
+
+            stats = {
+                "analysis_type": "sub-clustering",
+                "cluster_key": cluster_key,
+                "parent_clusters": clusters_to_refine,
+                "n_cells_subclustered": n_cells_to_subcluster,
+                "n_total_cells": adata.n_obs,
+                "resolution_used": resolution if resolutions is None else None,
+                "resolutions_tested": resolutions_to_test,
+                "n_pcs_used": n_pcs,
+                "n_neighbors_used": n_neighbors,
+                "execution_time_seconds": round(execution_time, 2),
+                "subclustering_results": subclustering_results,
+                "primary_subcluster_key": primary_key,
+            }
+
+            # Add cluster size summary
+            cluster_sizes = {}
+            for res_key, res_data in subclustering_results.items():
+                key_name = res_data["key_name"]
+                cluster_counts = adata.obs[key_name].value_counts().to_dict()
+                cluster_sizes[key_name] = {
+                    str(cluster): int(count)
+                    for cluster, count in cluster_counts.items()
+                }
+            stats["cluster_sizes"] = cluster_sizes
+
+            logger.info(f"Sub-clustering completed in {execution_time:.2f} seconds")
+
+            # Create IR
+            ir = self._create_subcluster_ir(
+                cluster_key=cluster_key,
+                clusters_to_refine=clusters_to_refine,
+                resolution=resolution if resolutions is None else None,
+                resolutions=resolutions,
+                n_pcs=n_pcs,
+                n_neighbors=n_neighbors,
+                algorithm=algorithm,
+            )
+
+            return adata, stats, ir
+
+        except Exception as e:
+            logger.exception(f"Error during sub-clustering: {e}")
+            raise ClusteringError(f"Sub-clustering failed: {str(e)}")
+
+    def _create_subcluster_ir(
+        self,
+        cluster_key: str = "leiden",
+        clusters_to_refine: Optional[List[str]] = None,
+        resolution: Optional[float] = None,
+        resolutions: Optional[List[float]] = None,
+        n_pcs: int = 20,
+        n_neighbors: int = 15,
+        algorithm: str = "leiden",
+    ) -> AnalysisStep:
+        """
+        Create Intermediate Representation for sub-clustering operation.
+
+        Args:
+            cluster_key: Key in adata.obs containing cluster assignments
+            clusters_to_refine: List of cluster IDs to re-cluster
+            resolution: Single resolution parameter
+            resolutions: List of resolution parameters
+            n_pcs: Number of principal components to use
+            n_neighbors: Number of neighbors for graph construction
+            algorithm: Clustering algorithm - 'leiden' or 'louvain'
+
+        Returns:
+            AnalysisStep with sub-clustering code template
+        """
+        # Parameter schema
+        parameter_schema = {
+            "cluster_key": ParameterSpec(
+                param_type="str",
+                papermill_injectable=True,
+                default_value=cluster_key,
+                required=True,
+                description="Key in adata.obs containing cluster assignments",
+            ),
+            "clusters_to_refine": ParameterSpec(
+                param_type="List[str]",
+                papermill_injectable=True,
+                default_value=clusters_to_refine if clusters_to_refine else [],
+                required=False,
+                description="List of cluster IDs to re-cluster (empty list = all clusters)",
+            ),
+            "resolution": ParameterSpec(
+                param_type="float",
+                papermill_injectable=True,
+                default_value=resolution if resolution else 0.5,
+                required=False,
+                validation_rule="resolution > 0" if resolution else None,
+                description="Resolution parameter for sub-clustering",
+            ),
+            "resolutions": ParameterSpec(
+                param_type="List[float]",
+                papermill_injectable=True,
+                default_value=resolutions if resolutions else [],
+                required=False,
+                validation_rule=(
+                    "all(r > 0 for r in resolutions)" if resolutions else None
+                ),
+                description="List of resolution parameters for multi-resolution sub-clustering",
+            ),
+            "n_pcs": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_pcs,
+                required=False,
+                validation_rule="n_pcs > 0",
+                description="Number of principal components to use",
+            ),
+            "n_neighbors": ParameterSpec(
+                param_type="int",
+                papermill_injectable=True,
+                default_value=n_neighbors,
+                required=False,
+                validation_rule="n_neighbors > 0",
+                description="Number of neighbors for graph construction",
+            ),
+        }
+
+        # Jinja2 code template
+        # Mirrors subcluster_cells step by step (fresh PCA on the subset, one
+        # key per resolution, labels as strings prefixed with the parent).
+        code_template = """# Sub-clustering pipeline: Re-cluster specific cell populations
+import scanpy as sc
+import numpy as np
+
+# Configuration
+cluster_key = {{ cluster_key|repr }}
+clusters_to_refine = [str(c) for c in {{ clusters_to_refine|repr }}]
+resolutions = {{ resolutions|repr }} or [{{ resolution }}]
+n_pcs = {{ n_pcs }}
+n_neighbors = {{ n_neighbors }}
+algorithm = {{ algorithm|repr }}
+
+if cluster_key not in adata.obs.columns:
+    raise ValueError(f"Cluster key {cluster_key!r} not found in adata.obs")
+if "X_pca" not in adata.obsm:
+    raise ValueError("PCA results not found in adata.obsm['X_pca']; run clustering first")
+if not clusters_to_refine:
+    clusters_to_refine = sorted(adata.obs[cluster_key].astype(str).unique())
+
+# Select and copy the cells to sub-cluster
+subset_mask = adata.obs[cluster_key].astype(str).isin(clusters_to_refine)
+print(f"Selected {subset_mask.sum()} cells from {len(clusters_to_refine)} clusters")
+adata_subset = adata[subset_mask].copy()
+
+# PCA and neighbors on the subset
+sc.tl.pca(adata_subset, n_comps=n_pcs)
+sc.pp.neighbors(adata_subset, n_neighbors=n_neighbors, n_pcs=n_pcs)
+
+for res in resolutions:
+    if len(resolutions) == 1:
+        subcluster_key = f"{algorithm}_subcluster"
+    else:
+        subcluster_key = f"{algorithm}_sub_res{res}".replace(".", "_")
+    getattr(sc.tl, algorithm)(adata_subset, resolution=res, key_added=subcluster_key)
+
+    # Labels become strings "<parent>.<sub>"
+    adata_subset.obs[subcluster_key] = adata_subset.obs[subcluster_key].astype(str)
+    for parent_cluster in clusters_to_refine:
+        parent_mask = adata_subset.obs[cluster_key].astype(str) == parent_cluster
+        adata_subset.obs.loc[parent_mask, subcluster_key] = adata_subset.obs.loc[
+            parent_mask, subcluster_key
+        ].apply(lambda x: f"{parent_cluster}.{x}")
+
+    # Merge back: cells not sub-clustered keep their parent label
+    adata.obs[subcluster_key] = adata.obs[cluster_key].astype(str)
+    adata.obs.loc[subset_mask, subcluster_key] = adata_subset.obs[subcluster_key]
+    print(f"{subcluster_key}: {adata.obs[subcluster_key].nunique()} clusters")
+"""
+
+        return AnalysisStep(
+            operation=f"scanpy.tl.{algorithm}",
+            tool_name="subcluster_cells",
+            description=f"Sub-cluster cells from {len(clusters_to_refine) if clusters_to_refine else 'all'} parent cluster(s) at resolution {resolution if resolution else resolutions} using {algorithm}",
+            library="scanpy",
+            code_template=code_template,
+            imports=["import scanpy as sc", "import numpy as np"],
+            parameters={
+                "cluster_key": cluster_key,
+                "clusters_to_refine": clusters_to_refine if clusters_to_refine else [],
+                "resolution": resolution if resolution else 0.5,
+                "resolutions": resolutions if resolutions else [],
+                "n_pcs": n_pcs,
+                "n_neighbors": n_neighbors,
+                "algorithm": algorithm,
+            },
+            parameter_schema=parameter_schema,
+            input_entities=["adata"],
+            output_entities=["adata"],
+            execution_context={
+                "operation_type": "sub-clustering",
+                "cluster_key": cluster_key,
+                "n_parent_clusters": (
+                    len(clusters_to_refine) if clusters_to_refine else "all"
+                ),
+            },
+            validates_on_export=True,
+            requires_validation=False,
+        )
+
+    def estimate_processing_time(self, n_cells: int, n_genes: int) -> Dict[str, float]:
+        """
+        Estimate processing time for clustering based on data dimensions.
+
+        This can help users decide whether to use demo mode for large datasets.
+
+        Args:
+            n_cells: Number of cells in the dataset
+            n_genes: Number of genes in the dataset
+
+        Returns:
+            Dict containing estimated processing times in seconds:
+            - 'standard': For standard processing
+            - 'demo': For demo mode processing
+        """
+        # These are rough approximations based on empirical testing
+        # Actual performance will vary based on hardware
+
+        # Base time (overhead)
+        base_time = 5.0
+
+        # Standard mode estimates
+        # Normalization & HVG: ~0.5s per 1000 cells
+        normalization_time = (n_cells / 1000) * 0.5
+        # PCA: ~1s per 1000 cells with 2000 genes
+        pca_time = (n_cells / 1000) * (n_genes / 2000) * 1.0
+        # Neighbors: ~2s per 1000 cells
+        neighbors_time = (n_cells / 1000) * 2.0
+        # Clustering: ~1s per 1000 cells
+        clustering_time = (n_cells / 1000) * 1.0
+        # UMAP: ~3s per 1000 cells
+        umap_time = (n_cells / 1000) * 3.0
+        # Marker genes: ~5s per 1000 cells
+        marker_time = (n_cells / 1000) * 5.0
+
+        standard_time = (
+            base_time
+            + normalization_time
+            + pca_time
+            + neighbors_time
+            + clustering_time
+            + umap_time
+            + marker_time
+        )
+
+        # Demo mode is approximately 5-10x faster due to:
+        # - Subsampling to 1000 cells
+        # - Using fewer HVG, PCs, and neighbors
+        # - Using faster algorithms
+        # - Skipping marker gene identification
+        demo_time = base_time + min(10.0, standard_time / 5.0)
+
+        return {"standard": standard_time, "demo": demo_time}
+
+    def _format_clustering_report(
+        self,
+        adata: sc.AnnData,
+        resolution: float,
+        batch_correction: bool = False,
+        batch_key: Optional[str] = None,
+        demo_mode: bool = False,
+        original_cell_count: Optional[int] = None,
+        cluster_key: str = "leiden",
+    ) -> str:
+        """
+        Format clustering results report.
+
+        Args:
+            adata: AnnData object with clustering results
+            resolution: Clustering resolution parameter
+            batch_correction: Whether batch correction was performed
+            batch_key: Batch key used for correction
+            demo_mode: Whether demo mode was used
+            original_cell_count: Original number of cells before subsampling
+            cluster_key: Column in adata.obs containing cluster assignments
+
+        Returns:
+            str: Formatted report
+        """
+        n_clusters = len(adata.obs[cluster_key].unique())
+        cluster_counts = adata.obs[cluster_key].value_counts().to_dict()
+
+        # Format cluster counts for display
+        cluster_summary = "\n".join(
+            [
+                f"- Cluster {cluster}: {count} cells ({count / len(adata) * 100:.1f}%)"
+                for cluster, count in sorted(
+                    cluster_counts.items(), key=lambda x: int(x[0])
+                )
+            ]
+        )
+
+        # Get top marker genes for each cluster if available
+        marker_summary = ""
+        if "rank_genes_groups" in adata.uns:
+            marker_summary = "\n\n**Top Marker Genes by Cluster:**\n"
+            for cluster in sorted(
+                adata.obs[cluster_key].unique(), key=lambda x: int(x)
+            ):
+                genes = adata.uns["rank_genes_groups"]["names"][cluster][:5]
+                adata.uns["rank_genes_groups"]["scores"][cluster][:5]
+                marker_summary += f"- Cluster {cluster}: {', '.join(genes)}\n"
+
+        # Batch correction information
+        batch_info = ""
+        if batch_correction and batch_key:
+            batch_info = f"\n- Batch correction performed using '{batch_key}'\n"
+            batch_counts = adata.obs[batch_key].value_counts().to_dict()
+            batch_info += f"- Number of batches: {len(batch_counts)}\n"
+
+        # Demo mode information
+        demo_info = ""
+        if demo_mode:
+            demo_info = "\n- Analysis performed in DEMO MODE (faster processing with reduced quality)\n"
+            if original_cell_count and original_cell_count > adata.n_obs:
+                demo_info += f"- Data subsampled from {original_cell_count} to {adata.n_obs} cells\n"
+
+        return f"""Clustering Completed!
+
+**Results Summary:**
+- Resolution: {resolution}
+- Number of clusters: {n_clusters}
+- UMAP coordinates calculated{batch_info}{demo_info}
+- Clusters stored for further analysis
+
+**Cluster Distribution:**
+{cluster_summary}
+{marker_summary}
+
+**Visualization:**
+The UMAP plot shows the clustering results. Each point represents a cell, colored by cluster assignment.
+You can use these clusters for downstream analysis such as finding marker genes or annotating cell types.
+
+**Next Steps:**
+- Find marker genes for specific clusters
+- Annotate cell types based on marker genes
+- Perform cell type-specific analyses
+- Explore differential gene expression between conditions
+"""

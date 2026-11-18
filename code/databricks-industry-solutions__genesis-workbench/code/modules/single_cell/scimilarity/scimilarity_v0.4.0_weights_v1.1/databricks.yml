@@ -1,0 +1,99 @@
+bundle:
+  name: genesis_workbench_scimilarity
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/*.yml
+
+targets:
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        register_scimilarity:
+          job_clusters:
+            - job_cluster_key: job_cluster_wget
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+            - job_cluster_key: job_cluster_gene_order
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+            - job_cluster_key: job_cluster_get_embedding
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+            - job_cluster_key: job_cluster_search_nearest
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        register_scimilarity:
+          job_clusters:
+            - job_cluster_key: job_cluster_wget
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+            - job_cluster_key: job_cluster_gene_order
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+            - job_cluster_key: job_cluster_get_embedding
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+            - job_cluster_key: job_cluster_search_nearest
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        register_scimilarity:
+          job_clusters:
+            - job_cluster_key: job_cluster_wget
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP
+            - job_cluster_key: job_cluster_gene_order
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP
+            - job_cluster_key: job_cluster_get_embedding
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP
+            - job_cluster_key: job_cluster_search_nearest
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP

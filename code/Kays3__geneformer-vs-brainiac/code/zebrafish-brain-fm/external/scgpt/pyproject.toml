@@ -1,0 +1,16 @@
+[project]
+name = "zfbrain-external-scgpt"
+version = "0.1.0"
+description = "Environment for scGPT embeddings, separate from the project environment"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "scgpt",
+    "gdown",
+    "ipython",  # scGPT imports it and does not declare it
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+scgpt = { git = "https://github.com/bowang-lab/scGPT.git" }

@@ -1,0 +1,29 @@
+# Root config. Compose with: python run.py +experiment=<name> [overrides]
+defaults:
+  - data: synthetic
+  - model: small
+  - execution: local_cpu
+  - eval: default
+  - _self_
+
+seed: 0
+output_dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+task: pretrain_and_evaluate      # pretrain_and_evaluate | evaluate_only
+
+train:
+  epochs: 10
+  lr: 3e-4
+  weight_decay: 0.01
+  betas: [0.9, 0.95]
+  warmup_steps: 100
+  grad_clip: 1.0
+  accumulate_grad_batches: 1
+  amp: false
+  early_stop_patience: 3
+  restore_best: true
+
+hydra:
+  run:
+    dir: ${output_dir}
+  job:
+    chdir: false

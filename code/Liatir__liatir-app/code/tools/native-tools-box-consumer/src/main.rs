@@ -1,0 +1,694 @@
+//! Static Scrollcase consumer used by the Windows app inside WSL2.
+//!
+//! The original four-argument command remains the bundled Native Tools entry point. Runtime
+//! Components use explicit subcommands so the Windows app can keep Linux payloads on the WSL2
+//! filesystem while preserving Scrollcase verification, self-test, atomic activation and rollback.
+
+use scrollcase_consumer::{
+    contract::targets::box_target_id,
+    prepare::{
+        attach_extracted_box, verify_and_extract_box, verify_extracted_payload,
+        verify_required_assets, AttachOptions, EnvironmentReportOptions, PrepareOptions, PreparedBox,
+    },
+    path::safe_relative_path,
+    release::{AssetDescriptor, ReleaseManifest},
+    trust::TrustAnchors,
+    verify::inspect_release_document,
+};
+use serde::Serialize;
+use serde_json::Value;
+use std::{
+    fs,
+    io::Read,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+
+const RUNTIME_BOX_TARGET: &str = "linux-x86_64-cpu";
+const DISK_SPACE_MARGIN_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_ACTIVATION_BYTES: u64 = 1024 * 1024;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeState {
+    runtime_dir: String,
+    python_path: String,
+    size_bytes: u64,
+    rollback_available: bool,
+    activation: Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RollbackState {
+    runtime_dir: String,
+    restored: bool,
+    activation: Option<Value>,
+}
+
+fn digest(value: &str) -> Result<&str, String> {
+    if value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(value)
+    } else {
+        Err("The Runtime Box archive digest is invalid.".into())
+    }
+}
+
+fn identifier<'a>(value: &'a str, label: &str) -> Result<&'a str, String> {
+    let valid = !value.is_empty()
+        && value.len() <= 96
+        && value.split(['-', '.']).all(|segment| {
+            !segment.is_empty()
+                && segment
+                    .chars()
+                    .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
+        });
+    valid
+        .then_some(value)
+        .ok_or_else(|| format!("The Runtime Box {label} is invalid."))
+}
+
+/// Target ids carry an underscore that box, component and runtime ids never do — `x86_64` — so
+/// they need their own rule rather than a looser [`identifier`] shared with all of them. This is a
+/// shape check only: the value's authority comes from being compared against the signed release.
+fn target_identifier<'a>(value: &'a str, label: &str) -> Result<&'a str, String> {
+    let valid = !value.is_empty()
+        && value.len() <= 96
+        && value.chars().all(|character| {
+            character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || matches!(character, '-' | '.' | '_')
+        });
+    valid
+        .then_some(value)
+        .ok_or_else(|| format!("The Runtime Box {label} is invalid."))
+}
+
+fn component_root(kind: &str) -> Result<PathBuf, String> {
+    if !matches!(kind, "ai-runtimes" | "tool-runtimes") {
+        return Err("The Runtime Component kind is invalid.".into());
+    }
+    let home = std::env::var_os("HOME").ok_or("WSL2 did not provide a home directory.")?;
+    Ok(PathBuf::from(home).join(".local/share/liatir").join(kind))
+}
+
+fn runtime_root(kind: &str, runtime_id: &str) -> Result<PathBuf, String> {
+    Ok(component_root(kind)?.join(identifier(runtime_id, "runtime id")?))
+}
+
+fn native_tools_install_root(archive_digest: &str) -> Result<PathBuf, String> {
+    let home = std::env::var_os("HOME").ok_or("WSL2 did not provide a home directory.")?;
+    Ok(PathBuf::from(home)
+        .join(".local/share/liatir/native-tools")
+        .join(digest(archive_digest)?))
+}
+
+fn prune_previous_native_tools(current: &Path) {
+    let Some(parent) = current.parent() else {
+        return;
+    };
+    let Ok(entries) = fs::read_dir(parent) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        if path != current && digest(&name.to_string_lossy()).is_ok() {
+            let _ = fs::remove_dir_all(path);
+        }
+    }
+}
+
+fn run_native_tools(arguments: &[String]) -> Result<PathBuf, String> {
+    let [release, trusted_key, archive, archive_digest] = arguments else {
+        return Err(
+            "Usage: native-tools-box-consumer <release> <trusted-key> <archive> <archive-sha256>"
+                .into(),
+        );
+    };
+    let release = Path::new(release);
+    let trusted_key = Path::new(trusted_key);
+    let archive = Path::new(archive);
+    let root = native_tools_install_root(archive_digest)?;
+    let environment = EnvironmentReportOptions::default();
+
+    let prepared = if root.is_dir() {
+        let options = AttachOptions {
+            trust: TrustAnchors::KeyFile(trusted_key),
+            root: &root,
+            environment,
+        };
+        verify_extracted_payload(release, &options).map_err(|error| error.to_string())?;
+        attach_extracted_box(release, &options)
+    } else {
+        verify_and_extract_box(
+            release,
+            &PrepareOptions {
+                trust: TrustAnchors::KeyFile(trusted_key),
+                archive: Some(archive),
+                destination: &root,
+                environment,
+            },
+        )
+    }
+    .map_err(|error| error.to_string())?;
+
+    if prepared.box_id() != "native-tools"
+        || prepared_label(&prepared, "runtime") != Some("native-tools")
+        || prepared.target_id() != RUNTIME_BOX_TARGET
+    {
+        return Err("The signed box is not the Linux Native Tools box.".into());
+    }
+    prune_previous_native_tools(prepared.root());
+    Ok(prepared.root().to_path_buf())
+}
+
+fn unique_staging(parent: &Path) -> Result<PathBuf, String> {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    for attempt in 0..8u8 {
+        let candidate = parent.join(format!(".s-{}-{nonce:x}-{attempt}", std::process::id()));
+        match fs::symlink_metadata(&candidate) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(candidate),
+            Ok(_) => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Err("Could not allocate Runtime Box staging inside WSL2.".into())
+}
+
+fn rollback_root(parent: &Path, runtime_id: &str) -> PathBuf {
+    parent.join(".rollbacks").join(runtime_id)
+}
+
+fn newest_rollback(root: &Path) -> Result<Option<PathBuf>, String> {
+    if !root.is_dir() {
+        return Ok(None);
+    }
+    let mut entries = fs::read_dir(root)
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect::<Vec<_>>();
+    entries.sort();
+    Ok(entries.pop())
+}
+
+fn prune_rollbacks(root: &Path, keep: &Path) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path != keep {
+            let _ = fs::remove_dir_all(path);
+        }
+    }
+}
+
+fn activate_runtime(runtime: &Path, staging: &Path, runtime_id: &str) -> Result<bool, String> {
+    let parent = runtime
+        .parent()
+        .ok_or("The Runtime Component directory has no parent.")?;
+    let rollback = rollback_root(parent, runtime_id);
+    fs::create_dir_all(&rollback).map_err(|error| error.to_string())?;
+    let displaced = rollback.join(format!(
+        "{}-{:020}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|error| error.to_string())?
+            .as_millis()
+    ));
+    let had_current = runtime.is_dir();
+    if had_current {
+        fs::rename(runtime, &displaced).map_err(|error| {
+            format!("Could not preserve the previous Runtime Box in WSL2: {error}")
+        })?;
+    }
+    if let Err(error) = fs::rename(staging, runtime) {
+        if had_current {
+            let _ = fs::rename(&displaced, runtime);
+        }
+        return Err(format!(
+            "Could not activate the Runtime Box in WSL2: {error}"
+        ));
+    }
+    if had_current {
+        prune_rollbacks(&rollback, &displaced);
+    }
+    Ok(had_current)
+}
+
+fn directory_size(path: &Path) -> Result<u64, String> {
+    if !path.exists() {
+        return Ok(0);
+    }
+    let mut total = 0u64;
+    let mut pending = vec![path.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let metadata = fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
+            if metadata.file_type().is_symlink() {
+                continue;
+            }
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else {
+                total = total
+                    .checked_add(metadata.len())
+                    .ok_or("Runtime Box size exceeds the supported range.")?;
+            }
+        }
+    }
+    Ok(total)
+}
+
+fn read_activation(path: &Path) -> Result<Value, String> {
+    let metadata = fs::metadata(path).map_err(|error| {
+        format!("Could not read Runtime Box activation metadata in WSL2: {error}")
+    })?;
+    if metadata.len() == 0 || metadata.len() > MAX_ACTIVATION_BYTES {
+        return Err("Runtime Box activation metadata in WSL2 has an invalid size.".into());
+    }
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    serde_json::from_slice(&bytes)
+        .map_err(|error| format!("Runtime Box activation metadata in WSL2 is invalid: {error}"))
+}
+
+fn run_self_test(python: &Path, imports: &[String], timeout_seconds: u64) -> Result<(), String> {
+    let script = imports
+        .iter()
+        .map(|name| format!("import {name}"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    let mut child = Command::new(python)
+        .args(["-c", &script])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("Could not start the Runtime Box self-test in WSL2: {error}"))?;
+    let started = Instant::now();
+    let timeout = Duration::from_secs(timeout_seconds.clamp(10, 600));
+    loop {
+        match child.try_wait().map_err(|error| error.to_string())? {
+            Some(status) if status.success() => return Ok(()),
+            Some(status) => {
+                let mut stderr = String::new();
+                if let Some(mut pipe) = child.stderr.take() {
+                    let _ = pipe.read_to_string(&mut stderr);
+                }
+                return Err(format!(
+                    "Runtime Box self-test failed in WSL2 with status {status}: {}",
+                    stderr.trim()
+                ));
+            }
+            None if started.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "Runtime Box self-test timed out in WSL2 after {} seconds.",
+                    timeout.as_secs()
+                ));
+            }
+            None => std::thread::sleep(Duration::from_millis(100)),
+        }
+    }
+}
+
+/// Installs a Runtime Component's box inside the distribution.
+///
+/// The target comes from the app rather than a constant here. Windows reaches every payload
+/// through WSL2, GPU boxes included, so pinning this to `linux-x86_64-cpu` would have made a CUDA
+/// box uninstallable on Windows no matter what the catalog published. The app has already selected
+/// and signature-checked that target, and every field below is still compared against the signed
+/// release, so nothing is taken on trust — the caller only says *which* release it approved.
+fn install_runtime(arguments: &[String]) -> Result<RuntimeState, String> {
+    let [kind, expected_box, expected_component, expected_runtime, expected_target, release_path, trusted_key, archive_path, archive_digest, expected_release_digest, activation_path, downloads_dir] =
+        arguments
+    else {
+        return Err("Usage: native-tools-box-consumer runtime-install <kind> <box-id> <component-id> <runtime-id> <target-id> <release> <trusted-key> <archive> <archive-sha256> <release-payload-sha256> <activation> <downloads-dir>".into());
+    };
+    identifier(expected_box, "box id")?;
+    identifier(expected_component, "component id")?;
+    identifier(expected_runtime, "runtime id")?;
+    target_identifier(expected_target, "target id")?;
+    // A Linux payload is the only thing WSL2 can run, whatever accelerator it carries.
+    if !expected_target.starts_with("linux-") {
+        return Err("A WSL2 Runtime Box target must be a Linux target.".into());
+    }
+    digest(archive_digest)?;
+    digest(expected_release_digest)?;
+    let release_path = Path::new(release_path);
+    let trusted_key = Path::new(trusted_key);
+    let archive_path = Path::new(archive_path);
+    let activation_path = Path::new(activation_path);
+    let inspected = inspect_release_document(release_path, TrustAnchors::KeyFile(trusted_key))
+        .map_err(|error| error.to_string())?;
+    let release = &inspected.release;
+    let target = box_target_id(&release.target).map_err(|error| error.to_string())?;
+    if release.box_id != *expected_box
+        || release_label(release, "model") != Some(expected_component.as_str())
+        || release_label(release, "runtime") != Some(expected_runtime.as_str())
+        || target != *expected_target
+        || inspected.signed.payload_sha256 != *expected_release_digest
+        || release.archive.sha256 != *archive_digest
+        || !release
+            .compatibility
+            .host_environments
+            .as_ref()
+            .is_some_and(|items| items.iter().any(|item| item == "windows-wsl2"))
+    {
+        return Err("The signed Runtime Box is not the expected WSL2 component release.".into());
+    }
+
+    let runtime = runtime_root(kind, expected_runtime)?;
+    let parent = runtime
+        .parent()
+        .ok_or("The Runtime Component directory has no parent.")?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    if let Some(installed_size) = release.installed_size_bytes {
+        let available = fs2::available_space(parent).map_err(|error| error.to_string())?;
+        let assets: u64 = release
+            .assets
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|asset| asset.size_bytes)
+            .sum();
+        let required = installed_size
+            .saturating_add(assets)
+            .saturating_add(DISK_SPACE_MARGIN_BYTES);
+        if available < required {
+            return Err(format!(
+                "WSL2 needs at least {required} free bytes to install this Runtime Box, but only {available} are available."
+            ));
+        }
+    }
+    let staging = unique_staging(parent)?;
+    let install = (|| -> Result<RuntimeState, String> {
+        let prepared = verify_and_extract_box(
+            release_path,
+            &PrepareOptions {
+                trust: TrustAnchors::KeyFile(trusted_key),
+                archive: Some(archive_path),
+                destination: &staging,
+                environment: EnvironmentReportOptions::default(),
+            },
+        )
+        .map_err(|error| error.to_string())?;
+        if prepared.box_id() != expected_box
+            || prepared_label(&prepared, "runtime") != Some(expected_runtime.as_str())
+            || prepared.target_id() != expected_target
+            || prepared.release_payload_sha256() != expected_release_digest
+        {
+            return Err(
+                "The prepared WSL2 Runtime Box does not match the approved release.".into(),
+            );
+        }
+        // Before the self-test, which may run what they hold.
+        place_on_demand_assets(
+            &staging,
+            prepared.required_assets(),
+            Path::new(downloads_dir),
+        )?;
+        let python_entry = prepared
+            .runtime()
+            .entry_point
+            .clone()
+            .ok_or("The prepared WSL2 Runtime Box declares no interpreter.")?;
+        let python = staging.join(&python_entry);
+        run_self_test(
+            &python,
+            release.self_test.probe.imports.as_deref().unwrap_or_default(),
+            release.self_test.timeout_seconds,
+        )?;
+        let activation = read_activation(activation_path)?;
+        fs::copy(activation_path, staging.join("runtime-box-activation.json")).map_err(
+            |error| format!("Could not persist Runtime Box provenance in WSL2: {error}"),
+        )?;
+        let size_bytes = directory_size(&staging)?;
+        let rollback_available = activate_runtime(&runtime, &staging, expected_runtime)?;
+        Ok(RuntimeState {
+            runtime_dir: runtime.to_string_lossy().to_string(),
+            python_path: runtime.join(python_entry).to_string_lossy().to_string(),
+            size_bytes,
+            rollback_available,
+            activation,
+        })
+    })();
+    if install.is_err() && staging.exists() {
+        let _ = fs::remove_dir_all(staging);
+    }
+    install
+}
+
+/// Copies each on-demand asset the app downloaded on the Windows side into the staged box, then has
+/// Scrollcase check every one against the signed release. The app names a download by its digest;
+/// HTTP carries no mode, so whoever places an asset owns its executable bit.
+fn place_on_demand_assets(
+    root: &Path,
+    assets: &[AssetDescriptor],
+    downloads_dir: &Path,
+) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    for asset in assets {
+        let relative = safe_relative_path(&asset.relative_path).map_err(|error| error.to_string())?;
+        let destination = root.join(relative);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        fs::copy(
+            downloads_dir.join(format!("{}.asset", asset.sha256)),
+            &destination,
+        )
+        .map_err(|error| format!("Cannot place on-demand asset {}: {error}", asset.relative_path))?;
+        if asset.executable == Some(true) {
+            fs::set_permissions(&destination, fs::Permissions::from_mode(0o755))
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    verify_required_assets(root, assets).map_err(|error| error.to_string())
+}
+
+/// The interpreter a persisted activation names, relative to the runtime root.
+///
+/// Read through the same signed release type install reads it from, so status cannot keep looking
+/// for a field a newer box format no longer has.
+fn activation_python_entry(activation: &Value) -> Result<String, String> {
+    let release: ReleaseManifest = serde_json::from_value(
+        activation
+            .get("release")
+            .cloned()
+            .ok_or("Runtime Box activation metadata has no release.")?,
+    )
+    .map_err(|error| format!("Runtime Box activation metadata has an invalid release: {error}"))?;
+    let python_entry = release
+        .runtime
+        .entry_point
+        .ok_or("Runtime Box activation metadata has no Python entry point.")?;
+    if python_entry.starts_with('/')
+        || python_entry
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err("Runtime Box activation metadata has an unsafe Python entry point.".into());
+    }
+    Ok(python_entry)
+}
+
+fn current_runtime_state(kind: &str, runtime_id: &str) -> Result<RuntimeState, String> {
+    let runtime = runtime_root(kind, runtime_id)?;
+    let activation = read_activation(&runtime.join("runtime-box-activation.json"))?;
+    let python_entry = activation_python_entry(&activation)?;
+    let python = runtime.join(&python_entry);
+    if !python.is_file() {
+        return Err("The Runtime Box Python interpreter is missing in WSL2.".into());
+    }
+    let rollback = rollback_root(
+        runtime
+            .parent()
+            .ok_or("The Runtime Component directory has no parent.")?,
+        runtime_id,
+    );
+    Ok(RuntimeState {
+        runtime_dir: runtime.to_string_lossy().to_string(),
+        python_path: python.to_string_lossy().to_string(),
+        size_bytes: directory_size(&runtime)?,
+        rollback_available: newest_rollback(&rollback)?.is_some(),
+        activation,
+    })
+}
+
+fn rollback_runtime(kind: &str, runtime_id: &str) -> Result<RollbackState, String> {
+    let runtime = runtime_root(kind, runtime_id)?;
+    let parent = runtime
+        .parent()
+        .ok_or("The Runtime Component directory has no parent.")?;
+    let rollback = rollback_root(parent, runtime_id);
+    let Some(previous) = newest_rollback(&rollback)? else {
+        return Ok(RollbackState {
+            runtime_dir: runtime.to_string_lossy().to_string(),
+            restored: false,
+            activation: runtime
+                .join("runtime-box-activation.json")
+                .is_file()
+                .then(|| read_activation(&runtime.join("runtime-box-activation.json")))
+                .transpose()?,
+        });
+    };
+    let failed = parent.join(format!(".failed-{}", std::process::id()));
+    if failed.exists() {
+        fs::remove_dir_all(&failed).map_err(|error| error.to_string())?;
+    }
+    if runtime.exists() {
+        fs::rename(&runtime, &failed).map_err(|error| error.to_string())?;
+    }
+    if let Err(error) = fs::rename(&previous, &runtime) {
+        if failed.exists() {
+            let _ = fs::rename(&failed, &runtime);
+        }
+        return Err(format!(
+            "Could not roll back the Runtime Box in WSL2: {error}"
+        ));
+    }
+    if failed.exists() {
+        fs::remove_dir_all(failed).map_err(|error| error.to_string())?;
+    }
+    Ok(RollbackState {
+        runtime_dir: runtime.to_string_lossy().to_string(),
+        restored: true,
+        activation: Some(read_activation(
+            &runtime.join("runtime-box-activation.json"),
+        )?),
+    })
+}
+
+fn remove_runtime(kind: &str, runtime_id: &str) -> Result<(), String> {
+    let runtime = runtime_root(kind, runtime_id)?;
+    let parent = runtime
+        .parent()
+        .ok_or("The Runtime Component directory has no parent.")?;
+    if runtime.exists() {
+        fs::remove_dir_all(&runtime).map_err(|error| error.to_string())?;
+    }
+    let rollback = rollback_root(parent, runtime_id);
+    if rollback.exists() {
+        fs::remove_dir_all(rollback).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn print_json(value: &impl Serialize) -> Result<(), String> {
+    println!(
+        "{}",
+        serde_json::to_string(value).map_err(|error| error.to_string())?
+    );
+    Ok(())
+}
+
+fn run() -> Result<(), String> {
+    let arguments = std::env::args().skip(1).collect::<Vec<_>>();
+    match arguments.first().map(String::as_str) {
+        Some("runtime-install") => print_json(&install_runtime(&arguments[1..])?),
+        Some("runtime-status") => {
+            let [kind, runtime_id] = &arguments[1..] else {
+                return Err(
+                    "Usage: native-tools-box-consumer runtime-status <kind> <runtime-id>".into(),
+                );
+            };
+            print_json(&current_runtime_state(kind, runtime_id)?)
+        }
+        Some("runtime-rollback") => {
+            let [kind, runtime_id] = &arguments[1..] else {
+                return Err(
+                    "Usage: native-tools-box-consumer runtime-rollback <kind> <runtime-id>".into(),
+                );
+            };
+            print_json(&rollback_runtime(kind, runtime_id)?)
+        }
+        Some("runtime-remove") => {
+            let [kind, runtime_id] = &arguments[1..] else {
+                return Err(
+                    "Usage: native-tools-box-consumer runtime-remove <kind> <runtime-id>".into(),
+                );
+            };
+            remove_runtime(kind, runtime_id)?;
+            print_json(&serde_json::json!({ "removed": true }))
+        }
+        _ => {
+            let root = run_native_tools(&arguments)?;
+            println!("{}", root.display());
+            Ok(())
+        }
+    }
+}
+
+/// One identity Liatir signs into a box, read back from a release's labels.
+///
+/// Scrollcase v3 removed `modelId` and `runtimeId` from the format because it never read either.
+/// Liatir routes on both, so they travel as labels, and `None` means a box this project did not
+/// build — which every caller here refuses.
+fn release_label<'a>(release: &'a ReleaseManifest, key: &str) -> Option<&'a str> {
+    release.labels.as_ref()?.get(key).map(String::as_str)
+}
+
+/// The same identity, read from a box already prepared on disk.
+fn prepared_label<'a>(prepared: &'a PreparedBox, key: &str) -> Option<&'a str> {
+    prepared.labels()?.get(key).map(String::as_str)
+}
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("{error}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::activation_python_entry;
+    use serde_json::Value;
+
+    /// The activation the Windows app persisted for a real OpenMM install through WSL2.
+    fn version_3_activation() -> Value {
+        serde_json::from_str(include_str!("fixtures/openmm-activation-v3.json")).unwrap()
+    }
+
+    // Status read a field only version 2 releases carried, so after the move to version 3 every
+    // box installed through WSL2 reported itself broken the moment the app asked for its status.
+    #[test]
+    fn reads_the_interpreter_of_a_version_3_activation() {
+        assert_eq!(
+            activation_python_entry(&version_3_activation()).as_deref(),
+            Ok("venv/bin/python")
+        );
+    }
+
+    #[test]
+    fn refuses_an_interpreter_outside_the_runtime_root() {
+        let mut activation = version_3_activation();
+        activation["release"]["runtime"]["entryPoint"] = Value::from("../venv/bin/python");
+        assert!(activation_python_entry(&activation)
+            .unwrap_err()
+            .contains("unsafe"));
+    }
+
+    #[test]
+    fn refuses_an_activation_that_is_not_a_version_3_release() {
+        let activation = serde_json::json!({
+            "release": { "pythonEntryPoint": "venv/bin/python" }
+        });
+        assert!(activation_python_entry(&activation).is_err());
+    }
+}

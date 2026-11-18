@@ -1,0 +1,185 @@
+# Databricks notebook source
+
+# COMMAND ----------
+
+dbutils.widgets.text("catalog", "genesis_workbench", "Catalog")
+dbutils.widgets.text("schema", "genesis_schema", "Schema")
+dbutils.widgets.text("parabricks_alignment_job_id", "1234", "Parabricks Alignment Job ID")
+dbutils.widgets.text("gwas_analysis_job_id", "1234", "GWAS Analysis Job ID")
+dbutils.widgets.text("user_email", "a@b.com", "Email of the user running the deploy")
+dbutils.widgets.text("sql_warehouse_id", "", "SQL Warehouse Id")
+dbutils.widgets.text("databricks_app_names", "genesis-workbench:mcp-genesis-workbench", "Databricks App Names (colon/comma-separated, UI + MCP)")
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+# COMMAND ----------
+
+# MAGIC %pip install databricks-sdk==0.50.0 databricks-sql-connector==4.0.3 mlflow==2.22.0
+
+# COMMAND ----------
+
+gwb_library_path = None
+libraries = dbutils.fs.ls(f"/Volumes/{catalog}/{schema}/libraries")
+for lib in libraries:
+    if lib.name.startswith("genesis_workbench"):
+        gwb_library_path = lib.path.replace("dbfs:", "")
+
+print(gwb_library_path)
+
+# COMMAND ----------
+
+# MAGIC %pip install {gwb_library_path} --force-reinstall
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+parabricks_alignment_job_id = dbutils.widgets.get("parabricks_alignment_job_id")
+gwas_analysis_job_id = dbutils.widgets.get("gwas_analysis_job_id")
+user_email = dbutils.widgets.get("user_email")
+sql_warehouse_id = dbutils.widgets.get("sql_warehouse_id")
+
+# COMMAND ----------
+
+print(f"Catalog: {catalog}")
+print(f"Schema: {schema}")
+print(f"Parabricks Alignment Job ID: {parabricks_alignment_job_id}")
+print(f"GWAS Analysis Job ID: {gwas_analysis_job_id}")
+
+# COMMAND ----------
+
+from genesis_workbench.workbench import initialize
+databricks_token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().getOrElse(None)
+initialize(core_catalog_name=catalog, core_schema_name=schema, sql_warehouse_id=sql_warehouse_id, token=databricks_token)
+
+# COMMAND ----------
+
+spark.sql(f"USE CATALOG {catalog}")
+spark.sql(f"USE SCHEMA {schema}")
+
+# COMMAND ----------
+
+ref_genome_path = f"/Volumes/{catalog}/{schema}/gwas_reference/genomes/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+
+query = f"""
+    MERGE INTO settings AS target
+    USING (
+        SELECT * FROM VALUES
+            ('parabricks_alignment_job_id', '{parabricks_alignment_job_id}', 'genomics'),
+            ('gwas_analysis_job_id', '{gwas_analysis_job_id}', 'genomics'),
+            ('gwas_reference_genome_path', '{ref_genome_path}', 'genomics'),
+            ('gwas_sample_vcf_path', '/Volumes/{catalog}/{schema}/gwas_data/sample_vcf/ALL.chr6.phase3_shapeit2_mvncall_integrated_v3plus_nounphased.rsID.genotypes.GRCh38_dbSNP_no_SVs.vcf.gz', 'genomics'),
+            ('gwas_sample_phenotype_path', '/Volumes/{catalog}/{schema}/gwas_data/sample_phenotype/breast_cancer_phenotype.tsv', 'genomics')
+        AS src(key, value, module)
+    ) AS source
+    ON target.key = source.key AND target.module = source.module
+    WHEN MATCHED THEN UPDATE SET target.value = source.value
+    WHEN NOT MATCHED THEN INSERT (key, value, module) VALUES (source.key, source.value, source.module)
+"""
+
+spark.sql(query)
+
+# COMMAND ----------
+
+from genesis_workbench.workbench import set_app_permissions_for_job
+
+import os
+_app_names_raw = dbutils.widgets.get("databricks_app_names")
+os.environ["DATABRICKS_APP_NAMES"] = ",".join([n.strip() for n in _app_names_raw.replace(":", ",").split(",") if n.strip()])  # UI + MCP
+
+set_app_permissions_for_job(job_id=parabricks_alignment_job_id, user_email=user_email)
+set_app_permissions_for_job(job_id=gwas_analysis_job_id, user_email=user_email)
+
+# COMMAND ----------
+
+# Copy bundled sample phenotype data to the gwas_data volume
+import os, shutil
+
+sample_data_dir = f"/Volumes/{catalog}/{schema}/gwas_data/sample_phenotype"
+os.makedirs(sample_data_dir, exist_ok=True)
+
+current_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+workspace_root = os.sep.join(current_path.split(os.sep)[:-1])
+source_tsv = f"/Workspace{workspace_root}/../data/example_sample_list.tsv"
+
+if os.path.exists(source_tsv):
+    dest = os.path.join(sample_data_dir, "example_sample_list.tsv")
+    shutil.copy2(source_tsv, dest)
+    print(f"Copied sample phenotype data to {dest}")
+else:
+    print(f"Sample data file not found at {source_tsv}, skipping")
+
+source_phenotype = f"/Workspace{workspace_root}/../data/breast_cancer_phenotype.tsv"
+if os.path.exists(source_phenotype):
+    dest = os.path.join(sample_data_dir, "breast_cancer_phenotype.tsv")
+    shutil.copy2(source_phenotype, dest)
+    print(f"Copied breast cancer phenotype data to {dest}")
+else:
+    print(f"Phenotype file not found at {source_phenotype}, skipping")
+
+# COMMAND ----------
+
+# Download sample FASTQ files from 1000 Genomes for the Variant Calling demo so the
+# gwas module is self-contained. The app's Variant Calling tab prefills these paths, but
+# previously ONLY the variant_annotation module staged them — deploying gwas on its own
+# left those defaults pointing at missing files. HTTPS (not FTP): serverless egress does
+# not reliably allow FTP. curl with retries + stall detection pulls the ~3.6 GB reliably;
+# on failure the partial file is removed so a re-run doesn't treat a truncated download as
+# complete. Idempotent: existing files are skipped (a no-op if variant_annotation already
+# staged them).
+import subprocess
+
+sample_fastq_dir = f"/Volumes/{catalog}/{schema}/gwas_data/sample_fastq"
+os.makedirs(sample_fastq_dir, exist_ok=True)
+
+# AWS Open Data S3 mirror of 1000 Genomes — fast/reliable from AWS; EBI HTTPS timed out.
+fastq_base_url = "https://1000genomes.s3.amazonaws.com/phase3/data/HG00096/sequence_read"
+fastq_files = {
+    "sample_1.fq.gz": f"{fastq_base_url}/SRR062634_1.filt.fastq.gz",
+    "sample_2.fq.gz": f"{fastq_base_url}/SRR062634_2.filt.fastq.gz",
+}
+
+for dest_name, url in fastq_files.items():
+    dest_path = os.path.join(sample_fastq_dir, dest_name)
+    # Only skip a fully-sized file; a prior run's timeout can leave a 0-byte/partial
+    # that an existence-only guard would wrongly treat as complete. These are multi-GB.
+    if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1_000_000:
+        print(f"{dest_name} already exists ({os.path.getsize(dest_path)} bytes), skipping")
+        continue
+    if os.path.exists(dest_path):
+        print(f"Removing partial {dest_name} ({os.path.getsize(dest_path)} bytes) and re-downloading")
+        os.remove(dest_path)
+    print(f"Downloading {dest_name} from {url} ...")
+    try:
+        subprocess.run(
+            ["curl", "-L", "--fail", "--retry", "5", "--retry-delay", "10",
+             "--connect-timeout", "30", "--speed-limit", "10000", "--speed-time", "60",
+             "-o", dest_path, url],
+            check=True,
+        )
+    except Exception:
+        if os.path.exists(dest_path):
+            os.remove(dest_path)  # don't leave a partial a re-run would treat as complete
+        raise
+    print(f"Downloaded {dest_name}")
+
+# COMMAND ----------
+
+# Register Glow as a batch model so it appears in the Deployed Models tab
+from genesis_workbench.models import register_batch_model
+
+register_batch_model(
+    model_name="glow",
+    model_display_name="Glow Genomics",
+    model_description="GPU-accelerated genomics library for VCF ingestion, variant annotation, and GWAS analysis on Spark",
+    model_category="genomics",
+    module="genomics",
+    job_id=gwas_analysis_job_id,
+    job_name="gwas_analysis",
+    cluster_type="CPU",
+    added_by=user_email,
+)
+
+print("Genomics GWAS module initialization complete")

@@ -1,0 +1,118 @@
+site_name: ssl-lab
+site_description: >-
+  A research lab for self-supervised learning — JEPA, its generative extension,
+  and the action-operator world-model direction.
+site_url: https://pleiadian53.github.io/ssl-lab/
+repo_url: https://github.com/pleiadian53/ssl-lab
+repo_name: pleiadian53/ssl-lab
+edit_uri: edit/main/docs/
+
+# Source for the rendered site. dev/ is intentionally NOT here (private notes).
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.instant      # SPA-style nav (needs the MathJax re-typeset hook below)
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  # Math: arithmatex in generic mode emits \( \) / \[ \] for MathJax, which
+  # sidesteps GitHub's backslash-escaping quirk and renders full LaTeX (incl.
+  # \, \; spacing) correctly. See docs/javascripts/mathjax.js.
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      # Render ```mermaid fenced blocks as diagrams (Material auto-loads mermaid.js).
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - footnotes
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Generative JEPA:
+      - Overview: generative_jepa/index.md
+      - 0 · Generative models, and why JEPA: generative_jepa/00-generative-models-and-why-jepa.md
+      - 1 · The JEPA encoder: generative_jepa/01-the-jepa-encoder.md
+      - 2 · The latent prior: generative_jepa/02-the-latent-prior.md
+      - 3 · The decoder: generative_jepa/03-the-decoder.md
+      - 4 · Sampling and evaluation: generative_jepa/04-sampling-and-evaluation.md
+      - 5 · Two gaps, four routes: generative_jepa/05-two-gaps-four-routes.md
+      - 6 · Route A — a decoder on the latent: generative_jepa/06-route-a-latent-decoder-head.md
+      - "6a · From rate to counts: library size, worked through": generative_jepa/06a-rate-library-size-and-counts.md
+      - 7 · Route B — variational JEPA and the trouble with Gaussian: generative_jepa/07-route-b-variational-and-beyond-gaussian.md
+      - "7a · JEPA two streams, rebuilt for Route B": generative_jepa/07a-jepa-two-streams-and-route-b.md
+      - "7b · The learnable prior and the KL term, up close": generative_jepa/07b-the-prior-and-the-kl-term.md
+      - "7c · Which network is the prior? (and the action-operator view)": generative_jepa/07c-which-network-is-the-prior.md
+      - 8 · Route C — representation-conditioned diffusion: generative_jepa/08-route-c-conditioned-diffusion.md
+      - 9 · The conditional flow prior: generative_jepa/09-conditional-flow-prior.md
+      - "9a · The three identities, made precise": generative_jepa/09a-three-identities-formalized.md
+      - "9b · Classifier-free guidance": generative_jepa/09b-classifier-free-guidance.md
+      - 10 · Route D — world-model planning: generative_jepa/10-route-d-world-model-planning.md
+      - 11 · Application — computational biology: generative_jepa/11-application-computational-biology.md
+      - 12 · Application — digital phenotyping: generative_jepa/12-application-digital-phenotyping.md
+      - "13 · Discussion — choosing a route to build": generative_jepa/13-choosing-a-route.md
+      - "Appendix — data-modalities primer": generative_jepa/appendix-data-modalities.md
+      - Notation reference: generative_jepa/notation.md
+      - Q&A:
+          - "Targets — how chosen, and coverage": generative_jepa/QA/jepa-target-selection-and-coverage.md
+          - "Baseline vs condition — why two mechanisms": generative_jepa/QA/condition-embedding-where-it-comes-from.md
+  - Time-Series JEPA:
+      - Overview: time_series_jepa/index.md
+      - From I-JEPA to Time-Series JEPA: time_series_jepa/01-from-ijepa-to-tjepa.md
+      - Multimodal temporal channels: time_series_jepa/02-multimodal-temporal-channels.md
+      - The limits of pure Time-Series JEPA: time_series_jepa/03-the-limits-of-pure-tjepa.md
+      - Notation reference: time_series_jepa/notation.md
+  - Action Operators:
+      - From actions to operators: action_operator/00-from-actions-to-operators.md
+      - Augmenting JEPA with Action Operators: action_operator/01-jepa-action-operators.md
+      - A gallery of operators (what θ does): action_operator/02-operator-gallery.md
+      - Notation reference: action_operator/notation.md
+  - Operator World Models:
+      - Overview: operator_world_models/index.md
+      - What is a world model?: operator_world_models/00-what-is-a-world-model.md
+      - State and latent operators: operator_world_models/01-state-and-latent-operators.md
+      - JEPA as a temporal world model: operator_world_models/02-jepa-as-a-temporal-world-model.md
+      - Conditioning JEPA on actions: operator_world_models/03-conditioning-jepa-on-actions.md
+      - Generator bases and the operator in code: operator_world_models/04-generator-bases-and-the-operator-in-code.md
+      - "Worked example: a personal world model for diabetes": operator_world_models/05-worked-example-diabetes.md
+      - Notation reference: operator_world_models/notation.md

@@ -1,0 +1,135 @@
+import { liatir } from '$lib/api';
+import { workspaceStore } from '$lib/stores/workspace.svelte';
+import {
+  liatirExecutionMetadata,
+  type JsonValue,
+  type LiatirExecutionIdentity,
+} from '@liatir/core';
+import { throwIfRunCancelled } from '$lib/pipeline/cancellation';
+import { waitForJobSettlement } from '$lib/pipeline/job-settlement';
+import { executionRuns } from '$lib/stores/executionRuns.svelte';
+
+export interface NativeRunResult {
+  jobId: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  ok: boolean;
+}
+
+export interface NativeJobSpawnRequest {
+  cmd: string;
+  args: string[];
+  cwd?: string;
+  workspaceId: string | null;
+  env?: Record<string, string>;
+  label?: string;
+  kind?: string;
+  metadata: Record<string, JsonValue>;
+  stdoutPath?: string;
+}
+
+export interface NativeRunOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  label?: string;
+  kind?: string;
+  metadata?: Record<string, JsonValue>;
+  onSpawn?: (jobId: string) => void;
+  signal?: AbortSignal;
+  stdoutPath?: string;
+  /** Stable owner copied into the Job and durable execution record. */
+  execution?: LiatirExecutionIdentity;
+  /** Capability-owned spawn boundary for backends that require stronger process control. */
+  spawn?: (request: NativeJobSpawnRequest) => Promise<{ jobId: string }>;
+}
+
+/**
+ * Spawn a system command via the Rust job registry and poll its buffered
+ * stdout/stderr until the process reaches a terminal status.
+ *
+ * Polling the registry is deliberate: short-lived bio tools can finish before
+ * the webview has registered Tauri event listeners, while the backend buffers
+ * every output line and final status as the durable source of truth.
+ */
+export async function runNativeTool(
+  cmd: string,
+  args: string[],
+  onStdout?: (line: string) => void,
+  onStderr?: (line: string) => void,
+  options: NativeRunOptions = {},
+): Promise<NativeRunResult> {
+  const api = liatir();
+  if (!api) throw new Error('Liatir API not available');
+  const signal = options.signal ?? (
+    options.execution ? executionRuns.signal(options.execution.runId) : undefined
+  );
+  throwIfRunCancelled(signal);
+
+  const executionMetadata = options.execution
+    ? liatirExecutionMetadata(options.execution)
+    : {};
+  const metadata = {
+    ...options.metadata,
+    ...executionMetadata,
+  };
+
+  // Spawn via invoke directly so the job is tagged with the active workspace.
+  // The backend resolves managed native tools to their installed binary (single
+  // source of truth, shared with plugins); bare names fall through to PATH.
+  const spawnRequest: NativeJobSpawnRequest = {
+    cmd,
+    args,
+    workspaceId: workspaceStore.activeId,
+    cwd: options.cwd,
+    env: options.env,
+    label: options.label,
+    kind: options.kind,
+    metadata,
+    stdoutPath: options.stdoutPath,
+  };
+  const { jobId } = options.spawn
+    ? await options.spawn(spawnRequest)
+    : await api.invoke('lia_jobs_spawn', { ...spawnRequest }) as { jobId: string };
+  if (options.execution && executionRuns.byId(options.execution.runId)) {
+    await executionRuns.attachJob(options.execution.runId, jobId);
+    // The command as actually spawned, not as a page chose to describe it. Recorded here so the
+    // run's transcript is complete without every caller remembering to narrate itself — and so it
+    // states the real argv, which is what someone reproducing the run needs.
+    await executionRuns.appendLog(
+      options.execution.runId,
+      `$ ${[cmd, ...args].join(' ')}`,
+      { stream: 'system' },
+    ).catch(() => {});
+  }
+  options.onSpawn?.(jobId);
+  const settlement = await waitForJobSettlement(api, jobId, {
+    signal,
+    onStdout: (line) => {
+      onStdout?.(line);
+      if (options.execution && executionRuns.byId(options.execution.runId)) {
+        void executionRuns.appendLog(options.execution.runId, line, { stream: 'stdout' }).catch(() => {});
+      }
+    },
+    onStderr: (line) => {
+      onStderr?.(line);
+      if (options.execution && executionRuns.byId(options.execution.runId)) {
+        void executionRuns.appendLog(options.execution.runId, line, {
+          stream: 'stderr',
+          level: 'error',
+        }).catch(() => {});
+      }
+    },
+  });
+  const exitCode = settlement.entry.status.type === 'done' || settlement.entry.status.type === 'failed'
+    ? settlement.entry.status.exitCode ?? null
+    : null;
+  const completed = settlement.entry.status.type === 'done' && (exitCode === null || exitCode === 0);
+  return {
+    jobId,
+    stdout: settlement.stdout.join('\n'),
+    stderr: settlement.stderr.join('\n'),
+    exitCode,
+    ok: completed,
+  };
+}

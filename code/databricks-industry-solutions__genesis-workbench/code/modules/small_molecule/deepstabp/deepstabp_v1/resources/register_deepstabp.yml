@@ -1,0 +1,48 @@
+resources:
+  jobs:
+    register_deepstabp:
+      name: register_deepstabp_gwb
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: register_deepstabp_thermostability
+          max_retries: 0
+          disable_auto_optimization: true
+          retry_on_timeout: false
+          environment_key: gpu_env
+          compute:
+            hardware_accelerator: GPU_1xA10
+          notebook_task:
+            notebook_path: ../notebooks/01_register_deepstabp.py
+
+      environments:
+        - environment_key: gpu_env
+          spec:
+            client: "4"
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: deepstabp_v1
+        - name: cache_dir
+          default: ${resources.volumes.deepstabp_cache_dir.name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          default: ${var.gpu_small_setting}
+        - name: hf_backbone_id
+          default: Rostlab/prot_t5_xl_uniref50
+        - name: upstream_ckpt_url
+          default: https://github.com/CSBiology/deepStabP/raw/main/src/Api/trained_model/b25_sampled_10k_tuned_2_d01/checkpoints/epoch%3D1-step%3D2316.ckpt
+
+      tags: ${var.common_resource_tags}

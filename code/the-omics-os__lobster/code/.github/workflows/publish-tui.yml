@@ -1,0 +1,225 @@
+# Build on TestPyPI; promote the same four verified wheels to production.
+# GitHub release creation belongs exclusively to the package-suite workflow.
+name: Publish TUI Wheels
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish; select its existing registry-specific tag'
+        required: true
+        type: string
+      target:
+        description: 'Target registry'
+        required: true
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: tui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Version
+    if: github.repository == 'the-omics-os/lobster'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_test: ${{ steps.version.outputs.is_test }}
+      test_run_id: ${{ steps.version.outputs.test_run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Extract and validate version and promotion source
+        id: version
+        env:
+          REQUEST_VERSION: ${{ inputs.version }}
+          REQUEST_TARGET: ${{ inputs.target }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            VERSION="$REQUEST_VERSION"
+            [[ "$REQUEST_TARGET" == testpypi || "$REQUEST_TARGET" == pypi ]] || exit 1
+            IS_TEST=$([[ "$REQUEST_TARGET" == testpypi ]] && echo true || echo false)
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            IS_TEST=false
+            if [[ "$VERSION" == *-test ]]; then
+              VERSION="${VERSION%-test}"
+              IS_TEST=true
+            fi
+          fi
+          python scripts/verify_release_artifacts.py source "$VERSION"
+          TAG="v$VERSION"
+          if [[ "$IS_TEST" == true ]]; then TAG="$TAG-test"; fi
+          [[ "$GITHUB_REF" == "refs/tags/$TAG" ]] || exit 1
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "is_test=$IS_TEST" >> "$GITHUB_OUTPUT"
+          if [[ "$IS_TEST" == false ]]; then
+            git fetch origin "refs/tags/v$VERSION-test:refs/tags/v$VERSION-test"
+            [[ "$(git rev-parse "v$VERSION-test^{commit}")" == "$GITHUB_SHA" ]] || exit 1
+            for workflow in publish-tui publish-packages; do
+              RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow.yml" \
+                --branch "v$VERSION-test" --commit "$GITHUB_SHA" --status success \
+                --json databaseId --jq '.[0].databaseId // empty')
+              [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+              if [[ "$workflow" == publish-tui ]]; then
+                echo "test_run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+              fi
+            done
+          fi
+
+  build:
+    name: Prepare ${{ matrix.platform }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-amd64
+            runner: ubuntu-latest
+          - platform: linux-arm64
+            runner: ubuntu-latest
+          - platform: darwin-arm64
+            runner: macos-latest
+          - platform: darwin-amd64
+            runner: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Set up Go
+        if: needs.validate.outputs.is_test == 'true'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: '1.26'
+          cache-dependency-path: lobster-tui/go.sum
+      - name: Install uv
+        if: needs.validate.outputs.is_test == 'true'
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - name: Build correctly tagged TestPyPI wheel
+        if: needs.validate.outputs.is_test == 'true'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python build wheel
+          .venv/bin/python packages/lobster-ai-tui/build_wheel.py --platform "$PLATFORM" --version "$VERSION"
+          python scripts/verify_release_artifacts.py artifacts "$VERSION" lobster-ai-tui packages/lobster-ai-tui/dist --platform "$PLATFORM"
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          wheel, = Path('packages/lobster-ai-tui/dist').glob('*.whl')
+          with zipfile.ZipFile(wheel) as archive:
+              Path('lobster-tui/lobster-tui').write_bytes(archive.read('lobster_ai_tui/bin/lobster-tui'))
+          PY
+          uvx twine check packages/lobster-ai-tui/dist/*.whl
+      - name: Promote verified TestPyPI wheel without rebuilding
+        if: needs.validate.outputs.is_test == 'false'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tui-wheel-${{ matrix.platform }}
+          path: packages/lobster-ai-tui/dist/
+          run-id: ${{ needs.validate.outputs.test_run_id }}
+          github-token: ${{ github.token }}
+      - name: Promote matching raw binary
+        if: needs.validate.outputs.is_test == 'false'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: tui-binary-${{ matrix.platform }}
+          path: lobster-tui/
+          run-id: ${{ needs.validate.outputs.test_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify wheel identity and target
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+        run: python scripts/verify_release_artifacts.py artifacts "$VERSION" lobster-ai-tui packages/lobster-ai-tui/dist --platform "$PLATFORM"
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tui-wheel-${{ matrix.platform }}
+          path: packages/lobster-ai-tui/dist/*.whl
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload raw binary artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tui-binary-${{ matrix.platform }}
+          path: lobster-tui/lobster-tui
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish lobster-ai-tui
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ needs.validate.outputs.is_test == 'true' && 'testpypi-lobster-ai-tui' || 'pypi-lobster-ai-tui' }}
+      url: ${{ needs.validate.outputs.is_test == 'true' && 'https://test.pypi.org/project/lobster-ai-tui/' || 'https://pypi.org/project/lobster-ai-tui/' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Download all four wheels
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: tui-wheel-*
+          path: dist/
+          merge-multiple: true
+      - name: Verify complete wheel inventory
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: python scripts/verify_release_artifacts.py artifacts "$VERSION" lobster-ai-tui dist
+      - name: Confirm production artifacts equal TestPyPI bytes
+        if: needs.validate.outputs.is_test == 'false'
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: python scripts/verify_release_artifacts.py registry "$VERSION" lobster-ai-tui dist --index testpypi
+      - name: Prepare isolated publisher inputs
+        id: prepare-publisher-inputs
+        run: |
+          # The publisher writes attestation sidecars beside its inputs.
+          # Preserve pristine reference bytes in dist/ for strict post-upload checks.
+          mkdir publisher-dist
+          cp -- dist/*.whl publisher-dist/
+      - name: Publish to PyPI/TestPyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: ${{ needs.validate.outputs.is_test == 'true' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          packages-dir: publisher-dist/
+          skip-existing: true
+          verbose: true
+      - name: Verify uploaded bytes, including skipped-existing files
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          INDEX: ${{ needs.validate.outputs.is_test == 'true' && 'testpypi' || 'pypi' }}
+        run: |
+          for attempt in $(seq 1 12); do
+            if python scripts/verify_release_artifacts.py registry "$VERSION" lobster-ai-tui dist --index "$INDEX"; then
+              exit 0
+            fi
+            echo "Attempt $attempt/12: registry bytes not yet verified"
+            sleep 10
+          done
+          exit 1

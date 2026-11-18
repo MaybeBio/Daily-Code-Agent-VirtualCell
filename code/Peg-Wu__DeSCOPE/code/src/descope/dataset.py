@@ -1,0 +1,334 @@
+import torch
+import random
+import pickle
+import logging
+import datasets
+import numpy as np
+import scanpy as sc
+
+from typing import Union, Optional
+from abc import ABC, abstractmethod
+from torch.utils.data import Dataset
+from .tokenizer import _filter_perturbations
+from .utils import (
+    load_gene_embs,
+    preprocess_atac_perturbation_adata_consistent_with_epiagent,
+    preprocess_rna_perturbation_adata
+)
+
+logger = logging.getLogger(__name__)
+
+
+# Slow | Deprecated
+class BaseDataset(Dataset, ABC):
+    MAIN_INPUT_NAME = None
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls is BaseDataset:
+            return
+        
+        if not hasattr(cls, 'MAIN_INPUT_NAME') or cls.MAIN_INPUT_NAME == None:
+            raise NotImplementedError(
+                f"Class {cls.__name__} must define the class attribute `MAIN_INPUT_NAME` with a non-None value."
+            )
+
+    def __init__(
+        self,
+        adata: Union[str, sc.AnnData],
+        pert_col: str = "perturbation",
+        ctrl_name: str = "control",
+        perts_to_include: Optional[list] = None,
+        perts_to_exclude: Optional[list] = None,
+        gene_embs_file: str = "./ESM2_pert_features.pt"
+    ):
+        super().__init__()
+        self.pert_col = pert_col
+        self.ctrl_name = ctrl_name
+        self.perts_to_include = perts_to_include
+        self.perts_to_exclude = perts_to_exclude
+
+        if isinstance(adata, str):
+            logger.info(f"Read anndata from {adata} ...")
+            adata = sc.read_h5ad(adata)
+
+        if hasattr(adata.X, "toarray"):
+            adata.X = adata.X.toarray()
+
+        adata = self.preprocess_adata(adata)  # abstract
+        self.adata = _filter_perturbations(
+            adata=adata,
+            pert_col=pert_col,
+            ctrl_name=ctrl_name,
+            perts_to_include=perts_to_include,
+            perts_to_exclude=perts_to_exclude
+        )
+        self.ctrl_cell_indices = self.get_ctrl_cell_indices(self.adata)
+        self.gene_embs = load_gene_embs(
+            gene_embs_file=gene_embs_file,
+            perts_to_emb=self.adata.obs[self.pert_col].unique().tolist()
+        )
+    
+    def get_ctrl_cell_indices(self, adata: sc.AnnData) -> list[int]:
+        ctrl_cell_indices = np.where(adata.obs[self.pert_col] == self.ctrl_name)[0]
+        if len(ctrl_cell_indices) == 0:
+            raise ValueError("No control cells found!")
+        return ctrl_cell_indices
+
+    def __getitem__(self, idx):
+        adata_pert = self.adata[idx]
+        pert_name = adata_pert.obs[self.pert_col].item()
+        pert_gene_emb = self.gene_embs[pert_name].to(torch.float32)
+
+        if pert_name != self.ctrl_name or self.RANDOM_MAPPING_CONTROL_TO_CONTROL:
+            random_ctrl_idx = np.random.choice(self.ctrl_cell_indices)
+            adata_ctrl = self.adata[random_ctrl_idx]
+            basal_sequence = torch.tensor(
+                adata_ctrl.X.reshape(-1), dtype=torch.float32
+            )
+            labels = torch.tensor(
+                adata_pert.X.reshape(-1), dtype=torch.float32
+            )
+        else:
+            basal_sequence = torch.tensor(
+                adata_pert.X.reshape(-1), dtype=torch.float32
+            )
+            labels = basal_sequence.clone()
+
+        return {self.MAIN_INPUT_NAME: basal_sequence, "pert_gene_emb": pert_gene_emb, "labels": labels}
+
+    def __len__(self) -> int:
+        return len(self.adata)
+
+    @abstractmethod
+    def preprocess_adata(self, adata: sc.AnnData) -> sc.AnnData:
+        raise NotImplementedError()
+
+
+# Slow | Deprecated
+class DatasetForATAC(BaseDataset):
+    MAIN_INPUT_NAME = "ctrl_cell_tf_idf"
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False
+    def __init__(
+        self,
+        adata: Union[str, sc.AnnData],
+        pert_col: str = "perturbation",
+        ctrl_name: str = "control",
+        topk_ccres: int = 50000,
+        perts_to_include: Optional[list] = None,
+        perts_to_exclude: Optional[list] = None,
+        gene_embs_file: str = "./ESM2_pert_features.pt"
+    ):
+        self.topk_ccres = topk_ccres
+        super().__init__(
+            adata=adata,
+            pert_col=pert_col,
+            ctrl_name=ctrl_name,
+            perts_to_include=perts_to_include,
+            perts_to_exclude=perts_to_exclude,
+            gene_embs_file=gene_embs_file
+        )
+
+    def preprocess_adata(self, adata: sc.AnnData) -> sc.AnnData:
+        return preprocess_atac_perturbation_adata_consistent_with_epiagent(
+            adata, self.topk_ccres, self.pert_col
+        )
+
+
+# Slow | Deprecated
+class DatasetForRNA(BaseDataset):
+    MAIN_INPUT_NAME = "ctrl_cell_expr"
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False
+    def __init__(
+        self,
+        adata: Union[str, sc.AnnData],
+        pert_col: str = "target_gene",
+        ctrl_name: str = "non-targeting",
+        target_sum: float = 1e4,
+        skip_raw_counts_check: bool = False,
+        perts_to_include: Optional[list] = None,
+        perts_to_exclude: Optional[list] = None,
+        gene_embs_file: str = "./ESM2_pert_features.pt"
+    ):
+        self.target_sum = target_sum
+        self.skip_raw_counts_check = skip_raw_counts_check
+        super().__init__(
+            adata=adata,
+            pert_col=pert_col,
+            ctrl_name=ctrl_name,
+            perts_to_include=perts_to_include,
+            perts_to_exclude=perts_to_exclude,
+            gene_embs_file=gene_embs_file
+        )
+
+    def preprocess_adata(self, adata: sc.AnnData) -> sc.AnnData:
+        return preprocess_rna_perturbation_adata(
+            adata=adata, 
+            target_sum=self.target_sum, 
+            pert_col=self.pert_col,
+            skip_raw_counts_check=self.skip_raw_counts_check
+        )
+
+
+# Fast
+class HFBaseDataset(Dataset):
+    MAIN_INPUT_NAME = None
+    INVOLVE_CONTROL_TO_CONTROL = False
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls is HFBaseDataset:
+            return
+        
+        if not hasattr(cls, 'MAIN_INPUT_NAME') or cls.MAIN_INPUT_NAME == None:
+            raise NotImplementedError(
+                f"Class {cls.__name__} must define the class attribute `MAIN_INPUT_NAME` with a non-None value."
+            )
+
+    def __init__(
+        self,
+        hf_dataset: datasets.Dataset,
+        ctrl_name: str = "control",
+        gene_embs_file: str = "./ESM2_pert_features.pt",
+        mse_weights_pkl_file: Optional[str] = None
+    ):
+        super().__init__()
+        self._check_hf_dataset_features(hf_dataset)
+        self.ds = hf_dataset  # features in self.ds: labels, pert_gene, celltype
+        self.ctrl_name = ctrl_name
+        self.ctrl_cell_indices, self.pert_cell_indices = self.get_ctrl_and_pert_cell_indices_for_each_celltype()
+        self.gene_embs = load_gene_embs(
+            gene_embs_file=gene_embs_file,
+            perts_to_emb=self.ds.unique("pert_gene")
+        )  # {gene: torch.Tensor}
+
+        if mse_weights_pkl_file is not None:
+            with open(mse_weights_pkl_file, "rb") as f:
+                self.cp2weights = pickle.load(f)  # {("celltype", "perturbation"): np.array(...)}
+                self.cp2weights = {k: torch.from_numpy(v) for k, v in self.cp2weights.items()}  # {("celltype", "perturbation"): torch.tensor(...)}
+                self.ones_weight = torch.ones_like(next(iter(self.cp2weights.values())))
+                self.ones_weight = self.ones_weight / len(self.ones_weight)
+        else:
+            self.cp2weights = None
+            
+        # preprocess hf dataset
+        self._preprocess_hf_dataset()  # features in self.ds: labels, pert_gene, celltype
+
+        # set valid indices (according to INVOLVE_CONTROL_TO_CONTROL)
+        if not self.INVOLVE_CONTROL_TO_CONTROL:
+            self.valid_indices = [idx for indices in self.pert_cell_indices.values() for idx in indices]
+        else:
+            self.valid_indices = list(range(len(self.ds)))
+    
+    @staticmethod
+    def _check_hf_dataset_features(hf_dataset: datasets.Dataset):
+        missing_features = ["labels", "pert_gene", "celltype"]
+        for feature in hf_dataset.features:
+            if feature in ["labels", "pert_gene", "celltype"]:
+                missing_features.remove(feature)
+        if len(missing_features) > 0:
+            raise ValueError(
+                f"The following features are missing from the HuggingFace dataset: {missing_features}. "
+                "Please make sure that the dataset contains the following features: labels, pert_gene, celltype."
+            )
+    
+    def get_ctrl_and_pert_cell_indices_for_each_celltype(self) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
+        celltype = np.array(self.ds["celltype"][:])
+        pert_gene = np.array(self.ds["pert_gene"][:])
+
+        ctrl_cell_indices = {}
+        pert_cell_indices = {}
+
+        unique_celltypes = np.unique(celltype)
+
+        from tqdm.auto import tqdm
+        from accelerate import PartialState
+
+        for ct in tqdm(
+            unique_celltypes, 
+            disable=not PartialState().is_main_process,
+            desc="Extracting ctrl and pert cell indices"
+        ):
+            ct_mask = celltype == ct
+            ctrl_mask = (pert_gene == self.ctrl_name) & ct_mask
+
+            ctrl_indices = np.where(ctrl_mask)[0]
+            pert_indices = np.where(ct_mask & ~ctrl_mask)[0]
+
+            if len(ctrl_indices) == 0:
+                raise ValueError(f"No control cells found for celltype {ct}!")
+
+            ctrl_cell_indices[ct] = ctrl_indices.tolist()
+            pert_cell_indices[ct] = pert_indices.tolist()
+
+        return ctrl_cell_indices, pert_cell_indices
+
+    def _preprocess_hf_dataset(self):
+        torch_columns = ["labels"]
+        self.ds.set_format("torch", columns=torch_columns, output_all_columns=True)
+
+    def __getitem__(self, idx) -> dict:
+        real_idx = self.valid_indices[idx]
+        # return self.ds[real_idx]
+        return self.__getitems__([real_idx])
+
+    def __getitems__(self, keys: list) -> list:
+        """Can be used to get a batch using a list of integers indices."""
+        # Map keys (indices in valid_indices) to real indices in the dataset
+        real_indices = [self.valid_indices[k] for k in keys]
+        batch = self.ds.__getitem__(real_indices)  # labels, pert_gene, celltype
+
+        # Extract `pert_gene_emb`
+        batch["pert_gene_emb"] = torch.stack(
+            [self.gene_embs[g] for g in batch["pert_gene"]]
+        )
+
+        # Extract `mse_weights`
+        if self.cp2weights is not None:
+            batch["mse_weights"] = torch.stack([
+                self.cp2weights.get((ct, pg), self.ones_weight)
+                for ct, pg in zip(batch["celltype"], batch["pert_gene"])
+            ])
+
+        # Assign control cells
+        selected_ctrl_indices = []
+        if self.RANDOM_MAPPING_CONTROL_TO_CONTROL:
+            for ct in batch["celltype"]:
+                selected_ctrl_indices.append(
+                    int(random.choice(self.ctrl_cell_indices[ct]))
+                )
+        else:
+            for ct, pg, real_idx in zip(batch["celltype"], batch["pert_gene"], real_indices):
+                if pg != self.ctrl_name:
+                    selected_ctrl_indices.append(
+                        int(random.choice(self.ctrl_cell_indices[ct]))
+                    )
+                else:
+                    selected_ctrl_indices.append(int(real_idx))
+        # MAIN_INPUT_NAME, pert_gene_emb, labels, pert_gene, celltype
+        batch[self.MAIN_INPUT_NAME] = self.ds.__getitem__(selected_ctrl_indices)["labels"]
+
+        return batch
+
+    def __len__(self) -> int:
+        return len(self.valid_indices)
+
+    @staticmethod
+    def collate_fn(batch):
+        return batch
+
+
+# Fast
+class HFDatasetForATAC(HFBaseDataset):
+    MAIN_INPUT_NAME = "ctrl_cell_tf_idf"
+    INVOLVE_CONTROL_TO_CONTROL = False
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False
+
+
+# Fast
+class HFDatasetForRNA(HFBaseDataset):
+    MAIN_INPUT_NAME = "ctrl_cell_expr"
+    INVOLVE_CONTROL_TO_CONTROL = False
+    RANDOM_MAPPING_CONTROL_TO_CONTROL = False

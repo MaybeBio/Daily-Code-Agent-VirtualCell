@@ -1,0 +1,74 @@
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+import logging
+import os
+
+from dotenv import load_dotenv
+from redis import Redis
+from redis.asyncio import Redis as AsyncRedis
+
+from backend.util.cache import cached, thread_cached
+from backend.util.retry import conn_retry
+
+load_dotenv()
+
+HOST = os.getenv("REDIS_HOST", "localhost")
+PORT = int(os.getenv("REDIS_PORT", "6379"))
+PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+logger = logging.getLogger(__name__)
+
+
+@conn_retry("Redis", "Acquiring connection")
+def connect() -> Redis:
+    c = Redis(
+        host=HOST,
+        port=PORT,
+        password=PASSWORD,
+        decode_responses=True,
+    )
+    c.ping()
+    return c
+
+
+@conn_retry("Redis", "Releasing connection")
+def disconnect():
+    get_redis().close()
+
+
+@cached(ttl_seconds=3600)
+def get_redis() -> Redis:
+    return connect()
+
+
+@conn_retry("AsyncRedis", "Acquiring connection")
+async def connect_async() -> AsyncRedis:
+    c = AsyncRedis(
+        host=HOST,
+        port=PORT,
+        password=PASSWORD,
+        decode_responses=True,
+    )
+    await c.ping()
+    return c
+
+
+@conn_retry("AsyncRedis", "Releasing connection")
+async def disconnect_async():
+    c = await get_redis_async()
+    await c.close()
+
+
+@thread_cached
+async def get_redis_async() -> AsyncRedis:
+    return await connect_async()
+
+__AUTHOR_SIGNATURE__ = "9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE"

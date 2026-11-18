@@ -1,0 +1,96 @@
+variables: 
+  current_user:
+    description: User deploying the bundle. Can apply to service principals as well.
+    default: ${workspace.current_user.userName}
+  
+  current_working_directory:
+    description: Working directory or bundle root.
+    default: /Workspace/Users/${var.current_user}/.bundle/genesis_workbench/${bundle.name}/${bundle.target}
+  
+  workspace_url:
+    description: Workspace url for deployment
+
+  serving_endpoint:
+    description: queryable serving endpoint for app to access
+    default: databricks-meta-llama-3-3-70b-instruct
+
+  common_resource_tags:
+    description: Resource tags
+    default: 
+      application: genesis_workbench
+      module: core
+      created_by: ${workspace.current_user.short_name}
+
+  cpu_node_type:
+    description: Node type for CPU vms
+    
+  t4_node_type:
+    description: Node type for T4 GPUs
+
+  a10_node_type:
+    description: Node type for A10 GPUs
+
+  gpu_small_setting:
+    description: The config setting for GPU_SMALL
+
+  gpu_medium_setting:
+    description: The config setting for GPU_SMALL
+
+  gpu_large_setting:
+    description: The config setting for GPU_SMALL
+    
+  sql_warehouse_id:
+    description: Id of the SQL Warehouse that will be used by the app
+
+  dev_user_prefix:
+    description: A prefix for resources to avoid conflict when developing
+    
+  secret_scope_name:
+    description: The secret scope that contains values for app
+
+  core_catalog_name:
+    description: primary catalog where data, models, and files are stored for this project.
+  
+  core_schema_name:
+    description: The schema where core components will be installed.
+
+  app_name:
+    description: Name of the databricks app for UI (default "genesis-workbench").
+
+  mcp_app_name:
+    description: Name of the sibling MCP server Databricks app (must start with "mcp-" for AI Playground discovery).
+    default: mcp-genesis-workbench
+
+  app_names:
+    description: Colon-separated list of databricks app names that should receive endpoint/job/volume grants. Defaults to BOTH the UI app and the sibling MCP app so every per-deploy grant (deploy_model → set_app_permissions_for_endpoint, reading this via DATABRICKS_APP_NAMES) covers both SPs. Single-app installs that never deploy the MCP app are safe — the grant helpers try/except-skip an app that doesn't exist. Colon (not comma) because `databricks bundle --var foo=a,bar=b` already uses commas as its own separator.
+    default: ${var.app_name}:${var.mcp_app_name}
+
+  llm_endpoint_name:
+    description: Name of the LLM serving endpoint (Claude Sonnet) used by the home page assistant
+    default: databricks-claude-sonnet-4-6
+
+  narrative_llm_endpoint_name:
+    description: Premium foundation-model endpoint (Claude Opus) for rich scientific narratives (e.g. perturbation interpretation)
+    default: databricks-claude-opus-4-8
+
+  module_registration_experiment_name:
+    description: >
+      Experiment tag passed to registration notebooks. At runtime, notebooks call
+      set_mlflow_experiment(experiment_tag=<this value>, shared=True), which creates
+      the experiment under /Shared/dbx_genesis_workbench_models/<this value>.
+      Note: this variable is NOT used to set the experiment path directly — the
+      shared base path is hardcoded in genesis_workbench/models.py.
+    default: dbx_genesis_workbench_modules
+
+  default_admin_group:
+    description: The default admin group for the app
+    default: genesis-admin-group
+
+  default_user_group:
+    description: The default user group for the app
+    default: genesis-users
+
+  admin_user:
+    description: The admin user for the app
+    default: ${var.current_user}
+

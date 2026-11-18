@@ -1,0 +1,29 @@
+defaults:
+  - tokenizer: binned
+  - splitter: donor_held_out
+  - _self_
+
+# CELLxGENE Census -- the default for real pretraining data.
+#   pip install cellxgene-census
+# Needs outbound access to
+#   cellxgene-census-public-us-west-2.s3.us-west-2.amazonaws.com
+source:
+  name: census
+  # keep is_primary_data == True or Census returns the same cell more than
+  # once via overlapping re-analyses, duplicating cells across splits
+  value_filter: "tissue_general == 'blood' and is_primary_data == True"
+  organism: "Homo sapiens"
+  census_version: "stable"
+  n_cells: 50000
+  seed: ${seed}
+
+n_hvg: 2000
+batch_size: 64
+num_workers: 4
+mask_ratio: 0.15
+min_genes_per_cell: 200
+min_cells_per_gene: 10
+label_columns: [cell_type, batch_id]
+return_counts: false
+fail_on_leakage: true
+seed: ${seed}

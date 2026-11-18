@@ -1,0 +1,44 @@
+resources:
+  jobs:
+    register_genmol:
+      name: register_genmol
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: register_genmol_generator
+          max_retries: 0
+          disable_auto_optimization: true
+          environment_key: default
+          notebook_task:
+            notebook_path: ../notebooks/01_register_genmol.py
+            base_parameters:
+              model_name: genmol
+              cache_dir: genmol_cache
+
+      environments:
+        - environment_key: default
+          spec:
+            # client 2 = Python 3.11. GenMol pins pandas==2.1.0 / transformers==4.52.4,
+            # which only ship wheels up to py3.11; on client 4 (py3.12) pip builds pandas
+            # from source and the C extensions fail to compile (metadata-generation-failed).
+            # Keep GenMol-installing jobs on py3.11.
+            client: '2'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          default: ${var.gpu_small_setting}
+
+      tags: ${var.common_resource_tags}

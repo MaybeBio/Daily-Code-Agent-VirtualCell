@@ -1,0 +1,18 @@
+# Tokenization control: continuous values, regression objective, no
+# binning. Pair with data/tokenizer=continuous or data/tokenizer=rank.
+d_model: 128
+pool: mean
+normalize_embedding: false
+stem:
+  name: continuous
+  n_genes: AUTO
+  dropout: 0.1
+backbone:
+  name: set_transformer
+  n_layers: 4
+  n_heads: 4
+heads:
+  masked_value:
+    name: masked_value
+    mode: regression
+    n_value_bins: 1

@@ -1,0 +1,9 @@
+resources:
+  volumes:
+    libraries:
+      name: libraries
+      catalog_name: ${var.core_catalog_name}
+      schema_name: ${var.core_schema_name}
+      volume_type: MANAGED
+
+    

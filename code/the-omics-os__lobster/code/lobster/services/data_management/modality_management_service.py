@@ -1,0 +1,692 @@
+"""
+Modality Management Service for centralized modality CRUD operations.
+
+This service provides a unified interface for managing modalities in DataManagerV2,
+including listing, inspection, removal, compatibility validation, and loading.
+All operations include W3C-PROV compliant provenance tracking.
+"""
+
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import anndata as ad
+from scipy import sparse
+
+from lobster.core.data_manager_v2 import DataManagerV2
+from lobster.core.exceptions import HdfReadRefusal
+from lobster.core.provenance.analysis_ir import AnalysisStep
+from lobster.core.utils.layer_keys import layer_names
+from lobster.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class ModalityManagementService:
+    """Service for centralized modality CRUD operations with provenance tracking."""
+
+    def __init__(self, data_manager: DataManagerV2):
+        """
+        Initialize the ModalityManagementService.
+
+        Args:
+            data_manager: DataManagerV2 instance for modality operations
+        """
+        self.data_manager = data_manager
+
+    def list_modalities(
+        self, filter_pattern: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any], AnalysisStep]:
+        """
+        List all available modalities with optional filtering.
+
+        Args:
+            filter_pattern: Optional glob-style pattern to filter modality names
+                          (e.g., "geo_gse*", "*clustered", "bulk_*")
+
+        Returns:
+            Tuple containing:
+            - List of modality info dicts (name, n_obs, n_vars, obs_cols, var_cols)
+            - Statistics dict (total_count, matched_count, filter_pattern)
+            - AnalysisStep for provenance tracking
+        """
+        try:
+            all_modalities = self.data_manager.list_modalities()
+
+            # Apply filter if provided
+            if filter_pattern:
+                import fnmatch
+
+                filtered = [
+                    name
+                    for name in all_modalities
+                    if fnmatch.fnmatch(name, filter_pattern)
+                ]
+            else:
+                filtered = all_modalities
+
+            # Gather info for each modality
+            modality_info = []
+            for name in filtered:
+                try:
+                    adata = self.data_manager.get_modality(name)
+                    info = {
+                        "name": name,
+                        "n_obs": adata.n_obs,
+                        "n_vars": adata.n_vars,
+                        "obs_columns": list(adata.obs.columns),
+                        "var_columns": list(adata.var.columns),
+                    }
+                    modality_info.append(info)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not retrieve info for modality '{name}': {e}"
+                    )
+                    modality_info.append({"name": name, "error": str(e)})
+
+            stats = {
+                "total_modalities": len(all_modalities),
+                "matched_modalities": len(filtered),
+                "filter_pattern": filter_pattern,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            ir = self._create_list_ir(filter_pattern=filter_pattern)
+
+            logger.info(
+                f"Listed {len(filtered)} modalities"
+                + (f" (filtered by '{filter_pattern}')" if filter_pattern else "")
+            )
+
+            return modality_info, stats, ir
+
+        except Exception as e:
+            logger.error(f"Error listing modalities: {e}")
+            raise
+
+    def get_modality_info(
+        self, modality_name: str
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], AnalysisStep]:
+        """
+        Get detailed information about a specific modality.
+
+        Args:
+            modality_name: Name of the modality to inspect
+
+        Returns:
+            Tuple containing:
+            - Detailed info dict (shape, layers, obsm keys, varm keys, uns keys, etc.)
+            - Statistics dict (summary metrics)
+            - AnalysisStep for provenance tracking
+        """
+        try:
+            if modality_name not in self.data_manager.list_modalities():
+                raise ValueError(
+                    f"Modality '{modality_name}' not found. "
+                    f"Available: {', '.join(self.data_manager.list_modalities())}"
+                )
+
+            adata = self.data_manager.get_modality(modality_name)
+
+            # Gather comprehensive info
+            info = {
+                "name": modality_name,
+                "shape": {"n_obs": adata.n_obs, "n_vars": adata.n_vars},
+                "obs_columns": list(adata.obs.columns),
+                "var_columns": list(adata.var.columns),
+                "layers": layer_names(adata),
+                "obsm_keys": list(adata.obsm.keys()) if hasattr(adata, "obsm") else [],
+                "varm_keys": list(adata.varm.keys()) if hasattr(adata, "varm") else [],
+                "uns_keys": list(adata.uns.keys()) if hasattr(adata, "uns") else [],
+                "is_sparse": sparse.issparse(adata.X),
+            }
+
+            # Get quality metrics if available
+            try:
+                quality_metrics = self.data_manager.get_quality_metrics(modality_name)
+                info["quality_metrics"] = quality_metrics
+            except Exception:
+                info["quality_metrics"] = {}
+
+            stats = {
+                "modality_name": modality_name,
+                "total_cells": adata.n_obs,
+                "total_features": adata.n_vars,
+                "layer_count": len(info["layers"]),
+                "obsm_count": len(info["obsm_keys"]),
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            ir = self._create_get_info_ir(modality_name=modality_name)
+
+            logger.info(
+                f"Retrieved info for modality '{modality_name}': "
+                f"{adata.n_obs} obs × {adata.n_vars} vars"
+            )
+
+            return info, stats, ir
+
+        except Exception as e:
+            logger.error(f"Error getting modality info for '{modality_name}': {e}")
+            raise
+
+    def remove_modality(
+        self, modality_name: str
+    ) -> Tuple[bool, Dict[str, Any], AnalysisStep]:
+        """
+        Remove a modality from DataManagerV2.
+
+        Args:
+            modality_name: Name of the modality to remove
+
+        Returns:
+            Tuple containing:
+            - Success boolean
+            - Statistics dict (removed_modality, remaining_count)
+            - AnalysisStep for provenance tracking
+        """
+        try:
+            if modality_name not in self.data_manager.list_modalities():
+                raise ValueError(
+                    f"Modality '{modality_name}' not found. "
+                    f"Available: {', '.join(self.data_manager.list_modalities())}"
+                )
+
+            # Get info before removal for stats
+            adata = self.data_manager.get_modality(modality_name)
+            n_obs = adata.n_obs
+            n_vars = adata.n_vars
+
+            # Remove modality
+            self.data_manager.remove_modality(modality_name)
+
+            remaining = self.data_manager.list_modalities()
+
+            stats = {
+                "removed_modality": modality_name,
+                "shape": {"n_obs": n_obs, "n_vars": n_vars},
+                "remaining_modalities": len(remaining),
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            ir = self._create_remove_ir(modality_name=modality_name)
+
+            logger.info(
+                f"Removed modality '{modality_name}' ({n_obs} × {n_vars}). "
+                f"{len(remaining)} modalities remaining."
+            )
+
+            return True, stats, ir
+
+        except Exception as e:
+            logger.error(f"Error removing modality '{modality_name}': {e}")
+            raise
+
+    def validate_compatibility(
+        self, modality_names: List[str]
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], AnalysisStep]:
+        """
+        Validate compatibility between multiple modalities for integration.
+
+        Checks:
+        - Observation (sample) alignment
+        - Variable (feature) overlap
+        - Batch effects (via obs columns)
+        - Schema compatibility
+        - Recommends integration strategy
+
+        Args:
+            modality_names: List of modality names to validate for compatibility
+
+        Returns:
+            Tuple containing:
+            - Validation result dict (compatible, issues, recommendations)
+            - Statistics dict (overlap_rate, shared_obs, shared_vars)
+            - AnalysisStep for provenance tracking
+        """
+        try:
+            if len(modality_names) < 2:
+                raise ValueError(
+                    "Need at least 2 modalities to validate compatibility. "
+                    f"Provided: {len(modality_names)}"
+                )
+
+            # Validate all modalities exist
+            available = self.data_manager.list_modalities()
+            missing = [name for name in modality_names if name not in available]
+            if missing:
+                raise ValueError(
+                    f"Modalities not found: {missing}. Available: {', '.join(available)}"
+                )
+
+            # Load all modalities
+            modalities = {
+                name: self.data_manager.get_modality(name) for name in modality_names
+            }
+
+            # Check observation overlap
+            obs_indices = [set(adata.obs_names) for adata in modalities.values()]
+            shared_obs = set.intersection(*obs_indices)
+            obs_overlap_rate = len(shared_obs) / max(len(idx) for idx in obs_indices)
+
+            # Check variable overlap
+            var_indices = [set(adata.var_names) for adata in modalities.values()]
+            shared_vars = set.intersection(*var_indices)
+            var_overlap_rate = len(shared_vars) / max(len(idx) for idx in var_indices)
+
+            # Detect batch effects (check for common batch columns)
+            batch_columns = []
+            first_obs_cols = set(modalities[modality_names[0]].obs.columns)
+            common_obs_cols = first_obs_cols.intersection(
+                *[set(adata.obs.columns) for adata in list(modalities.values())[1:]]
+            )
+            potential_batch_cols = [
+                col
+                for col in common_obs_cols
+                if "batch" in col.lower() or "sample" in col.lower()
+            ]
+            batch_columns = potential_batch_cols
+
+            # Determine compatibility
+            issues = []
+            compatible = True
+
+            if obs_overlap_rate < 0.5:
+                issues.append(
+                    f"Low observation overlap ({obs_overlap_rate:.1%}). "
+                    "Consider cohort-level integration."
+                )
+                compatible = False
+
+            if var_overlap_rate < 0.3 and len(shared_vars) == 0:
+                issues.append(
+                    "No shared features. Cross-modal integration required "
+                    "(e.g., pathway-level or correlation-based)."
+                )
+                compatible = False
+
+            if not batch_columns:
+                issues.append(
+                    "No common batch columns detected. "
+                    "May need manual batch annotation before integration."
+                )
+
+            # Recommendations
+            recommendations = []
+            if obs_overlap_rate >= 0.9:
+                recommendations.append(
+                    "High observation overlap - sample-level integration recommended"
+                )
+            elif obs_overlap_rate >= 0.5:
+                recommendations.append(
+                    "Medium observation overlap - consider metadata matching or cohort-level"
+                )
+            else:
+                recommendations.append(
+                    "Low observation overlap - cohort-level integration only"
+                )
+
+            if var_overlap_rate > 0:
+                recommendations.append(
+                    f"Feature overlap detected ({len(shared_vars)} shared) - "
+                    "direct integration possible"
+                )
+            else:
+                recommendations.append(
+                    "No feature overlap - use pathway-level or correlation-based integration"
+                )
+
+            validation = {
+                "compatible": compatible,
+                "modalities": modality_names,
+                "shared_observations": len(shared_obs),
+                "shared_variables": len(shared_vars),
+                "observation_overlap_rate": obs_overlap_rate,
+                "variable_overlap_rate": var_overlap_rate,
+                "batch_columns": batch_columns,
+                "issues": issues,
+                "recommendations": recommendations,
+            }
+
+            stats = {
+                "modality_count": len(modality_names),
+                "observation_overlap_rate": obs_overlap_rate,
+                "variable_overlap_rate": var_overlap_rate,
+                "compatibility_status": (
+                    "compatible" if compatible else "issues_detected"
+                ),
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            ir = self._create_validate_ir(modality_names=modality_names)
+
+            logger.info(
+                f"Validated compatibility for {len(modality_names)} modalities: "
+                f"{'Compatible' if compatible else 'Issues detected'}"
+            )
+
+            return validation, stats, ir
+
+        except Exception as e:
+            logger.error(f"Error validating modality compatibility: {e}")
+            raise
+
+    def load_modality(
+        self,
+        modality_name: str,
+        file_path: str,
+        adapter: str,
+        dataset_id: Optional[str] = None,
+        dataset_type: str = "custom",
+        validate: bool = True,
+        **kwargs: Any,
+    ) -> Tuple[ad.AnnData, Dict[str, Any], AnalysisStep]:
+        """
+        Load a data file as a modality using the modular adapter system.
+
+        Args:
+            modality_name: Name for the new modality
+            file_path: Path to the data file
+            adapter: Adapter to use (e.g., 'transcriptomics_single_cell', 'proteomics_ms')
+            dataset_id: Optional dataset identifier for metadata
+            dataset_type: Source type (e.g., 'custom', 'geo', 'local')
+            validate: Whether to validate against schema (default: True)
+            **kwargs: Additional adapter-specific parameters
+
+        Returns:
+            Tuple containing:
+            - Loaded AnnData object
+            - Statistics dict (shape, adapter, file_path, validation_status)
+            - AnalysisStep for provenance tracking
+        """
+        try:
+            # Validate file exists — resolve relative paths against workspace
+            file_path_obj = Path(file_path)
+            if not file_path_obj.is_absolute():
+                file_path_obj = (
+                    self.data_manager.workspace_path / file_path_obj
+                ).resolve()
+            if not file_path_obj.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            # Check if modality already exists
+            if modality_name in self.data_manager.list_modalities():
+                raise ValueError(
+                    f"Modality '{modality_name}' already exists. "
+                    "Use remove_modality() first or choose a different name."
+                )
+
+            # Check if adapter is available
+            available_adapters = list(self.data_manager.adapters.keys())
+            if adapter not in available_adapters:
+                raise ValueError(
+                    f"Adapter '{adapter}' not available. "
+                    f"Available adapters: {', '.join(available_adapters)}"
+                )
+
+            # Load using DataManagerV2
+            adata = self.data_manager.load_modality(
+                name=modality_name,
+                source=file_path_obj,
+                adapter=adapter,
+                validate=validate,
+                dataset_id=dataset_id,
+                dataset_type=dataset_type,
+                **kwargs,
+            )
+
+            # Auto-enrich Loom files with GEO SOFT metadata if filename has GSE accession
+            if file_path_obj.suffix.lower() == ".loom":
+                try:
+                    from lobster.services.data_access.geo.loom_metadata import (
+                        enrich_loom_adata_with_geo_metadata,
+                        extract_geo_accession,
+                    )
+
+                    geo_id = extract_geo_accession(str(file_path_obj))
+                    if geo_id:
+                        cache_dir = (
+                            str(self.data_manager.workspace_path)
+                            if self.data_manager.workspace_path
+                            else None
+                        )
+                        enriched = enrich_loom_adata_with_geo_metadata(
+                            adata, geo_id, cache_dir=cache_dir
+                        )
+                        if not enriched:
+                            logger.warning(
+                                f"Could not auto-enrich Loom metadata for {geo_id}. "
+                                f"Use inject_sample_metadata tool to add condition labels manually."
+                            )
+                except Exception as e:
+                    logger.warning(f"Loom metadata auto-enrichment failed: {e}")
+
+            # Get quality metrics
+            quality_metrics = self.data_manager.get_quality_metrics(modality_name)
+
+            stats = {
+                "modality_name": modality_name,
+                "shape": {"n_obs": adata.n_obs, "n_vars": adata.n_vars},
+                "adapter": adapter,
+                "file_path": str(file_path_obj),
+                "dataset_type": dataset_type,
+                "validation_status": "passed" if validate else "skipped",
+                "quality_metrics_count": len(
+                    [
+                        k
+                        for k, v in quality_metrics.items()
+                        if isinstance(v, (int, float))
+                    ]
+                ),
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            ir = self._create_load_ir(
+                modality_name=modality_name,
+                file_path=str(file_path_obj),
+                adapter=adapter,
+                dataset_type=dataset_type,
+            )
+
+            logger.info(
+                f"Loaded modality '{modality_name}' from {file_path_obj.name}: "
+                f"{adata.n_obs} obs × {adata.n_vars} vars (adapter: {adapter})"
+            )
+
+            return adata, stats, ir
+
+        except HdfReadRefusal:
+            raise
+        except Exception as e:
+            logger.error(f"Error loading modality '{modality_name}': {e}")
+            raise
+
+    # ============================================================
+    # Provenance IR Creation Helpers
+    # ============================================================
+
+    def _create_list_ir(self, filter_pattern: Optional[str]) -> AnalysisStep:
+        """Create provenance IR for list_modalities operation."""
+        return AnalysisStep(
+            operation="modality_management.list_modalities",
+            exportable=False,
+            tool_name="ModalityManagementService.list_modalities",
+            description=(
+                "List all available modalities"
+                + (f" matching pattern '{filter_pattern}'" if filter_pattern else "")
+            ),
+            library="lobster",
+            imports=[],
+            code_template="""# List modalities{{ (" matching " ~ (filter_pattern | string | repr)) if filter_pattern else "" }}
+# Read-only introspection recorded from the original session. It changed no state,
+# so the replay has nothing to re-run: the session's registry does not exist here.
+print("provenance: modalities listed here (read-only, no-op in replay)")
+""",
+            parameters={"filter_pattern": filter_pattern},
+            parameter_schema={
+                "filter_pattern": {
+                    "type": "string",
+                    "optional": True,
+                    "description": "Glob-style pattern to filter modality names",
+                }
+            },
+            input_entities=[],
+            output_entities=["modality_list"],
+        )
+
+    def _create_get_info_ir(self, modality_name: str) -> AnalysisStep:
+        """Create provenance IR for get_modality_info operation."""
+        return AnalysisStep(
+            operation="modality_management.get_modality_info",
+            exportable=False,
+            tool_name="ModalityManagementService.get_modality_info",
+            description=f"Retrieve detailed information for modality '{modality_name}'",
+            library="lobster",
+            imports=[],
+            code_template="""# Inspect modality: {{ modality_name | string | repr }}
+# Read-only introspection recorded from the original session. It changed no state.
+# The closest equivalent available here is the working object's own shape.
+print({{ ("provenance: modality '" ~ modality_name ~ "' inspected here (read-only)") | repr }})
+print(f"current working object: {adata.n_obs} x {adata.n_vars}")
+""",
+            parameters={"modality_name": modality_name},
+            parameter_schema={
+                "modality_name": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Name of the modality to inspect",
+                }
+            },
+            input_entities=[modality_name],
+            output_entities=["modality_info"],
+        )
+
+    def _create_remove_ir(self, modality_name: str) -> AnalysisStep:
+        """Create provenance IR for remove_modality operation."""
+        return AnalysisStep(
+            operation="modality_management.remove_modality",
+            exportable=False,
+            # State mutation: required to reproduce the session even though it is not
+            # published in a curated notebook. Must never be coupled to `exportable`
+            # or a replay silently diverges — the artefact still exists afterwards.
+            replayable=True,
+            tool_name="ModalityManagementService.remove_modality",
+            description=f"Remove modality '{modality_name}' from workspace",
+            library="lobster",
+            imports=[],
+            code_template="""# Remove modality: {{ modality_name | string | repr }}
+# Recorded state change from the original session.
+#
+# remove_modality() drops a NAMED REGISTRY ENTRY from the session's modality
+# registry. This notebook works on a single `adata` object, which is not that
+# entry, so there is nothing here to delete — and deleting `adata` would destroy
+# the object the remaining cells need.
+#
+# Effect in the original session: {{ modality_name | string | repr }} was unavailable from this
+# point on. If you are re-deriving the session's artefact set, do not expect it.
+print({{ ("provenance: modality '" ~ modality_name ~ "' removed here (no-op in replay)") | repr }})
+""",
+            parameters={"modality_name": modality_name},
+            parameter_schema={
+                "modality_name": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Name of the modality to remove",
+                }
+            },
+            input_entities=[modality_name],
+            output_entities=[],
+        )
+
+    def _create_validate_ir(self, modality_names: List[str]) -> AnalysisStep:
+        """Create provenance IR for validate_compatibility operation."""
+        return AnalysisStep(
+            operation="modality_management.validate_compatibility",
+            exportable=False,
+            tool_name="ModalityManagementService.validate_compatibility",
+            description=f"Validate compatibility between {len(modality_names)} modalities",
+            library="lobster",
+            imports=[],
+            code_template="""# Validate modality compatibility: {{ modality_names | string | repr }}
+# Read-only check recorded from the original session. It changed no state, and it
+# compared registry entries that do not exist in this notebook.
+print({{ ("provenance: compatibility checked here for " ~ modality_names ~ " (read-only)") | repr }})
+""",
+            parameters={"modality_names": modality_names},
+            parameter_schema={
+                "modality_names": {
+                    "type": "list",
+                    "required": True,
+                    "description": "List of modality names to validate for compatibility",
+                }
+            },
+            input_entities=modality_names,
+            output_entities=["compatibility_report"],
+        )
+
+    def _create_load_ir(
+        self, modality_name: str, file_path: str, adapter: str, dataset_type: str
+    ) -> AnalysisStep:
+        """Create provenance IR for load_modality operation."""
+        return AnalysisStep(
+            operation="modality_management.load_modality",
+            exportable=False,
+            tool_name="ModalityManagementService.load_modality",
+            description=f"Load data file as modality '{modality_name}' using {adapter} adapter",
+            library="lobster",
+            # State change: brings data into the session, so it belongs in a replay
+            # regardless of whether a curated notebook would publish it.
+            replayable=True,
+            imports=["import anndata as ad", "from pathlib import Path"],
+            code_template="""# Load modality {{ modality_name | string | repr }} from file
+# Recorded data entry point from the original session, loaded with the
+# {{ adapter | string | repr }} adapter (dataset_type={{ dataset_type | string | repr }}).
+#
+# The read is attempted directly rather than through the adapter, because a
+# notebook has no live session to hold the modality registry. It is guarded: a
+# missing file prints and continues instead of aborting the replay, since the
+# original path is specific to the machine the session ran on.
+_src = Path({{ file_path | string | repr }})
+if _src.exists() and _src.suffix == ".h5ad":
+    _loaded = ad.read_h5ad(_src)
+    print(f"Loaded '{ {{ modality_name | repr }} }': {_loaded.n_obs} x {_loaded.n_vars}")
+elif _src.exists():
+    print({{ ("provenance: '" ~ modality_name ~ "' came from ") | repr }}
+          f"{_src.name} via the '{ {{ adapter | repr }} }' adapter; "
+          "load it with that adapter to reproduce this step")
+else:
+    print(f"provenance: '{ {{ modality_name | repr }} }' was loaded here from {_src} "
+          "(not present; supply it to reproduce this step)")
+""",
+            parameters={
+                "modality_name": modality_name,
+                "file_path": file_path,
+                "adapter": adapter,
+                "dataset_type": dataset_type,
+            },
+            parameter_schema={
+                "modality_name": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Name for the new modality",
+                },
+                "file_path": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Path to the data file",
+                },
+                "adapter": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Adapter to use for loading",
+                },
+                "dataset_type": {
+                    "type": "string",
+                    "optional": True,
+                    "default": "custom",
+                    "description": "Source type (custom, geo, local)",
+                },
+            },
+            input_entities=[file_path],
+            output_entities=[modality_name],
+        )

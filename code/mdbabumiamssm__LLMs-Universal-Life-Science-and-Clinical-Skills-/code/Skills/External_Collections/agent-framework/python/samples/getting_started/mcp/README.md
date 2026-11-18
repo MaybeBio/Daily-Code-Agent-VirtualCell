@@ -1,0 +1,39 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# MCP (Model Context Protocol) Examples
+
+This folder contains examples demonstrating how to work with MCP using Agent Framework.
+
+## What is MCP?
+
+The Model Context Protocol (MCP) is an open standard for connecting AI agents to data sources and tools. It enables secure, controlled access to local and remote resources through a standardized protocol.
+
+## Examples
+
+| Sample | File | Description |
+|--------|------|-------------|
+| **Agent as MCP Server** | [`agent_as_mcp_server.py`](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/python/samples/getting_started/mcp/agent_as_mcp_server.py) | Shows how to expose an Agent Framework agent as an MCP server that other AI applications can connect to |
+| **API Key Authentication** | [`mcp_api_key_auth.py`](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/python/samples/getting_started/mcp/mcp_api_key_auth.py) | Demonstrates API key authentication with MCP servers |
+| **GitHub Integration with PAT** | [`mcp_github_pat.py`](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/agent-framework/python/samples/getting_started/mcp/mcp_github_pat.py) | Demonstrates connecting to GitHub's MCP server using Personal Access Token (PAT) authentication |
+
+## Prerequisites
+
+- `OPENAI_API_KEY` environment variable
+- `OPENAI_RESPONSES_MODEL_ID` environment variable
+
+For `mcp_github_pat.py`:
+- `GITHUB_PAT` - Your GitHub Personal Access Token (create at https://github.com/settings/tokens)
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

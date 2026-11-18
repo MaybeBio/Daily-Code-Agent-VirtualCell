@@ -1,0 +1,18 @@
+# Architectural control: no attention, so no gene-gene interaction
+# modelling. The transformer must beat this to justify its cost.
+d_model: 128
+pool: mean
+normalize_embedding: false
+stem:
+  name: expression
+  n_genes: AUTO
+  n_value_bins: AUTO
+backbone:
+  name: mean_pool_mlp
+  n_layers: 3
+  dropout: 0.1
+heads:
+  masked_value:
+    name: masked_value
+    n_value_bins: AUTO
+    mode: classification

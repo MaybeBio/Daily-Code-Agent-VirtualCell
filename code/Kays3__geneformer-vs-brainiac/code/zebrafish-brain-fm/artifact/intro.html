@@ -1,0 +1,509 @@
+<title>Zebrafish Brain Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; the three data layers keep one hue each from diagram to tables. */
+:root {
+  --chart-ext: #b85c00; --chart-base: #00897b; --chart-model: #2f46a8; --chart-ctl: #8a93a6; --ok: #1b7a43; --bad: #b3261e;
+  --bg: #f5f7fb; --surface: #ffffff; --fg: #141b2d; --muted: #5a6478; --line: #d5dbe7;
+  --cells: #2f46a8; --arch: #0c7a70; --func: #a55f12; --warn-bg: #fdf3dd;
+  --display: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --chart-ext: #b87a2a; --chart-base: #22a898; --chart-model: #6f86ee; --chart-ctl: #6b7590; --ok: #5fd08f; --bad: #ff8a80;
+  --bg: #0e1422; --surface: #161e31; --fg: #e8ecf5; --muted: #9aa5bb; --line: #2b3550;
+  --cells: #8fa3ff; --arch: #4fd1c1; --func: #f0b25e; --warn-bg: #2a2413; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --chart-ext: #b87a2a; --chart-base: #22a898; --chart-model: #6f86ee; --chart-ctl: #6b7590; --ok: #5fd08f; --bad: #ff8a80;
+  --bg: #0e1422; --surface: #161e31; --fg: #e8ecf5; --muted: #9aa5bb; --line: #2b3550;
+  --cells: #8fa3ff; --arch: #4fd1c1; --func: #f0b25e; --warn-bg: #2a2413; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 64px; }
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 44px; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+h1 { font-family: var(--display); font-size: clamp(30px, 6vw, 46px); line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-size: 24px; line-height: 1.2; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 66ch; }
+a { color: var(--cells); }
+a:focus-visible { outline: 2px solid var(--cells); outline-offset: 2px; }
+.eyebrow { font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 19px; }
+.status { background: var(--warn-bg); border: 1px solid var(--func); border-radius: 6px; padding: 12px 16px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); }
+th { font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag { font-family: var(--mono); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.c { color: var(--cells); } .a { color: var(--arch); } .f { color: var(--func); }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+figure .scroll svg { display: block; min-width: 640px; width: 100%; height: auto; }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 70ch; }
+svg text { font-family: var(--body); fill: var(--fg); }
+svg .lab { font-size: 12px; fill: var(--muted); }
+svg .hd { font-family: var(--display); font-weight: 700; font-size: 15px; }
+svg .box { fill: var(--surface); stroke-width: 1.6; }
+svg .ln { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+svg .key { fill: var(--fg); } svg .keyt { fill: var(--bg); font-family: var(--display); font-weight: 700; font-size: 15px; }
+ol.stages { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+ol.stages li { display: grid; grid-template-columns: 4.5rem 1fr; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+ol.stages .n { font-family: var(--mono); color: var(--muted); font-size: 13px; padding-top: 3px; }
+ol.stages h3 { font-family: var(--display); font-size: 17px; margin: 0 0 4px; }
+ol.stages p { font-size: 15px; }
+ol.stages .test { color: var(--muted); }
+ul { margin: 0; padding-left: 1.2em; max-width: 66ch; display: flex; flex-direction: column; gap: 8px; }
+pre { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.55; }
+.src { font-size: 14px; color: var(--muted); }
+.src li { max-width: 80ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--sw); }
+svg .val { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+svg .row { font-size: 13px; }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .chance { stroke: var(--fg); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.pass { color: var(--ok); font-weight: 600; } .fail { color: var(--bad); font-weight: 600; }
+.headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.headline div { border-top: 2px solid var(--line); padding-top: 8px; min-width: 0; }
+.headline b { display: block; font-family: var(--display); font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.headline span { font-size: 13px; color: var(--muted); }
+@media (max-width: 520px) { ol.stages li { grid-template-columns: 1fr; } }
+</style>
+
+<main>
+<section>
+  <span class="eyebrow">Project introduction · <i>Danio rerio</i>, larval brain</span>
+  <h1>A foundation model of the zebrafish brain</h1>
+  <p class="lede">One model that joins what each cell expresses, where cells sit in the brain, and what happens when a gene is removed.</p>
+  <p class="status"><strong>Status: two published models, used as they are, beat both the baseline and this project's own small model.</strong> On 10,000 real retina nuclei, scGPT and Geneformer, both trained on human cells only, predict zebrafish cell type better than principal components and better than the tier S model trained here.</p>
+</section>
+
+<section>
+  <h2>Geneformer and scGPT on the same test</h2>
+  <p>Both published models were run frozen, with no fine-tuning, on the same 10,000 nuclei, the same held-out samples and the same probe as the first run. They know human genes only, so zebrafish genes were first mapped to human orthologs. The benchmarks were fixed and committed before the runs.</p>
+  <div class="headline">
+    <div><b>0.894</b><span>scGPT, macro F1</span></div>
+    <div><b>0.879</b><span>Geneformer, macro F1</span></div>
+    <div><b>0.853</b><span>PCA baseline</span></div>
+    <div><b>0.81 to 0.83</b><span>Tier S model of this project</span></div>
+  </div>
+  <figure>
+    <div class="legend"><span style="--sw:var(--chart-ext)">Published model, frozen</span><span style="--sw:var(--chart-base)">PCA</span><span style="--sw:var(--chart-model)">Model trained here</span></div>
+    <div class="scroll">
+    <svg viewBox="0 0 820 250" role="img" aria-label="Macro F1 for cell type on held-out samples: scGPT 0.894, Geneformer 0.879, PCA of all genes 0.853, PCA of mapped genes 0.841, tier S model 0.826 and 0.808.">
+      <line class="grid" x1="210" y1="16" x2="210" y2="226"/><line class="grid" x1="340" y1="16" x2="340" y2="226"/><line class="grid" x1="470" y1="16" x2="470" y2="226"/><line class="grid" x1="600" y1="16" x2="600" y2="226"/><line class="grid" x1="730" y1="16" x2="730" y2="226"/>
+      <text class="lab" x="210" y="242" text-anchor="middle">0</text><text class="lab" x="340" y="242" text-anchor="middle">0.25</text><text class="lab" x="470" y="242" text-anchor="middle">0.50</text><text class="lab" x="600" y="242" text-anchor="middle">0.75</text><text class="lab" x="730" y="242" text-anchor="middle">1.00</text>
+      <text class="row" x="200" y="41" text-anchor="end">scGPT whole-human</text>
+      <path d="M210,28 h460.9 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-460.9 z" style="fill:var(--chart-ext)"><title>scGPT whole-human, frozen: macro F1 0.894</title></path>
+      <text class="val" x="682" y="41">0.894</text>
+      <text class="row" x="200" y="73" text-anchor="end">Geneformer V2-104M</text>
+      <path d="M210,60 h453.1 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-453.1 z" style="fill:var(--chart-ext)"><title>Geneformer V2-104M, frozen: macro F1 0.879</title></path>
+      <text class="val" x="674" y="73">0.879</text>
+      <text class="row" x="200" y="113" text-anchor="end">PCA, all zebrafish genes</text>
+      <path d="M210,100 h439.6 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-439.6 z" style="fill:var(--chart-base)"><title>PCA of all zebrafish genes: macro F1 0.853</title></path>
+      <text class="val" x="661" y="113">0.853</text>
+      <text class="row" x="200" y="145" text-anchor="end">PCA, mapped human genes</text>
+      <path d="M210,132 h433.3 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-433.3 z" style="fill:var(--chart-base)"><title>PCA of the mapped human genes: macro F1 0.841</title></path>
+      <text class="val" x="654" y="145">0.841</text>
+      <text class="row" x="200" y="185" text-anchor="end">Tier S model, seed 0</text>
+      <path d="M210,172 h425.5 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-425.5 z" style="fill:var(--chart-model)"><title>Tier S model, seed 0: macro F1 0.826</title></path>
+      <text class="val" x="646" y="185">0.826</text>
+      <text class="row" x="200" y="217" text-anchor="end">Tier S model, seed 1</text>
+      <path d="M210,204 h416.2 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-416.2 z" style="fill:var(--chart-model)"><title>Tier S model, seed 1: macro F1 0.808</title></path>
+      <text class="val" x="637" y="217">0.808</text>
+    </svg>
+    </div>
+    <figcaption>Macro F1 for cell type on the three held-out samples, 14 cell types. The differences are small, 0.03 to 0.09, and sit mostly in rare cell types. Accuracy over all nuclei is 0.96 to 0.97 for every method.</figcaption>
+  </figure>
+  <div class="scroll"><table>
+    <thead><tr><th>Benchmark, fixed before the run</th><th>Geneformer</th><th>scGPT</th></tr></thead>
+    <tbody>
+      <tr><td>At least the PCA baseline of the first run (0.853)</td><td><span class="pass">&#10003; Passed</span> (0.879)</td><td><span class="pass">&#10003; Passed</span> (0.894)</td></tr>
+      <tr><td>At least PCA of the mapped genes (0.841)</td><td><span class="pass">&#10003; Passed</span>, +0.038 (0.003 to 0.069)</td><td><span class="pass">&#10003; Passed</span>, +0.053 (0.024 to 0.085)</td></tr>
+      <tr><td>Against PCA of all genes, with 95% interval</td><td>+0.026 (-0.007 to 0.056)</td><td>+0.041 (0.011 to 0.071)</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>The gene mapping is lossy, and the models still win.</strong> Of 32,520 zebrafish genes, 16,295 have exactly one human ortholog and were kept; 69% of all counts survive. The mapping alone costs PCA 0.012.</li>
+    <li><strong>Not like for like.</strong> The published models have tens of millions of weights and saw tens of millions of human cells. The tier S model has 3.3 million weights and saw 7,731 nuclei for 16 minutes.</li>
+    <li><strong>A check added afterwards.</strong> The published models give wider feature vectors than the 128 principal components. PCA at 512 and 768 components scored lower (0.828 and 0.820), so width does not explain the gap. This check was not registered.</li>
+    <li><strong>What follows.</strong> Any model built here now has to beat 0.894 on this test. Starting from a published model and adapting it to zebrafish looks stronger than training from nothing.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>The workflow, drawn from the code</h2>
+  <p>Every workflow in the project has a function that builds its Neuro-Workflow graph without running it. A tool reads the nodes and connections of that graph and writes the diagram, so the picture cannot differ from the code. This is the graph of the comparison above: 12 nodes of 7 kinds, 15 connections. Each published model runs in its own environment behind one node.</p>
+  <figure>
+    <div class="scroll"><pre class="mermaid">flowchart TD
+    Loader["Loader<br/>MtxAtlasLoaderNode<br/>stage: io"]
+    Split["Split<br/>SampleSplitNode<br/>stage: analysis"]
+    Tokenizer["Tokenizer<br/>RankTokenizerNode<br/>stage: analysis"]
+    OrthologMap["OrthologMap<br/>OrthologMapNode<br/>stage: analysis"]
+    PCAAllGenes["PCAAllGenes<br/>PcaFeaturesNode<br/>stage: analysis"]
+    PCAMappedGenes["PCAMappedGenes<br/>PcaFeaturesNode<br/>stage: analysis"]
+    Geneformer["Geneformer<br/>ExternalEmbedNode<br/>stage: analysis"]
+    scGPT["scGPT<br/>ExternalEmbedNode<br/>stage: analysis"]
+    ProbePCAAllGenes["ProbePCAAllGenes<br/>CellTypeProbeNode<br/>stage: analysis"]
+    ProbePCAMappedGenes["ProbePCAMappedGenes<br/>CellTypeProbeNode<br/>stage: analysis"]
+    ProbeGeneformer["ProbeGeneformer<br/>CellTypeProbeNode<br/>stage: analysis"]
+    ProbescGPT["ProbescGPT<br/>CellTypeProbeNode<br/>stage: analysis"]
+    Loader -->|"data_path"| Split
+    Split -->|"data_path"| Tokenizer
+    Split -->|"data_path"| PCAAllGenes
+    Split -->|"data_path"| OrthologMap
+    OrthologMap -->|"data_path"| PCAMappedGenes
+    OrthologMap -->|"data_path"| Geneformer
+    OrthologMap -->|"data_path"| scGPT
+    PCAAllGenes -->|"features_path"| ProbePCAAllGenes
+    Tokenizer -->|"tokens_path"| ProbePCAAllGenes
+    PCAMappedGenes -->|"features_path"| ProbePCAMappedGenes
+    Tokenizer -->|"tokens_path"| ProbePCAMappedGenes
+    Geneformer -->|"features_path"| ProbeGeneformer
+    Tokenizer -->|"tokens_path"| ProbeGeneformer
+    scGPT -->|"features_path"| ProbescGPT
+    Tokenizer -->|"tokens_path"| ProbescGPT</pre></div>
+    <figcaption>Generated by <code>tools/draw_workflows.py</code>. Each box gives the node's name in the workflow, its class and its Neuro-Workflow stage; each arrow carries the name of the port. The repository holds the same kind of diagram for the other three workflows.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>First result on real cells: the tier S model</h2>
+  <p>The smallest model (4 layers, 3.3 M weights) was trained on 7,731 nuclei of the zebrafish retina and tested on 2,269 nuclei from three samples it never saw. The test: predict the cell type of a nucleus from the model's representation of it. The benchmarks were fixed and committed before the run.</p>
+  <div class="headline">
+    <div><b>0.853</b><span>PCA baseline, macro F1</span></div>
+    <div><b>0.81 to 0.83</b><span>Model, macro F1, two seeds</span></div>
+    <div><b>0.57</b><span>Same model, untrained</span></div>
+    <div><b>0.04</b><span>Permuted labels (chance 0.07)</span></div>
+  </div>
+  <figure>
+    <div class="legend"><span style="--sw:var(--chart-base)">Baseline</span><span style="--sw:var(--chart-model)">Trained model</span><span style="--sw:var(--chart-ctl)">Controls</span></div>
+    <div class="scroll">
+    <svg viewBox="0 0 820 300" role="img" aria-label="Macro F1 for cell type on held-out samples: PCA baseline 0.853, model 0.826 and 0.808, untrained model 0.566 and 0.577, permuted labels 0.038 and 0.040, chance 0.071.">
+      <line class="grid" x1="210" y1="16" x2="210" y2="276"/><line class="grid" x1="340" y1="16" x2="340" y2="276"/><line class="grid" x1="470" y1="16" x2="470" y2="276"/><line class="grid" x1="600" y1="16" x2="600" y2="276"/><line class="grid" x1="730" y1="16" x2="730" y2="276"/>
+      <text class="lab" x="210" y="292" text-anchor="middle">0</text><text class="lab" x="340" y="292" text-anchor="middle">0.25</text><text class="lab" x="470" y="292" text-anchor="middle">0.50</text><text class="lab" x="600" y="292" text-anchor="middle">0.75</text><text class="lab" x="730" y="292" text-anchor="middle">1.00</text>
+      <text class="row" x="200" y="41" text-anchor="end">PCA baseline</text>
+      <path d="M210,28 h439.6 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-439.6 z" style="fill:var(--chart-base)"><title>PCA baseline: macro F1 0.853</title></path>
+      <text class="val" x="660" y="41">0.853</text>
+      <text class="row" x="200" y="81" text-anchor="end">Model, seed 0</text>
+      <path d="M210,68 h425.5 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-425.5 z" style="fill:var(--chart-model)"><title>Model, seed 0: macro F1 0.826</title></path>
+      <text class="val" x="646" y="81">0.826</text>
+      <text class="row" x="200" y="113" text-anchor="end">Model, seed 1</text>
+      <path d="M210,100 h416.2 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-416.2 z" style="fill:var(--chart-model)"><title>Model, seed 1: macro F1 0.808</title></path>
+      <text class="val" x="637" y="113">0.808</text>
+      <text class="row" x="200" y="153" text-anchor="end">Untrained, seed 0</text>
+      <path d="M210,140 h290.3 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-290.3 z" style="fill:var(--chart-ctl)"><title>Untrained model, seed 0: macro F1 0.566</title></path>
+      <text class="val" x="511" y="153">0.566</text>
+      <text class="row" x="200" y="185" text-anchor="end">Untrained, seed 1</text>
+      <path d="M210,172 h296 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-296 z" style="fill:var(--chart-ctl)"><title>Untrained model, seed 1: macro F1 0.577</title></path>
+      <text class="val" x="517" y="185">0.577</text>
+      <text class="row" x="200" y="225" text-anchor="end">Permuted labels, seed 0</text>
+      <path d="M210,212 h15.8 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-15.8 z" style="fill:var(--chart-ctl)"><title>Permuted labels, seed 0: macro F1 0.038</title></path>
+      <text class="val" x="258" y="225">0.038</text>
+      <text class="row" x="200" y="257" text-anchor="end">Permuted labels, seed 1</text>
+      <path d="M210,244 h16.8 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-16.8 z" style="fill:var(--chart-ctl)"><title>Permuted labels, seed 1: macro F1 0.040</title></path>
+      <text class="val" x="258" y="257">0.040</text>
+      <line class="chance" x1="246.9" y1="16" x2="246.9" y2="276"/>
+      <text class="lab" x="251" y="24">chance 0.071</text>
+    </svg>
+    </div>
+    <figcaption>Macro F1 for cell type on the three held-out samples, 14 cell types. Higher is better. The trained model sits just below the baseline and far above its own untrained copy.</figcaption>
+  </figure>
+  <div class="scroll"><table>
+    <thead><tr><th>Benchmark, fixed before the run</th><th>Seed 0</th><th>Seed 1</th></tr></thead>
+    <tbody>
+      <tr><td>Model at least as good as the PCA baseline</td><td><span class="fail">&#10007; Failed</span> (0.826 against 0.853)</td><td><span class="fail">&#10007; Failed</span> (0.808 against 0.853)</td></tr>
+      <tr><td>Training adds something over the untrained model</td><td><span class="pass">&#10003; Passed</span> (0.826 against 0.566)</td><td><span class="pass">&#10003; Passed</span> (0.808 against 0.577)</td></tr>
+      <tr><td>Permuted labels fall below twice chance (0.143)</td><td><span class="pass">&#10003; Passed</span> (0.038)</td><td><span class="pass">&#10003; Passed</span> (0.040)</td></tr>
+      <tr><td>Masked-gene loss below the gene-frequency baseline (8.931)</td><td><span class="pass">&#10003; Passed</span> (4.545)</td><td><span class="pass">&#10003; Passed</span> (4.708)</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>The baseline wins.</strong> The gap is 0.03 to 0.05 in macro F1. For seed 0 the 95% interval of the difference includes zero (-0.062 to 0.009); for seed 1 it does not (-0.079 to -0.014).</li>
+    <li><strong>The labels are not independent.</strong> They come from the authors' own analysis of the same expression data, which used principal components, so the baseline starts close to them.</li>
+    <li><strong>Rare types are few.</strong> The held-out samples hold 8 microglia and 19 each of three progenitor types. Accuracy over all nuclei is 0.955 to 0.968 for model and baseline alike.</li>
+    <li><strong>Scope.</strong> One tissue, one data set, one small model trained for 16 minutes, two seeds. It does not say what more nuclei or a larger model would do.</li>
+    <li><strong>Cost.</strong> 0.722 of the 2.0 GPU-hours set for stage 1.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>The architecture</h2>
+  <p>Two things carry the name. The first is the neural network: how one nucleus becomes a list of gene tokens, passes through four transformer layers, and comes out either as predictions of its masked genes (training) or as one vector (after training).</p>
+  <figure>
+    <div class="scroll"><pre class="mermaid">flowchart TD
+    A["One nucleus<br/>counts for each gene"] --> B["Scale to 10,000 per nucleus,<br/>divide by the gene's median in the training nuclei"]
+    B --> C["Rank the genes, keep up to 2,048<br/>a list of gene tokens, padded"]
+    C --> D["Mask 15% of the tokens<br/>training only"]
+    D --> E["Gene embedding + rank-position embedding<br/>width 128"]
+    E --> F["4 transformer layers<br/>4 attention heads, feed-forward 512, pre-norm"]
+    F --> G["Layer norm"]
+    G -->|"training"| H["Predict each masked gene<br/>output weights tied to the gene embedding"]
+    G -->|"after training"| I["Mean over the genes of the nucleus<br/>one vector of 128 numbers"]
+    I --> J["Logistic regression to cell type<br/>scored on held-out samples"]</pre></div>
+    <figcaption>The model as run in stage 1: 3,315,072 weights, of which the gene embedding for 17,651 genes is the largest part. No cell type label enters the model; labels are used only by the logistic regression at the end.</figcaption>
+  </figure>
+  <p>The second is the Neuro-Workflow graph that runs it. Each box is a node with a schema; each arrow is a typed port carrying a file path. The baseline and the two controls are branches of the same graph, so they see the same nuclei and the same split.</p>
+  <figure>
+    <div class="scroll"><pre class="mermaid">flowchart TD
+    L["MtxAtlasLoaderNode<br/>10,000 nuclei"] -->|"data_path"| S["SampleSplitNode<br/>3 of 13 samples held out"]
+    S -->|"data_path"| T["RankTokenizerNode"]
+    S -->|"data_path"| P["PcaFeaturesNode<br/>128 components"]
+    T -->|"tokens_path"| TR["EncoderTrainNode<br/>3,000 steps on one GPU"]
+    TR -->|"checkpoint_path"| E["EmbedCellsNode<br/>trained weights"]
+    TR -->|"checkpoint_path"| EU["EmbedCellsNode<br/>untrained weights"]
+    E -->|"features_path"| PM["CellTypeProbeNode<br/>model"]
+    EU -->|"features_path"| PU["CellTypeProbeNode<br/>untrained control"]
+    P -->|"features_path"| PP["CellTypeProbeNode<br/>baseline"]
+    E -->|"features_path"| PX["CellTypeProbeNode<br/>permuted labels"]</pre></div>
+    <figcaption>The stage 1 workflow as it ran: seven kinds of node, eleven node instances. The tokenizer also feeds the two embedding nodes and all four probes; those arrows are left out to keep the picture readable.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Where the work stands</h2>
+  <p class="src">As of 15 November 2026, 14:45 UTC.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>State</th><th>Item</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag a">DONE</span></td><td>Plan and documents</td><td>Introduction, setup, Neuro-Workflow architecture, GPU and scale plan, node reference, eleven diagrams</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Environment</td><td>Installs from a clean clone on a Linux GPU machine in about 26 seconds</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Stage 0 for the retina</td><td>Six data sets from NCBI GEO, 422,539 cells or barcodes, 1.4 GB. The workflow reports 6 ready and verified, 10 blocked</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Tier S smoke test</td><td>4.9 M weights on synthetic cells, 300 steps in 178 s, held-out loss below both baselines</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Tier M calibration</td><td>12.9 M weights, 12 steps: 0.85 steps per second, 14.75 GB peak GPU memory</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Tier M timing run</td><td>2,500 steps on synthetic cells in 48 minutes: 0.87 steps per second, 14.8 GB peak, held-out loss 9.591 against a baseline of 10.127</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Stage 1, first run on real cells</td><td>Tier S on 10,000 retina nuclei, split by sample, two seeds. The PCA baseline won by 0.03 to 0.05 in macro F1</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Stage 1b, Geneformer and scGPT</td><td>Both run frozen on the same test through an ortholog map. scGPT 0.894, Geneformer 0.879, against 0.853 for PCA</td></tr>
+      <tr><td><span class="tag a">DONE</span></td><td>Workflow diagrams from code</td><td>A tool draws every workflow from its Neuro-Workflow graph and can check that the pictures are up to date</td></tr>
+      <tr><td><span class="tag c">NEXT</span></td><td>Decide the direction</td><td>Adapt a published model to zebrafish, or keep training from nothing. 1.039 GPU-hours remain of the 2.0 set for stage 1</td></tr>
+      <tr><td><span class="tag c">NEXT</span></td><td>Gene identifier map</td><td>The six retina data sets use four kinds of gene identifier and cannot share a vocabulary yet</td></tr>
+      <tr><td><span class="tag c">NEXT</span></td><td>Data statements</td><td>Read the data statement of each retina paper. The recorded licence is NCBI's general policy</td></tr>
+      <tr><td><span class="tag c">NEXT</span></td><td>The ten blocked sources</td><td>Retina chromatin data and the brain-wide atlases: terms not read, not downloaded</td></tr>
+      <tr><td><span class="tag c">NEXT</span></td><td>Neuro-Workflow stage names</td><td>Agree names for tokenizing and training with its maintainers</td></tr>
+      <tr><td><span class="tag c">NOT STARTED</span></td><td>Brain architecture and functional genomics layers</td><td>No region data, no chromatin data, no gene-removal test yet</td></tr>
+    </tbody>
+  </table></div>
+  <p>GPU time used so far: 1.830 GPU-hours in the ledger (0.869 on synthetic cells, 0.961 on real retina nuclei).</p>
+</section>
+
+<section>
+  <h2>The retina data that are ready</h2>
+  <p>The project starts with the retina: its six cell classes are well defined, and one study (Kölsch et al. 2021) links ganglion cell types to their projections into the brain and to behaviour.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Data set</th><th>Accession</th><th>Cells or barcodes</th><th>Gene identifiers</th></tr></thead>
+    <tbody>
+      <tr><td>Xu 2020, development</td><td class="num">GSE122680</td><td class="num">35,791</td><td>Ensembl ids</td></tr>
+      <tr><td>Celotto 2023, regeneration</td><td class="num">GSE226373</td><td class="num">24,604</td><td>Ensembl ids, GRCz11</td></tr>
+      <tr><td>Kölsch 2021, ganglion cells</td><td class="num">GSE152842</td><td class="num">48,588 adult, 12,698 larval</td><td>Upper-case symbols</td></tr>
+      <tr><td>Hahn 2023, retina atlas</td><td class="num">GSE237214</td><td class="num">150,535</td><td>Upper-case symbols</td></tr>
+      <tr><td>Ogawa 2021, photoreceptors</td><td class="num">GSE175929</td><td class="num">12,833</td><td>Lawson Lab ids</td></tr>
+      <tr><td>Lyu 2023, injury, single nuclei</td><td class="num">GSE239410</td><td class="num">137,490</td><td>Ensembl ids</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>These are the counts in the deposited files. No quality filter has been applied, and some files may hold unfiltered barcodes.</li>
+    <li>The licence recorded is NCBI's general policy: NCBI places no restrictions on use or distribution, and submitters may still hold rights. The data statement of each paper has not been read.</li>
+    <li>Every file has a checksum, and the stage 0 workflow recomputes them all.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Genes join the three layers</h2>
+  <p>The three kinds of public data do not share cells or animals. They share genes. So the gene identifier is the key that joins them, and the model is built and tested around it.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 900 430" role="img" aria-label="Three data layers, single cells, brain architecture and functional genomics, each connect to a shared gene key, which feeds three tests.">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker></defs>
+      <rect class="box" x="20" y="20" width="260" height="112" rx="6" style="stroke:var(--cells)"/>
+      <text class="hd" x="36" y="46" style="fill:var(--cells)">Single cells</text>
+      <text class="lab" x="36" y="70">Raj 2020 brain atlas</text><text class="lab" x="36" y="90">Daniocell</text><text class="lab" x="36" y="110">Zebrahub</text>
+      <rect class="box" x="320" y="20" width="260" height="112" rx="6" style="stroke:var(--arch)"/>
+      <text class="hd" x="336" y="46" style="fill:var(--arch)">Brain architecture</text>
+      <text class="lab" x="336" y="70">mapzebrain: regions, traced neurons</text><text class="lab" x="336" y="90">mapzebrain marker gene maps</text><text class="lab" x="336" y="110">Z-Brain</text>
+      <rect class="box" x="620" y="20" width="260" height="112" rx="6" style="stroke:var(--func)"/>
+      <text class="hd" x="636" y="46" style="fill:var(--func)">Functional genomics</text>
+      <text class="lab" x="636" y="70">DANIO-CODE regulatory elements</text><text class="lab" x="636" y="90">Mutants of 132 genes, with</text><text class="lab" x="636" y="110">whole-brain activity maps</text>
+
+      <line class="ln" x1="150" y1="132" x2="150" y2="196" marker-end="url(#ar)"/><text class="lab" x="160" y="168">expression per cell</text>
+      <line class="ln" x1="450" y1="132" x2="450" y2="196" marker-end="url(#ar)"/><text class="lab" x="460" y="168">marker gene per region</text>
+      <line class="ln" x1="750" y1="132" x2="750" y2="196" marker-end="url(#ar)"/><text class="lab" x="760" y="160">regions changed</text><text class="lab" x="760" y="176">per mutated gene</text>
+
+      <rect class="key" x="20" y="200" width="860" height="44" rx="6"/>
+      <text class="keyt" x="450" y="228" text-anchor="middle">Shared key: the gene identifier</text>
+
+      <line class="ln" x1="150" y1="244" x2="150" y2="306" marker-end="url(#ar)"/><text class="lab" x="160" y="280">stage 1</text>
+      <line class="ln" x1="450" y1="244" x2="450" y2="306" marker-end="url(#ar)"/><text class="lab" x="460" y="280">stage 2</text>
+      <line class="ln" x1="750" y1="244" x2="750" y2="306" marker-end="url(#ar)"/><text class="lab" x="760" y="280">stage 3</text>
+
+      <rect class="box" x="20" y="310" width="260" height="100" rx="6" style="stroke:var(--line)"/>
+      <text class="hd" x="36" y="336">Cell encoder</text>
+      <text class="lab" x="36" y="360">Test: cell type and stage</text><text class="lab" x="36" y="380">on held-out animals</text>
+      <rect class="box" x="320" y="310" width="260" height="100" rx="6" style="stroke:var(--line)"/>
+      <text class="hd" x="336" y="336">Cells into the brain</text>
+      <text class="lab" x="336" y="360">Test: region of a cell,</text><text class="lab" x="336" y="380">against random marker sets</text>
+      <rect class="box" x="620" y="310" width="260" height="100" rx="6" style="stroke:var(--func)"/>
+      <text class="hd" x="636" y="336">Gene removed in the model</text>
+      <text class="lab" x="636" y="360">Test: predicted regions against</text><text class="lab" x="636" y="380">measured mutant maps</text>
+    </svg>
+    </div>
+    <figcaption>Each layer reaches the model through genes, and each stage adds one test. Stage 3 is the reason to combine the layers: the mutant collection holds measured answers, so a prediction can be scored against an experiment and against random genes.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Public sources</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Layer</th><th>Source</th><th>What it gives</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag c">CELLS</span></td><td>Raj et al. 2020</td><td>About 220,000 brain cells, 12 stages from embryo to larva, about 800 clusters</td></tr>
+      <tr><td><span class="tag c">CELLS</span></td><td>Daniocell</td><td>489,686 cells of the whole animal, 62 stages, 3 to 120 hpf</td></tr>
+      <tr><td><span class="tag c">CELLS</span></td><td>Zebrahub</td><td>Single embryos at ten stages, with light-sheet lineage reconstructions</td></tr>
+      <tr><td><span class="tag a">ARCHITECTURE</span></td><td>mapzebrain</td><td>Reference brain at 6 dpf, over 2,000 traced neurons, 72 regions, over 100 transgene patterns</td></tr>
+      <tr><td><span class="tag a">ARCHITECTURE</span></td><td>mapzebrain gene expression</td><td>Marker gene maps across the larval brain, in the same reference</td></tr>
+      <tr><td><span class="tag a">ARCHITECTURE</span></td><td>Z-Brain</td><td>Region definitions and whole-brain activity maps</td></tr>
+      <tr><td><span class="tag f">FUNCTION</span></td><td>DANIO-CODE</td><td>1,802 genomic data sets, over 140,000 cis-regulatory elements</td></tr>
+      <tr><td><span class="tag f">FUNCTION</span></td><td>Thyme et al. 2019</td><td>Mutants of 132 genes, each with brain activity maps, structural differences and behaviour</td></tr>
+    </tbody>
+  </table></div>
+  <p class="src">hpf: hours post-fertilization. dpf: days post-fertilization. "Functional genomics" is read here as regulatory annotation plus mutant phenotypes.</p>
+</section>
+
+<section>
+  <h2>Why this is hard</h2>
+  <ul>
+    <li><strong>Scale.</strong> The two largest atlases here hold about 710,000 cells together. Geneformer was pretrained on about 30 million and later more than 100 million. Whether a zebrafish-only model deserves the name "foundation model" is a question for the tests.</li>
+    <li><strong>Stage mismatch.</strong> Daniocell ends at 120 hpf. The mapzebrain reference is at 6 dpf, which is 144 hpf. Cells and atlas must be matched by stage, or the mismatch measured.</li>
+    <li><strong>No shared cells.</strong> No cell has both a transcriptome and a position. Every link from a cell to a region is an inference through marker genes.</li>
+    <li><strong>Gene identifiers.</strong> Zebrafish has many duplicated genes. Reusing a model trained on human cells needs an ortholog map, and that map is many-to-many.</li>
+    <li><strong>Licences.</strong> The reuse terms of each source are not checked yet.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Stages</h2>
+  <p>Each stage has a simple baseline. If the baseline wins, the stage reports that.</p>
+  <ol class="stages">
+    <li><span class="n">Stage 0</span><div><h3>Inventory</h3><p>Download terms, file formats, genome build, gene identifiers. One row per data set in the manifest.</p></div></li>
+    <li><span class="n">Stage 1</span><div><h3>Cell encoder</h3><p>Genes ranked by expression in each cell, read by a small transformer.</p><p class="test">Test: cell type and stage on held-out animals and data sets. Baseline: principal components with a linear classifier.</p></div></li>
+    <li><span class="n">Stage 2</span><div><h3>Cells into the brain</h3><p>Predict the region of a cell from its expression, through the marker gene maps.</p><p class="test">Test: cell types with known positions. Null: random marker sets of the same size.</p></div></li>
+    <li><span class="n">Stage 3</span><div><h3>Functional genomics</h3><p>Remove a gene in the model and predict which regions change.</p><p class="test">Test: the 132 mutants, predicted regions against measured maps. Null: expression-matched random genes.</p></div></li>
+    <li><span class="n">Stage 4</span><div><h3>Image encoder</h3><p>A 3D vision transformer for registered brain stacks, in the manner of BrainIAC. Its test is set after stage 2.</p></div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Neuro-Workflow as the main architecture</h2>
+  <p><a href="https://github.com/oist/neuro-workflow">Neuro-Workflow</a>, from the Neural Computation Unit at OIST, organizes brain modelling as a graph of nodes. Each node carries a schema of its role, inputs, outputs and parameters, so people and AI agents can both connect it. In this project every step is a node and every stage is a workflow.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Project stage</th><th>Nodes</th></tr></thead>
+    <tbody>
+      <tr><td>0 Inventory</td><td>Manifest loader, manifest check. Both are written and run.</td></tr>
+      <tr><td>1 Cell encoder</td><td>Atlas loader, rank tokenizer, encoder training, held-out classifier, baseline classifier</td></tr>
+      <tr><td>2 Cells into the brain</td><td>Region atlas loader, marker map loader, region predictor, random marker null</td></tr>
+      <tr><td>3 Functional genomics</td><td>Mutant map loader, gene removal, region comparison, matched random gene null</td></tr>
+      <tr><td>Later</td><td>Region wiring to a TVB connectome, whole-brain simulation, comparison with measured activity maps</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>No stage for machine learning yet.</strong> Neuro-Workflow's nine stages cover simulation. Tokenizing and training need new stage names, to be agreed with its maintainers.</li>
+    <li><strong>Long GPU runs inside a node are untried.</strong> A training node should launch a job and return a checkpoint path, not hold a model in a port.</li>
+    <li><strong>Licence.</strong> Neuro-Workflow is under PolyForm Noncommercial 1.0.0. This project installs it and copies none of its code.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>GPU use and scale</h2>
+  <p>No timing has been measured, so no GPU-hour estimate is given. The sizes below are arithmetic from stated assumptions: a gene vocabulary of about 30,000 and up to 2,048 tokens per cell, which gives up to 1.45 billion tokens per pass over 710,000 cells.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Tier</th><th>Data</th><th>Model</th><th>Hardware</th><th>Go on when</th></tr></thead>
+    <tbody>
+      <tr><td class="num">S</td><td>10,000 cells</td><td class="num">4 layers, width 128, about 5 M weights</td><td>Laptop, no GPU</td><td>Every node and test runs end to end</td></tr>
+      <tr><td class="num">M</td><td>All zebrafish cells</td><td class="num">6 layers, width 256, about 12 M</td><td>One GPU</td><td>It beats the baseline on held-out animals, and the permuted-label run fails</td></tr>
+      <tr><td class="num">L</td><td>Zebrafish plus other species through orthologs</td><td class="num">12 layers, width 512, about 53 M</td><td>Several GPUs or a cluster</td><td>Tier M has passed and the ortholog map is validated</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>Set a GPU-hour ceiling for each stage before its first run, and record every run, failed ones included, in a ledger.</li>
+    <li>Time a short run first. If the projected total exceeds the ceiling, the full run does not start.</li>
+    <li>Check the output of a run before recording it as done.</li>
+    <li>Stage 3 runs 2,772 gene screens: 132 mutated genes, each with 20 matched random genes.</li>
+  </ul>
+  <figure>
+    <div class="scroll"><pre class="mermaid">flowchart TD
+    A["Ceiling set for the stage"] --> B["Start check: time a few steps"]
+    B --> C{"Projected total over the ceiling?"}
+    C -->|"yes"| D["Run does not start"]
+    C -->|"no"| E["Train, with checkpoints"]
+    E --> H["Output check"]
+    H --> I{"Outputs finite, varied, complete?"}
+    I -->|"yes"| J["Ledger row: passed"]
+    I -->|"no"| K["Ledger row: failed. Hours still count."]
+    D --> L["Ledger row: not started"]</pre></div>
+    <figcaption>The path of one GPU run. Every branch ends in a ledger row.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>First measurement: tier S</h2>
+  <p>The smallest model was trained on synthetic cells, random type profiles plus noise, to check that the nodes run and to get a first timing. It says nothing about zebrafish.</p>
+  <div class="scroll"><table>
+    <tbody>
+      <tr><td>Model</td><td class="num">4 layers, width 128, 4,895,616 weights</td></tr>
+      <tr><td>Data</td><td class="num">9,000 training and 1,000 held-out cells, 2,048 genes per cell</td></tr>
+      <tr><td>Hardware</td><td class="num">one NVIDIA GB10, fp32</td></tr>
+      <tr><td>Time</td><td class="num">300 steps in 177.9 s, about 110,500 tokens per second</td></tr>
+      <tr><td>Peak GPU memory</td><td class="num">11.35 GB</td></tr>
+      <tr><td>Held-out loss</td><td class="num">9.916</td></tr>
+      <tr><td>Baseline: gene frequency</td><td class="num">10.127</td></tr>
+      <tr><td>Baseline: uniform</td><td class="num">10.309</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>The model beats both baselines on held-out cells, by a small margin.</li>
+    <li>The first attempt, at 600 steps, projected 394 s against the 360 s ceiling and did not start. The ceiling was kept and the steps halved.</li>
+    <li>At this speed, one pass over 1.45 billion tokens with this model would take about 3.7 hours on this GPU. That is arithmetic from one short run.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Setup</h2>
+  <p>The dependency list resolves and the stage 0 workflow runs. The full install, downloading and training are untested.</p>
+  <pre>git clone https://github.com/Kays3/geneformer-vs-brainiac.git
+cd geneformer-vs-brainiac/zebrafish-brain-fm
+uv sync
+uv run python workflows/stage0_inventory.py</pre>
+  <ul>
+    <li>No data in git. Each download gets a path, a sha256 and a licence in <code>data/MANIFEST.tsv</code>.</li>
+    <li>A data set with an empty licence cell is not used.</li>
+    <li>The laptop is for writing and small checks. Training needs a GPU machine, and its cost is estimated from a short timed run first.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Decisions still open</h2>
+  <ul>
+    <li>Train from scratch on zebrafish, adapt a model from other species through orthologs, or do both and compare.</li>
+    <li>One larval stage only, or development as well.</li>
+    <li>Which reference space is the standard: mapzebrain or Z-Brain.</li>
+    <li>Where training runs, and how much compute stage 1 may use.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Sources</h2>
+  <ul class="src">
+    <li>Raj et al., <i>Neuron</i> 2020. <a href="https://doi.org/10.1016/j.neuron.2020.09.023">doi:10.1016/j.neuron.2020.09.023</a></li>
+    <li>Sur et al. (Daniocell), <i>Developmental Cell</i> 2023. <a href="https://doi.org/10.1016/j.devcel.2023.11.001">doi:10.1016/j.devcel.2023.11.001</a></li>
+    <li>Lange et al. (Zebrahub), <i>Cell</i> 2024. <a href="https://doi.org/10.1016/j.cell.2024.09.047">doi:10.1016/j.cell.2024.09.047</a></li>
+    <li>Kunst et al. (mapzebrain), <i>Neuron</i> 2019. <a href="https://doi.org/10.1016/j.neuron.2019.04.034">doi:10.1016/j.neuron.2019.04.034</a></li>
+    <li>Shainer et al., <i>Science Advances</i> 2023. <a href="https://doi.org/10.1126/sciadv.ade9909">doi:10.1126/sciadv.ade9909</a></li>
+    <li>Randlett et al. (Z-Brain), <i>Nature Methods</i> 2015. <a href="https://doi.org/10.1038/nmeth.3581">doi:10.1038/nmeth.3581</a></li>
+    <li>Baranasic et al. (DANIO-CODE), <i>Nature Genetics</i> 2022. <a href="https://doi.org/10.1038/s41588-022-01089-w">doi:10.1038/s41588-022-01089-w</a></li>
+    <li>Thyme et al., <i>Cell</i> 2019. <a href="https://doi.org/10.1016/j.cell.2019.01.048">doi:10.1016/j.cell.2019.01.048</a></li>
+    <li>Theodoris et al. (Geneformer), <i>Nature</i> 2023. <a href="https://doi.org/10.1038/s41586-023-06139-9">doi:10.1038/s41586-023-06139-9</a></li>
+    <li>Tak et al. (BrainIAC), <i>Nature Neuroscience</i> 2026. <a href="https://doi.org/10.1038/s41593-026-02202-6">doi:10.1038/s41593-026-02202-6</a></li>
+  </ul>
+  <p class="src">Article details are from PubMed. The plan, the stages and the tests are the author's proposal, not taken from these papers. Repository: <a href="https://github.com/Kays3/geneformer-vs-brainiac/tree/main/zebrafish-brain-fm">Kays3/geneformer-vs-brainiac</a>.</p>
+</section>
+</main>

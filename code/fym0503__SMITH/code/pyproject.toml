@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smith-panel-design"
+version = "0.1.0"
+description = "Agentic and transferable target panel design for imaging-based spatial molecular profiling."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  {name = "Yimin Fan"},
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+  "anndata",
+  "biopython",
+  "h5py",
+  "matplotlib>=3.8",
+  "numpy",
+  "openpyxl>=3.1",
+  "pandas",
+  "prompt-toolkit>=3.0",
+  "pyyaml",
+  "requests",
+  "rich>=13.0",
+  "scikit-learn",
+  "scanpy",
+  "scipy",
+  "torch",
+  "tqdm",
+  "umap-learn",
+]
+
+[project.urls]
+Homepage = "https://github.com/fym0503/SMITH"
+Documentation = "https://smith-panel-design.readthedocs.io/en/latest/"
+Repository = "https://github.com/fym0503/SMITH"
+Issues = "https://github.com/fym0503/SMITH/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+cellxgene = [
+  "cellxgene-census>=1.17",
+  "tiledbsoma>=1.15.3",
+]
+docs = [
+  "furo>=2024.1.29",
+  "linkify-it-py>=2.0",
+  "myst-nb>=1.0",
+  "myst-parser>=2.0",
+  "sphinx>=7.0",
+  "sphinx-copybutton>=0.5",
+  "sphinx-design>=0.5",
+]
+notebooks = [
+  "ipykernel>=6.29",
+  "jupyterlab>=4.0",
+  "nbclient>=0.10",
+  "nbformat>=5.10",
+]
+
+[project.scripts]
+smith-cli = "smith_agent.cli:main"
+smith-agent = "smith_agent.cli:main"
+smith-repro = "smith.reproducibility.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["smith", "smith.*", "smith_agent", "smith_agent.*"]
+
+[tool.setuptools.package-data]
+"smith.reproducibility.resources" = [
+  "README.md",
+  "manifests/*.yaml",
+  "configs/*.yaml",
+  "configs/*.json",
+]
+"smith_agent.resources" = [
+  "configs/agent/*.yaml",
+  "configs/agent/*/*.yaml",
+  "scripts/main.py",
+  "scripts/eval.py",
+  "scripts/make_smoke_h5ad.py",
+  "scripts/odt_property_only_runner.py",
+  "scripts/odt_scrinshot_feasibility_demo.py",
+  "scripts/run_odt_property_batches.py",
+  "scripts/README.md",
+  "manifests/*",
+]

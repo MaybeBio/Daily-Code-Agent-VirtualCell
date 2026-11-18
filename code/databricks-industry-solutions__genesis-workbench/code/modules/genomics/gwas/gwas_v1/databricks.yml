@@ -1,0 +1,74 @@
+bundle:
+  name: genesis_workbench_gwas
+  databricks_cli_version: ">=0.295.*"
+
+include:
+  - variables.yml
+  - resources/*.yml
+
+# Packages airt/ (run_alignment.py + command.sh) into ./dist/code.tgz for the
+# parabricks_alignment ai_runtime_task's code_source_path. The bundle packages the tarball.
+artifacts:
+  gwas_parabricks_code:
+    type: tgz
+    path: .
+    include:
+      - airt
+    files:
+      - source: ./dist/code.tgz
+
+targets:
+  prod_aws:
+    mode: production
+    default: true
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        gwas_analysis:
+          job_clusters:
+            - job_cluster_key: gwas_spark_cluster
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+
+  prod_azure:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        gwas_analysis:
+          job_clusters:
+            - job_cluster_key: gwas_spark_cluster
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+
+  prod_gcp:
+    mode: production
+    workspace:
+      root_path: ${var.current_working_directory}
+    permissions:
+      - user_name: ${var.current_user}
+        level: CAN_MANAGE
+    run_as:
+      user_name: ${var.current_user}
+    resources:
+      jobs:
+        gwas_analysis:
+          job_clusters:
+            - job_cluster_key: gwas_spark_cluster
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP

@@ -1,0 +1,1028 @@
+"""the protocol must cover the contract, and agree with it.
+
+this exists because it drifted once already: six of ten checks registered, two of
+the missing four REQUIRED, and one authority disagreeing. none of it was visible
+from the record, because an unregistered check does not appear at all - it is not
+`not_run`, it is absent. a missing check that says nothing is the defect the whole
+record contract exists to prevent, reappearing one level up.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+import omicstra
+
+from omicstra.protocols import ProtocolOrderError, Step, build_protocol
+from omicstra.protocols.eda import EDA_STEPS
+from omicstra.protocols.inventory import INVENTORY_STEPS
+
+CONTRACT = json.loads(
+    (Path(omicstra.__file__).parent / "configs" / "eda_contract.json").read_text()
+)
+CHECKS = {c["id"]: c for c in CONTRACT["checks"]}
+REGISTERED = {s.id: s for s in EDA_STEPS}
+
+
+def test_every_contract_check_is_registered():
+    """an unregistered check is INVISIBLE - not not_run, absent."""
+    missing = sorted(set(CHECKS) - set(REGISTERED))
+    assert not missing, (
+        f"{len(missing)} contract check(s) unregistered: {missing}. a check that is "
+        f"not registered produces no record at all, so the gate cannot judge it and "
+        f"nobody can see that it was skipped."
+    )
+
+
+def test_no_registered_step_is_absent_from_the_contract():
+    """the reverse: a step nobody declared has no criterion to be judged against."""
+    extra = sorted(set(REGISTERED) - set(CHECKS))
+    assert not extra, f"registered but undeclared: {extra}"
+
+
+@pytest.mark.parametrize("cid", sorted(CHECKS))
+def test_authority_agrees_with_the_contract(cid):
+    """authority decides whether a bar derived elsewhere ESCALATES on a new cohort.
+
+    declaring a cohort_calibrated check as universal makes it judge a new cohort
+    against another cohort's threshold without asking - silently.
+    """
+    want = CHECKS[cid].get("authority")
+    got = REGISTERED[cid].authority
+    assert got == want, f"{cid}: contract says {want!r}, step declares {got!r}"
+
+
+@pytest.mark.parametrize("cid", [c for c, v in CHECKS.items() if v.get("applies_when")])
+def test_conditional_checks_have_an_applicability_predicate(cid):
+    """`applies_when` in the contract means the step must be able to say
+    not_applicable. without a predicate it would report not_run instead, which
+    means 'nobody looked' rather than 'it cannot apply here'."""
+    assert REGISTERED[cid].applicable_when is not None, (
+        f"{cid} declares applies_when={CHECKS[cid]['applies_when']!r} but the step "
+        f"has no applicable_when predicate")
+
+
+def test_required_checks_are_all_present():
+    req = {c for c, v in CHECKS.items() if v.get("required")}
+    assert req <= set(REGISTERED), f"required and unregistered: {sorted(req - set(REGISTERED))}"
+
+
+# --- the driver's own invariants --------------------------------------------
+def test_protocol_refuses_a_bad_order():
+    """an invalid order is a wrong METHOD, so it must fail before data is touched."""
+    with pytest.raises(ProtocolOrderError):
+        build_protocol(
+            [Step(id="moran", fn=lambda c: None, requires=frozenset({"weights"})),
+             Step(id="knn", fn=lambda c: None, produces=frozenset({"weights"}))],
+            "bad")
+
+
+def test_protocol_accepts_a_good_order():
+    assert build_protocol(
+        [Step(id="knn", fn=lambda c: None, produces=frozenset({"weights"})),
+         Step(id="moran", fn=lambda c: None, requires=frozenset({"weights"}))],
+        "good") is not None
+
+
+@pytest.mark.parametrize("steps,name", [(EDA_STEPS, "eda"), (INVENTORY_STEPS, "inventory")])
+def test_shipped_protocols_build(steps, name):
+    """both real protocols must satisfy their own order assertion."""
+    assert build_protocol(steps, name) is not None
+
+
+# --- the two bugs that shipped, now covered ---------------------------------
+def test_inventory_halts_on_any_failure_not_only_unbound_roles():
+    """a failed inventory must stop eda.
+
+    the halt originally read only `bind.unbound_required`. when `platform`
+    failed, `bind` was not_run, its unbound list was empty, and the run
+    proceeded - letting eda measure data inventory could not describe.
+    """
+    import inspect
+    from omicstra.graphs import eda as eda_graph
+    src = inspect.getsource(eda_graph.inventory)
+    assert 'status") == "fail"' in src or "status') == 'fail'" in src, (
+        "inventory must halt on any failed step, not only on unbound roles")
+    assert "unbound or failed" in src, "the halt must be the union of both conditions"
+
+
+@pytest.mark.parametrize("proj", ["projects/tnbc-92"])
+def test_platform_json_has_the_flat_samples_map(proj):
+    """platform.json must map sample_id -> platform key.
+
+    it was first written with sample_ids nested inside each platform. the
+    inventory step requires the flat map, so every sample read as undeclared
+    and the whole cohort halted for a schema reason, not a data one.
+    """
+    p = Path(__file__).resolve().parents[1] / proj / "platform.json"
+    if not p.exists():
+        pytest.skip(f"{proj} has no platform.json")
+    d = json.loads(p.read_text())
+    assert "samples" in d, "platform.json needs a flat samples map"
+    assert isinstance(d["samples"], dict) and d["samples"], "samples must be non-empty"
+    undefined = set(d["samples"].values()) - set(d.get("platforms", {}))
+    assert not undefined, f"samples name undefined platforms: {sorted(undefined)}"
+    for key, spec in d.get("platforms", {}).items():
+        assert "sample_ids" not in spec, (
+            f"{key} still nests sample_ids - that is the superseded shape")
+
+
+def test_eda_graph_has_an_inventory_node_before_profile():
+    """inventory produces the join key, platform and raw matrix that eda reads."""
+    from omicstra.graphs.eda import build_eda_graph
+    nodes = set(build_eda_graph().get_graph().nodes)
+    assert {"inventory", "profile", "gate"} <= nodes, f"nodes: {sorted(nodes)}"
+
+
+def test_step_registry_is_gone_from_the_graph():
+    """the registry lives in protocols/. a graph that also owns one is two things."""
+    from omicstra.graphs import eda as eda_graph
+    assert not hasattr(eda_graph, "STEP_REGISTRY")
+
+
+# --- transport and protocol revision ----------------------------------------
+def test_serve_refuses_an_unknown_mode():
+    from omicstra.mcp.server import serve
+    with pytest.raises(ValueError, match="stdio or http"):
+        serve(mode="grpc")
+
+
+def test_protocol_version_is_read_from_meta_not_a_session():
+    """the july revision removed the initialize handshake - version travels in
+    `_meta` on every request, so it is per-request and belongs on the record."""
+    from mcp.types import PROTOCOL_VERSION_META_KEY, LATEST_PROTOCOL_VERSION
+    from omicstra.mcp.server import negotiated_protocol_version
+    assert negotiated_protocol_version(
+        {PROTOCOL_VERSION_META_KEY: LATEST_PROTOCOL_VERSION}) == LATEST_PROTOCOL_VERSION
+    assert negotiated_protocol_version(None) is None
+
+
+def test_require_protocol_2026_defaults_off_and_refuses_when_on(monkeypatch):
+    """default permissive; strict refuses an older client, which is what a
+    deployment behind an authorization server needs - an older client cannot
+    present an audience-bound token."""
+    import importlib
+    from mcp.types import PROTOCOL_VERSION_META_KEY as K, LATEST_PROTOCOL_VERSION as L
+    import omicstra.mcp.server as s
+    monkeypatch.setenv("REQUIRE_PROTOCOL_2026", "0")
+    s = importlib.reload(s)
+    assert s.REQUIRE_PROTOCOL_2026 is False
+    assert s.check_protocol({K: "2025-03-26"}) == "2025-03-26"
+    monkeypatch.setenv("REQUIRE_PROTOCOL_2026", "1")
+    s = importlib.reload(s)
+    assert s.REQUIRE_PROTOCOL_2026 is True
+    assert s.check_protocol({K: L}) == L
+    with pytest.raises(ValueError):
+        s.check_protocol({K: "2025-03-26"})
+    monkeypatch.setenv("REQUIRE_PROTOCOL_2026", "0")
+    importlib.reload(s)
+
+
+def test_http_app_is_stateless():
+    """any instance handles any request - omicstra's handle is run_id, passed
+    as an ordinary param, so nothing needs session affinity."""
+    from omicstra.mcp.server import srv
+    app = srv.streamable_http_app(streamable_http_path="/mcp", stateless_http=True)
+    assert "/mcp" in [getattr(r, "path", None) for r in app.routes]
+
+
+def test_gate_interrupt_carries_the_records():
+    """a client asked to accept cautions must see the diagnostics behind them.
+
+    while a subgraph is paused the parent sees none of its state, so anything
+    the human needs has to travel IN the interrupt payload.
+    """
+    import inspect
+    from omicstra.graphs import eda as g
+    assert '"records": state.get("records", [])' in inspect.getsource(g.escalate)
+
+
+# --- a,b: the version reaches the record ------------------------------------
+def test_protocol_version_is_a_field_on_the_base_record():
+    """b - without this every public-demo run carries a null forever, and
+    REQUIRE_PROTOCOL_2026 means something only at the door, never after."""
+    from omicstra.records import DiagnosticRecord, GateRecord, Record, TransformRecord
+    for cls in (Record, DiagnosticRecord, TransformRecord, GateRecord):
+        assert "protocol_version" in cls.model_fields, cls.__name__
+
+
+def test_request_protocol_version_is_on_the_request_path():
+    """a - a checker that is only ever called from a test refuses nothing."""
+    from omicstra.mcp.server import request_protocol_version
+    assert request_protocol_version() is None       # outside a request: stdio
+    import inspect
+    from omicstra.mcp.server import request_protocol_version as f
+    assert "check_protocol" in inspect.getsource(f), "must validate, not just read"
+
+
+# --- c: durability is what makes the stateless claim true -------------------
+def test_checkpointer_selector():
+    from omicstra.graph import make_checkpointer
+    m, label = make_checkpointer("memory")
+    assert type(m).__name__ == "InMemorySaver" and label == "memory"
+    with pytest.raises(ValueError, match="memory or sqlite"):
+        make_checkpointer("redis://nope")
+
+
+def test_sqlite_checkpoint_survives_a_new_saver(tmp_path):
+    """the point of c: a thread resumable by an instance that never ran it.
+
+    InMemorySaver dies with the process, which quietly makes "any instance
+    handles any request" false. this builds a SECOND saver over the same file -
+    the in-process stand-in for a restarted or second server.
+    """
+    from langgraph.checkpoint.memory import InMemorySaver  # noqa: F401
+    from omicstra.graph import make_checkpointer
+    db = tmp_path / "ck.sqlite"
+    s1, _ = make_checkpointer(f"sqlite:{db}")
+    assert db.exists(), "setup() must create the file"
+    s2, _ = make_checkpointer(f"sqlite:{db}")
+    assert s1 is not s2 and type(s2).__name__ == "SqliteSaver"
+
+
+# --- d: through the real http app -------------------------------------------
+def test_tools_served_over_http_with_meta():
+    """d - the same tools, over streamable-http, with the version in `_meta`.
+
+    note the transport rejects an unknown Host by default (DNS-rebinding
+    protection), so a deployment must declare its hostname.
+    """
+    import json as _json
+    from starlette.testclient import TestClient
+
+    from mcp.server.transport_security import TransportSecuritySettings
+    from mcp.types import LATEST_PROTOCOL_VERSION, PROTOCOL_VERSION_META_KEY
+    from omicstra.mcp.server import srv
+
+    sec = TransportSecuritySettings(allowed_hosts=["testserver"], allowed_origins=["*"])
+    app = srv.streamable_http_app(streamable_http_path="/mcp", stateless_http=True,
+                                  transport_security=sec)
+    with TestClient(app) as c:
+        r = c.post("/mcp",
+                   json={"jsonrpc": "2.0", "id": 1, "method": "tools/list",
+                         "params": {"_meta": {PROTOCOL_VERSION_META_KEY:
+                                              LATEST_PROTOCOL_VERSION}}},
+                   headers={"Accept": "application/json, text/event-stream",
+                            "Content-Type": "application/json",
+                            "Mcp-Method": "tools/list"})
+    assert r.status_code == 200, r.text[:200]
+    data = [l for l in r.text.splitlines() if l.startswith("data:")]
+    payload = _json.loads(data[0][5:]) if data else r.json()
+    names = {t["name"] for t in payload["result"]["tools"]}
+    assert {"check_eda_gate", "route", "decision_record"} <= names, sorted(names)
+
+
+def test_http_rejects_an_unknown_host():
+    """DNS-rebinding protection is ON by default and should stay on."""
+    from starlette.testclient import TestClient
+    from omicstra.mcp.server import srv
+    app = srv.streamable_http_app(streamable_http_path="/mcp", stateless_http=True)
+    with TestClient(app) as c:
+        r = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                   headers={"Accept": "application/json, text/event-stream",
+                            "Content-Type": "application/json"})
+    assert r.status_code == 421, "unknown Host must be refused"
+
+
+# --- packaging: the contracts must travel with the code ---------------------
+def test_contracts_resolve_from_the_package_not_a_repo_checkout():
+    """`pip install omicstra` shipped a server that could not find its own
+    contracts: configs/ was at repo root, and in an installed wheel
+    `parents[2]` is site-packages with no configs/ beside it. this is the
+    difference between "pip-installable mcp server" being true or a claim."""
+    from omicstra.settings import settings
+    pkg = Path(omicstra.__file__).parent
+    assert settings.configs_dir == pkg / "configs", settings.configs_dir
+    assert settings.configs_dir.is_absolute(), "must not depend on cwd"
+    for f in ("eda_contract.json", "routing_contract.json", "data_contract.json"):
+        assert (settings.configs_dir / f).exists(), f
+
+
+def test_no_cohort_data_inside_the_package():
+    """package data is generalizable and cohort-free. configs/v3/ is one
+    cohort's run grid and belongs at repo root, not in the wheel."""
+    pkg_cfg = Path(omicstra.__file__).parent / "configs"
+    names = {p.name for p in pkg_cfg.iterdir()}
+    assert "v3" not in names, "run configs are not package data"
+    for p in pkg_cfg.glob("*.json"):
+        d = json.loads(p.read_text())
+        # `source` is provenance - citing where a shape came from is legitimate.
+        # a cohort named anywhere ELSE is a measurement that escaped its evidence
+        # file into the contract that is supposed to be cohort-free.
+        d.pop("source", None)
+        assert "tnbc" not in json.dumps(d).lower(), (
+            f"{p.name} names a cohort outside its provenance field - that value "
+            f"belongs in routing_evidence.json")
+
+
+def test_server_json_matches_the_server():
+    """the registry entry is a claim about what this server serves. a tool list
+    that drifts from the code is how a client discovers a tool that is not
+    there."""
+    import asyncio
+    import tomllib
+    from omicstra.mcp.server import srv
+    root = Path(__file__).resolve().parents[1]
+    sj = json.loads((root / "server.json").read_text())
+    meta = sj["_meta"]["io.github.teslajoy/omicstra"]
+    actual = {t.name for t in asyncio.run(srv.list_tools())}
+    assert set(meta["tools"]) == actual, f"drift: {set(meta['tools']) ^ actual}"
+    pj = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    assert sj["version"] == pj, f"server.json {sj['version']} != pyproject {pj}"
+    for pkg in sj["packages"]:
+        assert pkg["version"] == pj, f"package entry {pkg['version']} != {pj}"
+
+
+def test_declared_protocol_version_matches_the_sdk():
+    from mcp.types import LATEST_PROTOCOL_VERSION
+    sj = json.loads((Path(__file__).resolve().parents[1] / "server.json").read_text())
+    assert sj["_meta"]["io.github.teslajoy/omicstra"]["protocolVersion"] \
+        == LATEST_PROTOCOL_VERSION
+
+
+# --- the compute path's interrupt points ------------------------------------
+COMPUTE = json.loads(
+    (Path(omicstra.__file__).parent / "configs" / "compute_contract.json").read_text())
+GATES = {g["id"]: g for g in COMPUTE["gates"]}
+
+
+def test_five_preflight_one_mid_run():
+    """the split is the argument, and it is about ENCODE. five of six can be asked
+    before a unit is embedded, so durable execution is justified by ONE mid-run
+    gate plus waiting-without-an-allocation - not by 'six human pauses overnight'.
+
+    counted per stage because align's gates fire before a GRID rather than before
+    an embed, so they neither strengthen nor weaken this claim.
+    """
+    enc = [g for g in GATES.values() if g.get("stage", "encode") == "encode"]
+    pre = [g for g in enc if g["when"] == "preflight"]
+    mid = [g for g in enc if g["when"] == "mid_run"]
+    assert len(pre) == COMPUTE["summary"]["encode"]["preflight"] == 5
+    assert len(mid) == COMPUTE["summary"]["encode"]["mid_run"] == 1
+    assert mid[0]["id"] == "shard_failure_threshold"
+    assert "cannot be asked before submission" in mid[0]["why_it_cannot_be_preflight"]
+
+
+def test_the_align_stage_opens_with_the_admissibility_constraint():
+    """this repo's first constraint is that nothing runs until the EDA gate is
+    satisfied. it was a convention; `eda_admissibility` is the gate that enforces
+    it, and it must be the one that fires before a grid.
+    """
+    al = [g for g in GATES.values() if g.get("stage") == "align"]
+    assert len(al) == COMPUTE["summary"]["align"]["preflight"] == 3
+    assert {g["id"] for g in al} == {"eda_admissibility", "verdict_disagreement",
+                                     "grid_scope"}
+    # structure, not prose. the previous version .replace()d the note so it would
+    # contain its own phrase, which asserted nothing.
+    adm = GATES["eda_admissibility"]
+    assert adm["when"] == "preflight" and adm["stage"] == "align"
+    assert "halt" in adm["options"] and adm["default"] is None
+    assert adm["pre_answerable_by"].startswith(DECL_FILES)
+    # the refusal is behaviour, so it is asserted against behaviour
+    from omicstra.protocols.align import EdaGateMissing
+    assert issubclass(EdaGateMissing, Exception)
+
+
+def test_the_evaluate_stage_gates_what_a_number_may_claim():
+    """the last gate set, and the only one that protects a CLAIM rather than a
+    compute. its two refusals are refusals on purpose: no pack means there is
+    nothing to return a verdict over, and a drifted artifact cannot be made
+    evaluable by any answer a person could give.
+    """
+    ev = [g for g in GATES.values() if g.get("stage") == "evaluate"]
+    assert len(ev) == COMPUTE["summary"]["evaluate"]["preflight"] == 3
+    assert {g["id"] for g in ev} == {"hypothesis_scope", "artifact_pinning",
+                                     "guard_failure"}
+    for g in ev:
+        assert g["when"] == "preflight" and g["default"] is None
+        assert "halt" in g["options"]
+    # demote, do not discard - a failing guard has a reporting option
+    assert "report_as_diagnostic" in GATES["guard_failure"]["options"]
+    # the pin gate resolves by COMPARISON, so it carries the resolved option as
+    # well as the question's own answers
+    assert "declared_pins" in GATES["artifact_pinning"]["options"]
+
+    from omicstra.protocols.evaluate import ArtifactDrift, EvidencePackMissing
+    assert issubclass(EvidencePackMissing, Exception)
+    assert issubclass(ArtifactDrift, Exception)
+
+
+def test_every_contract_guard_declares_whether_it_is_implemented():
+    """the contract names seven required guards and the package implements six
+    checks. a required guard silently not run is the failure the guard library
+    exists to prevent, so the gap is declared with a reason per guard.
+    """
+    from omicstra.protocols.evaluate import guard_implementations, routing_contract
+
+    rc = routing_contract()
+    impl = guard_implementations()
+    assert set(impl["map"]) == set(rc["guards"]), \
+        "a guard the contract requires with nothing said about its implementation"
+    for name, key in impl["map"].items():
+        if key is None:
+            assert impl["unimplemented"][name], f"{name} unimplemented with no reason"
+        else:
+            from omicstra.protocols.evaluate import GUARDS
+            assert key in GUARDS, f"{name} claims {key}, which is not a guard"
+    # every family's required guards are names the contract defines
+    for f in rc["task_families"]:
+        assert set(f["required_guards"]) <= set(rc["guards"]), f["id"]
+
+
+@pytest.mark.parametrize("gid", sorted(GATES))
+def test_every_gate_has_a_closed_option_set_and_no_default(gid):
+    """the model or the person picks from an enumerated set; nothing is free
+    text but the rationale. and no gate has a default - the system does not
+    pick, which is what makes an override a decision someone took."""
+    g = GATES[gid]
+    assert isinstance(g["options"], list) and len(g["options"]) >= 2, gid
+    assert g["default"] is None, f"{gid} declares a default"
+    assert g["emits"] in {"SelectionRecord", "GateRecord", "DiagnosticRecord"}, gid
+    assert g["forecloses"], f"{gid} must say what accepting gives up"
+
+
+# a cohort declares across two committed files: cohort.json holds the gate
+# answers and the data declarations, project.json the run layout - the grid among
+# it. both are the cohort's, so a pointer into either is a declared answer.
+DECL_FILES = ("cohort.json#", "project.json#")
+
+
+def test_preflight_gates_are_pre_answerable_and_the_mid_run_one_is_not():
+    """a gate with a declared answer does not fire. that is what makes an
+    unattended run possible without lowering the bar - the answer is still
+    recorded, with the declaration as its source.
+
+    the invariant is that the pointer names a COMMITTED declaration, not that it
+    names one particular file. this read `cohort.json#` until an align gate
+    pointed at the grid, which lives in project.json.
+    """
+    for g in GATES.values():
+        if g["when"] == "preflight":
+            assert g["pre_answerable_by"], f"{g['id']} has no cohort declaration"
+            assert g["pre_answerable_by"].startswith(DECL_FILES), (
+                f"{g['id']} points at {g['pre_answerable_by']!r}, which is not a "
+                f"committed cohort declaration")
+        else:
+            assert g["pre_answerable_by"] is None, (
+                f"{g['id']} is mid_run - it depends on failures that have not "
+                f"happened, so it cannot be declared in advance")
+
+
+def test_one_schema_two_hosts():
+    """the contract must not know which host asks. a preflight gate is a
+    langgraph interrupt; the mid-run one is a signal on a durable workflow;
+    both emit the same record."""
+    h = COMPUTE["gate_schema"]["hosting"]
+    assert "interrupt()" in h["preflight"] and "signal" in h["mid_run"]
+    assert {g["emits"] for g in GATES.values()} <= {"SelectionRecord", "GateRecord"}
+
+
+# --- the layer boundary: measures compute, protocols order ------------------
+def test_measures_are_outside_protocols():
+    """a file's location says what it is allowed to do. a measure that lives
+    inside protocols/ makes that boundary stop meaning anything."""
+    import omicstra.measures
+    pkg = Path(omicstra.__file__).parent
+    assert (pkg / "measures" / "__init__.py").exists()
+    assert not (pkg / "protocols" / "measures.py").exists()
+    assert not (pkg / "protocols" / "eda_steps.py").exists()
+
+
+def test_measures_import_nothing_from_protocols():
+    """the dependency runs one way. protocols call measures; a measure that
+    imported a protocol would have acquired an order it is not allowed to have."""
+    src = (Path(omicstra.__file__).parent / "measures" / "__init__.py").read_text()
+    assert "omicstra.protocols" not in src and "from omicstra import protocols" not in src
+
+
+def test_measures_take_no_ctx():
+    """no ctx, no state, no conditions - give it data and parameters, get a
+    record. that is what makes it callable from a notebook."""
+    import inspect
+    from omicstra import measures
+    for name in ("count_statistics", "marker_expression",
+                 "spatial_autocorrelation", "batch_structure"):
+        params = list(inspect.signature(getattr(measures, name)).parameters)
+        assert "ctx" not in params, f"{name} takes ctx"
+        assert params[0] in ("adata", "load_sample_fn"), f"{name} first arg: {params[0]}"
+
+
+# --- the alignment / evaluation port ----------------------------------------
+def _cfg():
+    from omicstra.contracts.project import ProjectConfig
+    from omicstra.settings import settings
+    settings.project_dir = Path(__file__).resolve().parents[1] / "projects" / "tnbc-92"
+    return ProjectConfig.load("tnbc-92")
+
+
+def test_all_four_stages_record_whether_they_computed():
+    """`resolves_only` is how a ledger reader tells a stage that computed from
+    one that read. without it the two are indistinguishable after the fact."""
+    from omicstra.protocols import align
+    cfg = _cfg()
+    for fn in (align.run_embed_he, align.run_embed_st):
+        _, rec = fn(cfg, "tnbc-92")
+        assert rec.params["resolves_only"] is True, f"{rec.step_id} must never compute"
+
+
+def test_encode_stages_never_encode():
+    """the interface is satisfied; the execution is not claimed. running a
+    foundation model is a backend question and deliberately outside this layer."""
+    import inspect
+    from omicstra.protocols import align
+    for fn in (align.run_embed_he, align.run_embed_st):
+        src = inspect.getsource(fn) + inspect.getsource(align._embed)
+        assert "_run_script" not in src, f"{fn.__name__} invokes a script"
+
+
+def test_baseline_dispatch_does_not_guess():
+    """B4 is random-init with its own script and no --baseline. routing it
+    through align_classical would produce a CCA number wearing B4's name."""
+    import inspect
+    from omicstra.protocols import align
+    src = inspect.getsource(align.run_align)
+    assert "align_b4.py" in src, "B4 must use its own script"
+    assert '"random_init"' in src, "random_init method must be handled explicitly"
+    assert "raise ValueError" in src, "an unknown method must raise, not default"
+    assert align._CLASSICAL_METHODS == frozenset({"cca", "procrustes", "unaligned"})
+    assert "B4" in align._LEGACY_METHOD
+    assert align._LEGACY_METHOD["B4"] == "random_init"
+
+
+def test_eval_stages_produce_the_artifacts_the_pack_cites():
+    """the map follows what the evidence pack cites, not the rollups.
+
+    H2-C cites metrics_h2_ci.json -> h2c, built from each run's biology.parquet;
+    H3 cites per_pathway_cca.parquet from the gpath2vec v2 CCA script. an earlier
+    version put the biology script under H3, where it scores nothing H3 cites.
+    """
+    from omicstra.protocols import align
+    m = {h: [s for s, _ in stages] for h, stages in align._EVAL_STAGES.items()}
+    for h in ("H1", "H2", "H3"):
+        assert m[h][0] == "eval.py", f"{h}'s rollup must come from eval.py"
+    assert m["H2"][1:] == ["eval_alignment_biology.py", "eval_h2_bootstrap_ci.py"], \
+        "biology.parquet must exist before the CI script reads it"
+    assert m["H3"][1:] == ["eval_h3_pathway_cca_gpath2vec_v2.py"]
+    assert "eval_alignment_biology.py" not in m["H3"]
+
+
+def test_eval_stages_pass_the_as_built_settings_not_script_defaults():
+    """the biology script defaults to 100,000 permutations; the cited artifact used 10,000."""
+    from omicstra.protocols import align
+    assert align._AS_BUILT["eval_alignment_biology.py"]["n_permutations"] == 10000
+    ab = align._AS_BUILT["eval_h3_pathway_cca_gpath2vec_v2.py"]
+    assert (ab["n_perms"], ab["n_test_pats"], ab["allow_set_size_drift"]) == (500, 3, True)
+    root = Path(__file__).resolve().parents[1]
+    prov = root / "runs" / "tnbc-92_v3" / "eval" / "H3" / "pathway_cca_gpath2vec_v3" / "provenance.json"
+    if prov.is_file():
+        p = json.loads(prov.read_text())
+        assert (p["n_perms"], p["n_test_pats"], p["set_size_drift_allowed"]) == (500, 3, True)
+
+
+def test_eval_stage_args_are_built_from_declarations(tmp_path):
+    from omicstra.contracts.project import ProjectConfig
+    from omicstra.protocols import align
+
+    niches = tmp_path / "niches"; niches.mkdir()
+    pkl = tmp_path / "nodes.pkl"; pkl.write_bytes(b"x")
+    cfg = ProjectConfig(project_id="t", platform="p", niches_dir=str(niches),
+                        pathway_node_embeddings=str(pkl))
+    grid = align.AlignGrid(runs_root=str(tmp_path / "runs"),
+                           run_refs={"R1": "a", "R2": "b"}, computed=[])
+    per_run = align._stage_args("eval_alignment_biology.py", "per_run", "H2", cfg, grid, None)
+    assert len(per_run) == 2 and "--n-permutations" in per_run[0]
+    assert per_run[0][per_run[0].index("--n-permutations") + 1] == "10000"
+    (h3,) = align._stage_args("eval_h3_pathway_cca_gpath2vec_v2.py", "pathway_cca", "H3", cfg, grid, None)
+    assert h3[h3.index("--embeddings-pkl") + 1] == str(pkl)
+    assert h3[h3.index("--out-dir") + 1].endswith("eval/H3/pathway_cca_gpath2vec_v3")
+    assert "--allow-set-size-drift" in h3
+
+
+def test_h3_refuses_an_undeclared_or_different_pathway_build(tmp_path):
+    from omicstra.contracts.project import ProjectConfig
+    from omicstra.protocols import align
+
+    niches = tmp_path / "niches"; niches.mkdir()
+    grid = align.AlignGrid(runs_root=str(tmp_path), run_refs={"R1": "a"}, computed=[])
+    bare = ProjectConfig(project_id="t", platform="p", niches_dir=str(niches))
+    with pytest.raises(align.ComputeUnavailable, match="pathway_node_embeddings"):
+        align._stage_args("eval_h3_pathway_cca_gpath2vec_v2.py", "pathway_cca", "H3", bare, grid, None)
+    pkl = tmp_path / "nodes.pkl"; pkl.write_bytes(b"x")
+    wrong = ProjectConfig(project_id="t", platform="p", niches_dir=str(niches),
+                          pathway_node_embeddings=str(pkl), pathway_node_embeddings_sha256="0" * 64)
+    with pytest.raises(align.ComputeUnavailable, match="sha256"):
+        align._stage_args("eval_h3_pathway_cca_gpath2vec_v2.py", "pathway_cca", "H3", wrong, grid, None)
+
+
+def test_the_seed_cohort_declares_the_pathway_build_the_cited_artifact_used():
+    root = Path(__file__).resolve().parents[1]
+    pj = json.loads((root / "projects" / "tnbc-92" / "project.json").read_text())
+    meta = json.loads((FIXTURES / "h3_per_pathway_cca_v3.meta.json").read_text())
+    assert pj["pathway_node_embeddings_sha256"] == meta["provenance"]["embeddings_sha256"]
+
+
+def test_the_rollup_script_really_writes_each_hypothesis_summary():
+    """the map is only right if eval.py actually accepts each hypothesis."""
+    src = (Path(__file__).resolve().parents[1] / "scripts" / "eval.py").read_text()
+    assert "choices=['H1', 'H2', 'H3']" in src
+    bio = (Path(__file__).resolve().parents[1] / "scripts"
+           / "eval_alignment_biology.py").read_text()
+    assert "summary.json" not in bio, "the biology script now writes a rollup - revisit the map"
+
+
+def test_run_eval_resolves_the_pack_and_never_generates_it():
+    """no script writes routing_evidence.json. deciding which metric answers
+    which task family, what the floors are, and which caveat attaches where is
+    editorial - generating it would invent the judgements it records."""
+    import inspect
+    from omicstra.protocols import align
+    src = inspect.getsource(align.run_eval)
+    assert "curated" in src.lower()
+    assert 'ev.write_text' not in src and 'json.dump' not in src
+
+
+def test_project_relative_paths_resolve_against_the_project():
+    """project.json writes niches_dir/runs_dir relative to the PROJECT dir.
+    resolving against repo_root leaves `../..` in the path - a wrong answer
+    that looks like a missing artifact."""
+    from omicstra.protocols import align
+    cfg = _cfg()
+    p = align._project_rel(cfg.niches_dir, "tnbc-92")
+    assert ".." not in p.parts, p
+    assert p.is_absolute()
+
+
+def test_declared_runs_exist_on_disk():
+    """project.json must name the runs that exist. it listed R1..B4 while the
+    directories are R1_v3..B4_v3, so the grid resolved to nothing."""
+    from omicstra.protocols import align
+    cfg = _cfg()
+    root = align._project_rel(cfg.runs_dir, "tnbc-92")
+    if not root.is_dir():
+        pytest.skip("run grid not present on this machine")
+    for rid in list(cfg.contrastive_runs) + list(cfg.classical_runs):
+        assert (root / rid).is_dir(), f"{rid} declared but absent under {root}"
+
+
+# --- the acceptance test, and WHY its tolerance is what it is ---------------
+#
+# B1 is CCA: deterministic linear algebra on a fixed split. a rerun is
+# BIT-IDENTICAL, and anything else means the port changed something. verified
+# 2026-09-08 - 13/13 metrics at delta 0.00e+00, and H1 over the full grid at
+# 90/90 numeric fields identical.
+#
+# do NOT copy this assertion to a contrastive run. R1-R6 have a training loop
+# on MPS, seeded inside a subprocess, so they need a stated tolerance and a
+# stated reason - not exact equality that happens to be true for CCA.
+EXACT_RUNS = {"B1_v3", "B2_v3", "B3_v3"}      # classical: deterministic
+TOLERANCE_RUNS = {"R1_v3", "R2_v3", "R3_v3", "R4_v3", "R5_v3", "R6_v3", "B4_v3"}
+
+
+def test_the_acceptance_split_is_declared():
+    """which runs are exact and which need a tolerance is a property of the
+    METHOD, not of the machine. classical baselines are closed-form; anything
+    with a training loop or a random init is not."""
+    from omicstra.protocols import align
+    cfg = _cfg()
+    declared = set(cfg.contrastive_runs) | set(cfg.classical_runs)
+    assert EXACT_RUNS | TOLERANCE_RUNS == declared, (
+        f"unclassified: {declared ^ (EXACT_RUNS | TOLERANCE_RUNS)}")
+    assert "B4_v3" in TOLERANCE_RUNS, "B4 is random-init - not reproducible exactly"
+
+
+# --- the acceptance test, pinned and guarded --------------------------------
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+def test_pinned_h1_summary_is_intact():
+    """the verified summary, pinned so 90/90 runs on a fresh clone.
+
+    runs/ is gitignored, so an acceptance test that reads it passes on one
+    machine and skips everywhere else - which is not a test.
+    """
+    import hashlib
+    f = FIXTURES / "h1_summary_v3.json"
+    meta = json.loads((FIXTURES / "h1_summary_v3.meta.json").read_text())
+    assert hashlib.sha256(f.read_bytes()).hexdigest() == meta["sha256"]
+    d = json.loads(f.read_text())
+    assert sorted(d["per_run"]) == meta["runs"] and len(meta["runs"]) == 10
+    assert not any(v is None for r in d["per_run"].values() for v in r.values())
+
+
+def test_pinned_summary_agrees_with_the_evidence_pack():
+    """the pack cites numbers; the summary produced them. if they disagree,
+    one of the two is stale and the router is quoting a number nothing made."""
+    from omicstra.settings import settings
+    root = Path(__file__).resolve().parents[1] / "projects" / "tnbc-92"
+    ev = json.loads((root / "routing_evidence.json").read_text())
+    per_run = json.loads((FIXTURES / "h1_summary_v3.json").read_text())["per_run"]
+    for cand in ev["tasks"]["cross_modal_retrieval"]["candidates"]:
+        rid = cand["id"]
+        if rid in per_run:
+            assert abs(per_run[rid]["AUC"] - cand["value"]) < 5e-4, (
+                f"{rid}: summary {per_run[rid]['AUC']:.6f} vs pack {cand['value']}")
+
+
+def test_compute_cannot_write_into_the_declared_runs_dir():
+    """the GUARD, not the behaviour.
+
+    passing runs_root to a scratch path is what the acceptance test does;
+    this asserts the stage cannot write to the cohort's declared grid when
+    given one. a test that only demonstrates the safe call proves nothing
+    about the unsafe one.
+    """
+    import inspect
+    from omicstra.protocols import align
+    src = inspect.getsource(align.run_align)
+    # every write goes through `root`, which is runs_root when supplied
+    assert "root = Path(runs_root) if runs_root else" in src
+    assert '"--runs-root", str(root)' in src, "the script must be told where to write"
+    # cfg.runs_dir may appear exactly ONCE - as the fallback when no runs_root
+    # is supplied. a second occurrence means some path bypasses the override.
+    assert src.count("cfg.runs_dir") == 1, (
+        f"cfg.runs_dir referenced {src.count('cfg.runs_dir')} times; every write "
+        "must go through `root` so runs_root can redirect it")
+    # every mention of the flag passes `root` - two invocations share a
+    # `common` arg list, so counting call sites would be wrong here.
+    assert src.count('"--runs-root"') > 0
+    assert src.count('"--runs-root", str(root)') == src.count('"--runs-root"'), (
+        "a --runs-root is passed something other than the resolved root")
+
+
+def test_declared_runs_dir_untouched_by_a_scratch_run(tmp_path):
+    """mtime guard: a compute run into a scratch root leaves the cohort's own
+    grid byte-for-byte unmodified. this is the assertion that would have caught
+    an eval writing to a module-level RUNS_ROOT instead of --runs-dir."""
+    from omicstra.protocols import align
+    cfg = _cfg()
+    declared = align._project_rel(cfg.runs_dir, "tnbc-92")
+    if not declared.is_dir():
+        pytest.skip("run grid not present on this machine")
+    before = {p: p.stat().st_mtime_ns for p in declared.rglob("*") if p.is_file()}
+    nj, _ = align.run_niche_join(cfg, "tnbc-92")
+    with pytest.raises(align.ComputeUnavailable):
+        # scratch root is empty, compute not requested -> must refuse, and must
+        # not have reached into the declared grid to satisfy itself
+        align.run_align(cfg, nj, project_id="tnbc-92", runs_root=tmp_path)
+    after = {p: p.stat().st_mtime_ns for p in declared.rglob("*") if p.is_file()}
+    assert before == after, "a scratch run modified the declared grid"
+
+
+# --- the contracts layer: reads a declaration, decides nothing --------------
+def test_contracts_only_read():
+    """a contract module answers "what did someone declare", never "what
+    follows from it". a decision in here would be a rule nobody could find."""
+    import inspect
+    from omicstra.contracts import eda as ceda, project as cproj, routing as crout
+    for mod in (ceda, cproj, crout):
+        src = inspect.getsource(mod)
+        assert "interrupt(" not in src, f"{mod.__name__} asks a human"
+        assert "subprocess" not in src, f"{mod.__name__} runs something"
+        for verb in ("def resolve(", "def evaluate(", "def run_gate("):
+            assert verb not in src, f"{mod.__name__} decides: {verb}"
+
+
+def test_settings_is_the_bottom_layer():
+    """settings imports nothing from omicstra. everything else may import it,
+    which is what keeps the package/project split from becoming a cycle -
+    and is why ProjectConfig belongs in contracts/, not merged into settings."""
+    src = (Path(omicstra.__file__).parent / "settings.py").read_text()
+    assert "from omicstra" not in src and "import omicstra" not in src
+
+
+def test_project_config_reads_a_cohort_declaration():
+    """ProjectConfig is a COHORT's declaration, not package settings. merging
+    it into settings.py would put a cohort-shaped object in the module that is
+    meant to know about no cohort at all."""
+    from omicstra.contracts.project import ProjectConfig
+    assert "project" in ProjectConfig.__module__
+    src = (Path(omicstra.__file__).parent / "contracts" / "project.py").read_text()
+    assert "project.json" in src
+
+
+def test_init_public_scaffolds_without_crashing(tmp_path):
+    """`init --public` read payload["provenance"], but provenance is written into
+    cohort.json - so the flag that matters most raised KeyError at the last line.
+    the assertion is exit 0; the rest guards the split that caused it."""
+    import json
+
+    from click.testing import CliRunner
+
+    from omicstra.cli import main
+    r = CliRunner().invoke(main, ["init", "--project-dir", str(tmp_path / "c"), "--public"])
+    assert r.exit_code == 0, r.output + str(r.exception)
+
+    cohort = json.loads((tmp_path / "c" / "cohort.json").read_text())
+    project = json.loads((tmp_path / "c" / "project.json").read_text())
+    assert cohort["data_classification"] == "public"
+    assert cohort["provenance"] == {"source": "", "licence": "", "gated": ""}
+    assert "cohort.json" in r.output, "the prompt must name the file provenance is in"
+    # one home per declaration: classification is cohort's, never project's
+    assert "data_classification" not in project
+    # a scaffold must not claim a model backend the server does not have
+    assert cohort["client_model_backend"] is None
+
+
+def test_init_defaults_to_restricted(tmp_path):
+    """forgetting the flag fails closed, and no provenance block is invented."""
+    import json
+
+    from click.testing import CliRunner
+
+    from omicstra.cli import main
+    r = CliRunner().invoke(main, ["init", "--project-dir", str(tmp_path / "d")])
+    assert r.exit_code == 0, r.output + str(r.exception)
+    cohort = json.loads((tmp_path / "d" / "cohort.json").read_text())
+    assert cohort["data_classification"] == "restricted"
+    assert "provenance" not in cohort
+    assert "data/inputs/" in (tmp_path / "d" / ".gitignore").read_text()
+
+
+def test_tensor_libraries_stay_out_of_core():
+    """`pip install omicstra` must serve, route and gate without torch.
+
+    the last packaging bug was the mirror of this one - core deps shipped as
+    extras, so a bare install could not import itself. this is the other
+    direction: an extra drifting inward would put a 2 GB tensor library in the
+    dependency list of a read-only server. the verify job's bare-install step
+    enforces it at runtime; this catches it at review time.
+    """
+    import tomllib
+    from pathlib import Path
+    pj = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
+    core = " ".join(pj["project"]["dependencies"])
+    for heavy in ("torch", "timm", "novae", "numpy", "scipy", "pandas", "scikit-learn"):
+        assert heavy not in core, f"{heavy} belongs in an extra, not core"
+    extras = pj["project"]["optional-dependencies"]
+    assert "encode" in extras, "the encode extra is where tensor libraries live"
+    assert any("torch" in d for d in extras["encode"])
+    # and the split stays meaningful: measure is numerics, encode is tensors
+    assert not any("torch" in d for d in extras["measure"])
+
+
+# --- encoders: declared, not imported ---------------------------------------
+def test_encoder_registry_is_readable_without_a_tensor_library():
+    """`pip install omicstra` must reason about encoders it cannot run.
+
+    the preflight gates decide platform_floor and encoder_compatibility from
+    metadata alone, so spec() has to work on a machine with no torch. only
+    load() may require it, and it must say so rather than raising ImportError.
+    """
+    from omicstra.models import available, spec
+    assert {"virchow2", "novae"} <= set(available())
+    v, n = spec("virchow2"), spec("novae")
+    assert (v.dim, v.unit, v.gated) == (1280, "tile", True)
+    assert (n.dim, n.unit, n.min_units) == (64, "spot", 512)
+    assert "MERSCOPE" in n.trained_on, "the non-overlap is what the compatibility gate reads"
+
+
+def test_an_undeclared_encoder_names_what_exists():
+    from omicstra.models import EncoderUnavailable, spec
+    import pytest as _pytest
+    with _pytest.raises(EncoderUnavailable) as e:
+        spec("no_such_encoder")
+    assert "novae" in str(e.value) and "virchow2" in str(e.value)
+
+
+def test_encoders_are_not_imported_at_package_scope():
+    """timm/torch/novae must not be imported when the registry is imported.
+
+    the same lint as the pyproject extras, one layer down: a module-level import
+    here would drag a tensor library into `pip install omicstra`.
+    """
+    import inspect
+
+    from omicstra.models import encoders
+    src = inspect.getsource(encoders)
+    head = src.split("# --- Virchow2")[0]
+    for heavy in ("import timm", "import torch", "import novae"):
+        assert heavy not in head, f"{heavy} at module scope"
+
+
+def test_version_comes_from_the_distribution_not_a_literal():
+    """__version__ drifted to 0.0.1 while pyproject said 1.0.0, and nothing
+    failed, because nothing read it. it is derived now; this is what keeps it so.
+    """
+    import tomllib
+
+    src = Path(omicstra.__file__).read_text()
+    assert 'version("omicstra")' in src, "__version__ restated as a literal; read the metadata"
+
+    pyproject = Path(omicstra.__file__).parents[2] / "pyproject.toml"
+    if not pyproject.is_file():          # installed, not a source tree
+        pytest.skip("not running from the source tree")
+    declared = tomllib.loads(pyproject.read_text())["project"]["version"]
+    assert omicstra.__version__ == declared, (
+        f"installed metadata {omicstra.__version__} != pyproject {declared} - "
+        "the editable install is stale; `pip install -e .` refreshes it")
+
+
+def test_every_file_that_states_a_version_states_the_same_one():
+    """four files carry the version and a release is where they diverge.
+
+    CI already compares server.json to pyproject; .zenodo.json and CITATION.cff
+    are newer and were not covered. a mismatch there is not cosmetic - the DOI
+    record and the citation would claim a version that was never released, and
+    nothing else in the suite would notice.
+
+    which is also why the two groups are only required to agree AT a release.
+    `pyproject`/`server.json` say what the package is NOW; `CITATION.cff` and
+    `.zenodo.json` describe what was last published and archived, and carry that
+    release's date and DOI. between releases the working tree moves ahead and
+    they correctly do not. forcing them level on a `.devN` would put a release
+    date on a version nobody released - the very claim this test forbids.
+    """
+    import tomllib
+
+    import yaml
+
+    root = Path(omicstra.__file__).parents[2]
+    if not (root / "pyproject.toml").is_file():
+        pytest.skip("not running from the source tree")
+
+    declared = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    sj = json.loads((root / "server.json").read_text())
+    package = {
+        "pyproject.toml": declared,
+        "server.json": sj["version"],
+        "server.json#packages[0]": sj["packages"][0]["version"],
+    }
+    archive = {
+        "CITATION.cff": str(yaml.safe_load((root / "CITATION.cff").read_text())["version"]),
+    }
+    zj = root / ".zenodo.json"
+    if zj.is_file():
+        archive[".zenodo.json"] = json.loads(zj.read_text())["version"]
+
+    assert len(set(package.values())) == 1, f"package version drift: {package}"
+    assert len(set(archive.values())) == 1, f"archive version drift: {archive}"
+
+    prerelease = any(m in declared for m in (".dev", "a", "b", "rc")) and declared[0].isdigit()
+    if not prerelease:
+        assert set(package.values()) == set(archive.values()), (
+            f"a release must agree everywhere: {package} vs {archive}")
+
+
+def test_no_file_cites_a_doi_that_was_only_reserved():
+    """10.5281/zenodo.22666752 was reserved and never published - it returns 404.
+
+    it sat in the README badge, the bibtex and CITATION.cff, so a reader who
+    followed any of the three got nothing. this fails if it comes back before a
+    record actually exists behind it.
+    """
+    root = Path(omicstra.__file__).parents[2]
+    if not (root / "pyproject.toml").is_file():
+        pytest.skip("not running from the source tree")
+
+    dead = "22666752"
+    # pyproject is in this list because it was MISSED the first time: the url
+    # block carried it into the PyPI metadata, where a version is immutable and
+    # a wrong url cannot be corrected after upload. the widest net is the point.
+    checked = ("README.md", "CITATION.cff", ".zenodo.json", "pyproject.toml",
+               "server.json")
+    offenders = [n for n in checked
+                 if (root / n).is_file() and dead in (root / n).read_text()
+                 and "404" not in (root / n).read_text()]
+    assert not offenders, (
+        f"{offenders} cite zenodo.{dead}, which does not resolve. cite the CONCEPT "
+        "DOI minted by the GitHub-Zenodo integration once a release is archived.")
+
+
+def test_compute_backend_is_a_closed_set_declared_in_the_contract():
+    """the option set was a COMMENT in settings.py, and a cohort drifted outside
+    it - declaring the name of a machine where a backend kind belongs, which
+    matches nothing that reads the field.
+
+    same defect as an answer outside a gate's options, one layer over: a declared
+    value has to land on its declared set or the declaration is decoration.
+    """
+    contract = json.loads(
+        (Path(omicstra.__file__).parent / "configs" / "data_contract.json").read_text())
+    spec = contract["compute_backend"]
+    assert spec["closed"] is True
+    values = set(spec["values"])
+    assert values == {"in_process", "slurm"}, "one closed set per axis: this is the executor"
+
+    # settings' default must itself be a member
+    from omicstra.settings import Settings
+
+    assert Settings.model_fields["compute_backend"].default in values
+
+
+@pytest.mark.parametrize("cohort", sorted(
+    (Path(omicstra.__file__).parents[2] / "projects").glob("*/cohort.json")),
+    ids=lambda p: p.parent.name)
+def test_every_cohort_declares_a_backend_the_contract_offers(cohort):
+    contract = json.loads(
+        (Path(omicstra.__file__).parent / "configs" / "data_contract.json").read_text())
+    values = set(contract["compute_backend"]["values"])
+    decl = json.loads(cohort.read_text())
+    declared = decl.get("compute_backend")
+    # the pool is a deployment fact and deliberately not a closed set; it is
+    # optional in 1.1 and required in 1.2, so only its presence is checked here.
+    assert isinstance(decl.get("pool", ""), str)
+    assert declared in values, (
+        f"{cohort.parent.name} declares compute_backend={declared!r}, which is not one of "
+        f"{sorted(values)}. the contract's set is closed.")

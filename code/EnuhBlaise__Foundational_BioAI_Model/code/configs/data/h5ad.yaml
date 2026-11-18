@@ -1,0 +1,25 @@
+defaults:
+  - tokenizer: binned
+  - splitter: donor_held_out
+  - _self_
+
+# A locally downloaded .h5ad (CELLxGENE Discover, HCA, Tabula Sapiens...).
+# Set obs_map so this repo's required columns exist.
+source:
+  name: h5ad
+  path: ???            # must be supplied: data.source.path=/path/to/file.h5ad
+  obs_map: {}          # e.g. {donor: donor_id, sample: batch_id, dataset: study_id}
+  raw_layer: null      # e.g. counts  -- portal files often keep counts in a layer
+  use_raw: false
+  require_counts: true
+
+n_hvg: 2000
+batch_size: 64
+num_workers: 4
+mask_ratio: 0.15
+min_genes_per_cell: 200
+min_cells_per_gene: 10
+label_columns: [cell_type, batch_id]
+return_counts: false
+fail_on_leakage: true
+seed: ${seed}

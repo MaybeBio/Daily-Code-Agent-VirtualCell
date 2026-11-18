@@ -1,0 +1,501 @@
+"""A refused MuData backup leaves the session as it was.
+
+Saving a backed modality first loads its matrix into memory. That load closes the
+file handle, replaces the registered object, marks it modified and re-checks the
+memory budget, which can spill an older modality to disk. When the backup the
+MuData writer makes is then refused (its name links into the managed figure
+folder), those changes used to stay behind. The backup name is now fixed and
+checked before the load, for direct saves (with or without a given backup name)
+and in the auto-save plan, including a target that only comes to exist because
+the load spills another modality to the file it links to.
+
+Saves that make no backup are not refused over a backup name that is never
+written, whether or not they load backed data. What cannot be told for certain counts
+as a backup that may be made (checked early). Named residual: a destination that
+resolves to the spill file of a modality the budget would not actually spill can be
+refused over an unused backup name that links into a revision. Likewise, a spelling
+through a missing folder that nothing creates, or a spill name that cannot be resolved,
+counts as uncertain and is checked (a false refusal, never a late one).
+
+Real ``DataManagerV2``, real backends, real backed AnnData files and a real memory
+budget. The seams are the clock the backup name reads and, in one test, a relative
+base folder set on the data manager's own MuData backend.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime as _real_datetime
+from pathlib import Path
+from types import SimpleNamespace
+
+import anndata as ad
+import numpy as np
+import pytest
+
+from lobster.core.figures.errors import ManagedPathError
+from lobster.core.runtime.data_manager import DataManagerV2, estimate_anndata_bytes
+from tests.unit.export_guard_fixtures import alias, saved_revision, workspace_tree
+
+NAME = "pbmc_sample"
+SHAPE = (50, 40)
+NOT_SAVED = "Not saved: 1 modalities refused (managed figure folder)"
+LATE_LOG = "Auto-save skipped: the target is inside the managed figure folder."
+T0 = _real_datetime(2026, 10, 30, 9, 0, 0)
+STAMP0 = T0.strftime("%Y%m%d_%H%M%S")
+T1 = _real_datetime(2026, 10, 30, 9, 0, 1)
+STAMP1 = T1.strftime("%Y%m%d_%H%M%S")
+GIVEN = "20261030_120000"
+
+
+def _adata(seed: int) -> ad.AnnData:
+    rng = np.random.default_rng(seed)
+    adata = ad.AnnData(X=rng.random(SHAPE))
+    adata.obs_names = [f"cell{i}" for i in range(SHAPE[0])]
+    adata.var_names = [f"gene{i}" for i in range(SHAPE[1])]
+    return adata
+
+
+def _session(tmp_path, monkeypatch, **kwargs):
+    """Room for one and a half modalities of SHAPE: loading a backed modality spills
+    the older resident one."""
+    cwd = tmp_path / "cwd"
+    cwd.mkdir(exist_ok=True)
+    monkeypatch.chdir(cwd)
+    size = estimate_anndata_bytes(_adata(0))
+    monkeypatch.setenv("LOBSTER_MODALITY_MEMORY_BUDGET_GB", str(1.5 * size / 1024**3))
+    dm = DataManagerV2(workspace_path=tmp_path / "ws", **kwargs)
+    rev = saved_revision(dm.workspace_path)
+    return SimpleNamespace(dm=dm, ws=Path(dm.workspace_path), rev=rev, tmp=tmp_path)
+
+
+@pytest.fixture
+def s(tmp_path, monkeypatch):
+    return _session(tmp_path, monkeypatch)
+
+
+@pytest.fixture
+def mu(tmp_path, monkeypatch):
+    """Default backend MuData: auto-save makes backups."""
+    return _session(tmp_path, monkeypatch, default_backend="mudata")
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """The clock read for an unbound backup name: ``datetime.datetime.now()``."""
+    import datetime as datetime_module
+
+    class _Clocked(_real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return T0
+
+    monkeypatch.setattr(datetime_module, "datetime", _Clocked)
+    return T0
+
+
+def _resident(s, name="m0", seed=0):
+    s.dm.store_modality(name=name, adata=_adata(seed))
+    return s.dm.modalities[name]
+
+
+def _backed(s, seed=1):
+    source = s.tmp / f"backed{seed}.h5ad"
+    _adata(seed).write_h5ad(source)
+    backed = ad.read_h5ad(source, backed="r")
+    s.dm.store_modality(name=NAME, adata=backed)
+    assert s.dm.modalities[NAME] is backed and backed.isbacked
+    return backed
+
+
+def _state(s):
+    return (
+        {k: id(v) for k, v in s.dm.modalities.items()},
+        set(s.dm._modality_dirty),
+        dict(s.dm._modality_spilled),
+        dict(s.dm._modality_sources),
+    )
+
+
+def _rev_file(s) -> Path:
+    return s.rev.directory / sorted(s.rev.files)[0]
+
+
+def _sibling(path: Path, stamp: str) -> Path:
+    return path.with_suffix(f".{stamp}.backup{path.suffix}")
+
+
+def _spill_file(s, name="m0") -> Path:
+    return s.ws / ".lobster" / "spill" / f"{name}.h5ad"
+
+
+def _diagnostics(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def _assert_untouched(s, state, held, backed, before):
+    assert _state(s) == state and s.dm.modalities["m0"] is held
+    assert s.dm.modalities[NAME] is backed and backed.file.is_open  # not loaded
+    assert not _spill_file(s).exists()
+    assert workspace_tree(s.ws) == before and s.rev.unchanged()
+
+
+# ------------------------------------------------------------- direct saves
+
+
+@pytest.mark.parametrize("bound", [False, True], ids=["unbound", "given_name"])
+def test_refused_backup_of_a_backed_save_changes_nothing(s, clock, caplog, bound):
+    """An existing ordinary destination whose backup name links into a revision."""
+    held = _resident(s)
+    backed = _backed(s)
+    destination = s.dm.data_dir / "x.h5mu"
+    destination.write_bytes(b"previous")
+    alias(_sibling(destination, GIVEN if bound else STAMP0), _rev_file(s))
+    state, before = _state(s), workspace_tree(s.ws)
+    extra = {"backup_stamp": GIVEN} if bound else {}
+    with caplog.at_level(logging.INFO):
+        with pytest.raises(ManagedPathError) as refused:
+            s.dm.save_modality(NAME, "x.h5mu", backend="mudata", **extra)
+    assert str(s.ws) not in f"{refused.value} {refused.value.args!r}"
+    _assert_untouched(s, state, held, backed, before)
+    assert destination.read_bytes() == b"previous"
+    assert _diagnostics(caplog) == []
+    backed.file.close()
+
+
+def test_backup_target_created_by_the_load_is_refused_first(s, clock, caplog):
+    """The destination does not exist yet: it links to the file the load would spill
+    the older modality to, and the backup name next to that file links into a
+    revision. Refused before the load, so the file is never created."""
+    held = _resident(s)
+    backed = _backed(s)
+    alias(_sibling(_spill_file(s), STAMP0), _rev_file(s))
+    destination = alias(s.dm.data_dir / "x.h5mu", _spill_file(s))
+    assert not destination.exists()
+    state, before = _state(s), workspace_tree(s.ws)
+    with caplog.at_level(logging.INFO):
+        with pytest.raises(ManagedPathError):
+            s.dm.save_modality(NAME, "x.h5mu", backend="mudata")
+    _assert_untouched(s, state, held, backed, before)
+    assert _diagnostics(caplog) == []
+    backed.file.close()
+
+
+def test_ordinary_backed_save_still_loads_spills_and_backs_up(s, clock):
+    """Control: without the link, the save loads the data (spilling the older
+    modality), backs up the existing file under the name read at the call, and
+    writes as before."""
+    _resident(s)
+    _backed(s)
+    destination = s.dm.data_dir / "x.h5mu"
+    destination.write_bytes(b"previous")
+    s.dm.save_modality(NAME, "x.h5mu", backend="mudata")
+    assert _sibling(destination, STAMP0).read_bytes() == b"previous"
+    assert destination.stat().st_size > len(b"previous")
+    assert not s.dm.modalities[NAME].isbacked and "m0" in s.dm._modality_spilled
+
+
+def test_given_backup_name_is_the_one_written(s, clock):
+    _resident(s)
+    _backed(s)
+    destination = s.dm.data_dir / "x.h5mu"
+    destination.write_bytes(b"previous")
+    s.dm.save_modality(NAME, "x.h5mu", backend="mudata", backup_stamp=GIVEN)
+    assert _sibling(destination, GIVEN).read_bytes() == b"previous"
+    assert not _sibling(destination, STAMP0).exists()
+
+
+def test_in_memory_save_to_a_new_file_ignores_an_unused_backup_name(s, clock):
+    """Nothing is loaded and the destination does not exist, so no backup is made:
+    a backup name linking into a revision does not refuse the save (as before)."""
+    _resident(s)
+    destination = s.dm.data_dir / "new.h5mu"
+    alias(_sibling(destination, STAMP0), _rev_file(s))
+    s.dm.save_modality("m0", "new.h5mu", backend="mudata")
+    assert destination.is_file() and s.rev.unchanged()
+
+
+def test_h5ad_save_of_a_backed_modality_is_unchanged(s, clock):
+    """The H5AD writer makes no backup: nothing about it is checked or changed."""
+    _resident(s)
+    _backed(s)
+    alias(_sibling(s.dm.data_dir / "x.h5ad", STAMP0), _rev_file(s))
+    s.dm.save_modality(NAME, "x.h5ad")
+    assert (s.dm.data_dir / "x.h5ad").is_file() and "m0" in s.dm._modality_spilled
+
+
+# ---------------------------------------------------------------- auto-save
+
+
+def _progress(calls):
+    def progress(current, total, name, status):
+        calls.append((name, status))
+
+    return progress
+
+
+def test_autosave_target_created_by_the_load_is_excluded_in_the_plan(mu, clock, caplog):
+    """The backed modality's auto-save target links to the older modality's spill
+    file (not there yet); the backup name next to that file links into a revision.
+    The plan excludes the backed modality, so it is never loaded: the older modality
+    is saved on its own and stays resident, and nothing is spilled."""
+    s = mu
+    held = _resident(s)
+    backed = _backed(s)
+    alias(_sibling(_spill_file(s), STAMP0), _rev_file(s))
+    target = alias(s.dm.data_dir / f"{NAME}_autosave.h5ad", _spill_file(s))
+    assert not target.exists()
+    ids, dirty, spilled, sources = _state(s)
+    calls = []
+    with caplog.at_level(logging.INFO):
+        result = s.dm.auto_save_state(progress_callback=_progress(calls))
+    # Only the permitted save of m0 changed anything: its modified mark.
+    assert _state(s) == (ids, dirty - {"m0"}, spilled, sources)
+    assert result.count(NOT_SAVED) == 1 and "Modality 'm0': m0_autosave.h5ad" in result
+    assert calls == [("m0", "saving"), ("m0", "done"), (NAME, "error")]
+    assert s.dm.modalities["m0"] is held and "m0" not in s.dm._modality_spilled
+    assert s.dm.modalities[NAME] is backed and backed.file.is_open
+    assert NAME in s.dm._modality_dirty and "m0" not in s.dm._modality_dirty
+    assert not _spill_file(s).exists() and not target.exists()
+    assert (s.dm.data_dir / "m0_autosave.h5ad").is_file() and s.rev.unchanged()
+    # The permitted save of m0 may warn about its own content (count only). Nothing
+    # comes from the refused modality: no late refusal, no error, nothing named.
+    diagnostics = _diagnostics(caplog)
+    assert LATE_LOG not in diagnostics
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+    assert [m for m in diagnostics if NAME in m or str(s.ws) in m] == []
+    backed.file.close()
+
+
+def test_autosave_new_target_of_an_in_memory_modality_is_saved(mu, clock):
+    """Control: nothing to load, the target does not exist, so no backup is made and
+    the unused backup name is not checked (as before)."""
+    s = mu
+    _resident(s)
+    target = s.dm.data_dir / "m0_autosave.h5ad"
+    alias(_sibling(target, STAMP0), _rev_file(s))
+    result = s.dm.auto_save_state()
+    assert "Modality 'm0': m0_autosave.h5ad" in result
+    assert not any(i.startswith("Not saved") for i in result)
+    assert target.is_file() and s.rev.unchanged()
+
+
+# ------------------------------------------- saves that make no backup (R2)
+
+
+@pytest.mark.parametrize("bound", [False, True], ids=["unbound", "given_name"])
+@pytest.mark.parametrize("older", [False, True], ids=["alone", "with_spill"])
+def test_backed_save_to_a_new_file_ignores_an_unused_backup_name(
+    s, clock, bound, older
+):
+    """The load creates nothing at this ordinary new destination (with an older
+    modality it spills that one elsewhere), so no backup is made and the backup
+    name linking into a revision does not refuse the save (as before)."""
+    if older:
+        _resident(s)
+    _backed(s)
+    destination = s.dm.data_dir / "new.h5mu"
+    unused = alias(_sibling(destination, GIVEN if bound else STAMP0), _rev_file(s))
+    extra = {"backup_stamp": GIVEN} if bound else {}
+    s.dm.save_modality(NAME, "new.h5mu", backend="mudata", **extra)
+    assert destination.is_file() and not s.dm.modalities[NAME].isbacked
+    assert ("m0" in s.dm._modality_spilled) is older
+    assert unused.is_symlink() and s.rev.unchanged()
+
+
+def test_autosave_new_target_of_a_backed_modality_is_saved(mu, clock):
+    """Auto-save of a backed modality to an ordinary new target makes no backup: the
+    unused backup name is not a reason to refuse it (as before)."""
+    s = mu
+    _backed(s)
+    target = s.dm.data_dir / f"{NAME}_autosave.h5ad"
+    unused = alias(_sibling(target, STAMP0), _rev_file(s))
+    result = s.dm.auto_save_state()
+    assert f"Modality '{NAME}': {NAME}_autosave.h5ad" in result
+    assert not any(i.startswith("Not saved") for i in result)
+    assert target.is_file() and unused.is_symlink() and s.rev.unchanged()
+
+
+def test_backup_source_that_does_not_exist_is_not_checked(s, clock):
+    """With a relative base folder the backup copies a second resolution of the
+    destination. When that file does not exist, the writer makes no backup, so its
+    backup name is not checked either (as before)."""
+    _resident(s)
+    backend = s.dm.backends["mudata"]
+    backend.base_path = Path("b")  # relative to the working folder
+    (Path("b")).mkdir()
+    Path("b/x.h5mu").write_bytes(b"previous")
+    second = Path("b/b/x.h5mu").resolve()
+    assert not second.exists()
+    alias(_sibling(second, STAMP0), _rev_file(s))
+    s.dm.save_modality("m0", s.dm.data_dir / "x.h5mu", backend="mudata")
+    written = Path(backend._resolve_path(s.dm._backend_path(s.dm.data_dir / "x.h5mu")))
+    assert written.is_file() and written.stat().st_size > len(b"previous")
+    assert s.rev.unchanged()
+
+
+def test_malformed_given_backup_name_is_left_to_the_writer(s, caplog):
+    """A given backup name that cannot form a file name: the writer logs the failed
+    backup and saves, as before; the early check does not turn it into an error."""
+    _resident(s)
+    destination = s.dm.data_dir / "x.h5mu"
+    destination.write_bytes(b"previous")
+    with caplog.at_level(logging.INFO):
+        s.dm.save_modality("m0", "x.h5mu", backend="mudata", backup_stamp="bad/name")
+    assert destination.stat().st_size > len(b"previous")
+    assert sorted(p.name for p in s.dm.data_dir.iterdir()) == ["x.h5mu"]
+
+
+def test_backup_name_is_read_before_the_backed_data_is_loaded(s, monkeypatch):
+    """The clock reads T0 while the backed file is still open and T1 once the load
+    has closed it: the backup is named at T0, the name that was checked."""
+    import datetime as datetime_module
+
+    _resident(s)
+    backed = _backed(s)
+
+    class _Clocked(_real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return T0 if backed.file.is_open else T1
+
+    monkeypatch.setattr(datetime_module, "datetime", _Clocked)
+    destination = s.dm.data_dir / "x.h5mu"
+    destination.write_bytes(b"previous")
+    s.dm.save_modality(NAME, "x.h5mu", backend="mudata")
+    assert not backed.file.is_open and "m0" in s.dm._modality_spilled
+    assert _sibling(destination, STAMP0).read_bytes() == b"previous"
+    assert not _sibling(destination, STAMP1).exists()
+
+
+# ------------------------------------- uncertain or reachable targets (R3)
+
+
+def _self_loop(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.symlink_to(path)
+    return path
+
+
+@pytest.mark.parametrize("caller", ["direct", "autosave"])
+def test_unrelated_spill_name_loop_does_not_skip_the_check(
+    tmp_path, monkeypatch, clock, caplog, caller
+):
+    """A link loop at the spill name of the modality being saved (never spilled)
+    cannot be evaluated; the existing destination's refused backup is still checked
+    before the load."""
+    s = _session(tmp_path, monkeypatch, default_backend="mudata")
+    held = _resident(s)
+    backed = _backed(s)
+    _self_loop(_spill_file(s, NAME))
+    name = "x.h5mu" if caller == "direct" else f"{NAME}_autosave.h5ad"
+    destination = s.dm.data_dir / name
+    destination.write_bytes(b"previous")
+    alias(_sibling(destination, STAMP0), _rev_file(s))
+    state, before = _state(s), workspace_tree(s.ws)
+    calls = []
+    with caplog.at_level(logging.INFO):
+        if caller == "direct":
+            with pytest.raises(ManagedPathError):
+                s.dm.save_modality(NAME, name, backend="mudata")
+            assert _state(s) == state and workspace_tree(s.ws) == before
+        else:
+            result = s.dm.auto_save_state(progress_callback=_progress(calls))
+            assert result.count(NOT_SAVED) == 1 and (NAME, "saving") not in calls
+            assert LATE_LOG not in _diagnostics(caplog)
+    assert s.dm.modalities["m0"] is held and "m0" not in s.dm._modality_spilled
+    assert s.dm.modalities[NAME] is backed and backed.file.is_open
+    assert destination.read_bytes() == b"previous" and s.rev.unchanged()
+    backed.file.close()
+
+
+def test_destination_spelled_through_a_missing_folder_is_checked(s, clock):
+    """``traverse/../existing.h5mu``: ``traverse`` does not exist yet, so the spelled
+    path does not either, but the spill folder lies under it: loading the backed data
+    spills m0, which creates ``traverse``, and the writer then backs up the existing
+    file. Its refused backup is checked before the load."""
+    s.dm._modality_spill_dir = s.dm.data_dir / "traverse" / "spill"
+    held = _resident(s)
+    backed = _backed(s)
+    existing = s.dm.data_dir / "existing.h5mu"
+    existing.write_bytes(b"previous")
+    alias(_sibling(existing, STAMP0), _rev_file(s))
+    state, before = _state(s), workspace_tree(s.ws)
+    with pytest.raises(ManagedPathError):
+        s.dm.save_modality(NAME, "traverse/../existing.h5mu", backend="mudata")
+    _assert_untouched(s, state, held, backed, before)
+    assert not (s.dm.data_dir / "traverse").exists()
+    backed.file.close()
+
+
+@pytest.mark.parametrize("caller", ["direct", "autosave"])
+def test_link_through_a_folder_the_spill_creates_is_checked(
+    tmp_path, monkeypatch, clock, caplog, caller
+):
+    """The spill folder is spelled ``cache/ghost/../spill``: spilling creates
+    ``cache/ghost``. The destination links to ``cache/ghost/../existing``, which the
+    spill makes reachable; that file's refused backup is checked before the load."""
+    s = _session(tmp_path, monkeypatch, default_backend="mudata")
+    s.dm._modality_spill_dir = s.ws / "cache" / "ghost" / ".." / "spill"
+    held = _resident(s)
+    backed = _backed(s)
+    suffix = ".h5mu" if caller == "direct" else ".h5ad"
+    existing = s.ws / "cache" / f"existing{suffix}"
+    existing.parent.mkdir(parents=True, exist_ok=True)
+    existing.write_bytes(b"previous")
+    alias(_sibling(existing, STAMP0), _rev_file(s))
+    name = "x.h5mu" if caller == "direct" else f"{NAME}_autosave.h5ad"
+    alias(s.dm.data_dir / name, s.ws / "cache" / "ghost" / ".." / existing.name)
+    state = _state(s)
+    calls = []
+    with caplog.at_level(logging.INFO):
+        if caller == "direct":
+            with pytest.raises(ManagedPathError):
+                s.dm.save_modality(NAME, name, backend="mudata")
+            assert _state(s) == state
+        else:
+            result = s.dm.auto_save_state(progress_callback=_progress(calls))
+            assert result.count(NOT_SAVED) == 1 and (NAME, "saving") not in calls
+            assert LATE_LOG not in _diagnostics(caplog)
+    assert s.dm.modalities["m0"] is held and "m0" not in s.dm._modality_spilled
+    assert s.dm.modalities[NAME] is backed and backed.file.is_open
+    assert not (s.ws / "cache" / "ghost").exists()
+    assert existing.read_bytes() == b"previous" and s.rev.unchanged()
+    backed.file.close()
+
+
+@pytest.mark.parametrize("caller", ["direct", "autosave"])
+def test_spill_name_of_the_newest_modality_is_no_reason_to_refuse(
+    tmp_path, monkeypatch, clock, caller
+):
+    """The modality being saved is the most recently used one, which is never
+    spilled: its spill file cannot appear, so a destination linking there makes no
+    backup and an unused backup name next to it does not refuse the save."""
+    s = _session(tmp_path, monkeypatch, default_backend="mudata")
+    _backed(s)
+    unused = alias(_sibling(_spill_file(s, NAME), STAMP0), _rev_file(s))
+    name = "x.h5mu" if caller == "direct" else f"{NAME}_autosave.h5ad"
+    alias(s.dm.data_dir / name, _spill_file(s, NAME))
+    if caller == "direct":
+        s.dm.save_modality(NAME, name, backend="mudata")
+    else:
+        result = s.dm.auto_save_state()
+        assert not any(i.startswith("Not saved") for i in result)
+    assert _spill_file(s, NAME).is_file() and not s.dm.modalities[NAME].isbacked
+    assert unused.is_symlink() and s.rev.unchanged()
+
+
+def test_spill_that_reuses_its_file_is_no_reason_to_refuse(s, clock):
+    """m0 was read from a file and is unchanged: spilling it reuses that file and
+    writes nothing, so a destination linking to its spill name makes no backup."""
+    folder = s.ws / "reload"
+    folder.mkdir()
+    _adata(0).write_h5ad(folder / "m0.h5ad")
+    s.dm.load_workspace("reload")
+    assert "m0" not in s.dm._modality_dirty and not s.dm.modalities["m0"].isbacked
+    _backed(s)
+    unused = alias(_sibling(_spill_file(s), STAMP0), _rev_file(s))
+    alias(s.dm.data_dir / "x.h5mu", _spill_file(s))
+    s.dm.save_modality(NAME, "x.h5mu", backend="mudata")
+    assert Path(s.dm._modality_spilled["m0"]) == folder / "m0.h5ad"
+    assert _spill_file(s).is_file() and unused.is_symlink() and s.rev.unchanged()

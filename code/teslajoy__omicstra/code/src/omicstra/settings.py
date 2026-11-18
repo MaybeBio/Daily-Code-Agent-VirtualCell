@@ -1,0 +1,245 @@
+"""runtime settings - all paths injected, nothing bound to __file__ location.
+
+this kills the scripts/ `Path(__file__).parents[1]` portability blocker: every
+stage / tool / agent reads paths through Settings, so the code runs the same
+under src/, a subprocess, a temporal activity, or a nextflow process.
+
+two roots, deliberately separate:
+
+  PACKAGE root   this repo / the wheel. code + the generalizable contract.
+                 cohort-free - nothing here may name a cohort.
+  PROJECT root   one cohort. `project_dir` is BOTH the security boundary and
+                 the cohort selector. lives anywhere on disk, usually its own
+                 git repo, never inside the package.
+
+tnbc-92 is the fixture and happens to sit at ./projects/tnbc-92, but it is
+reached through the same `project_root()` call as any external cohort - one
+code path, different default.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _package_repo_root() -> Path:
+    """repo root derived from the package when running from a source checkout;
+    cwd() when installed as a wheel.
+
+    in a src-layout editable install parents[2] is the repo root (the dir that
+    contains pyproject.toml). in a wheel install parents[2] is some path inside
+    site-packages and contains no pyproject.toml, so we fall back to cwd().
+
+    package contract JSONs are found via _package_configs() (which uses __file__
+    correctly in both cases), so this function is only needed for cohort paths
+    (projects/, data/, runs/). override with OMICSTRA_REPO_ROOT when the process
+    is not launched from the checkout root.
+    """
+    candidate = Path(__file__).resolve().parents[2]
+    if (candidate / "pyproject.toml").is_file():
+        return candidate
+    return Path.cwd()
+
+
+def _package_configs() -> Path:
+    """the contracts, resolved from the PACKAGE - not from a repo checkout.
+
+    they were at repo root, which meant `pip install omicstra` shipped a server
+    that could not find its own contracts: in an installed wheel `parents[2]` is
+    site-packages, and there is no configs/ beside it. the contracts are package
+    data - generalizable, cohort-free, versioned with the code - so they live
+    inside the package and travel with it.
+
+    configs/v3/ stays at repo root. those are run configs for one cohort's grid,
+    which is exactly what package data must NOT contain.
+    """
+    return Path(__file__).resolve().parent / "configs"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="OMICSTRA_", env_file=".env", extra="ignore"
+    )
+
+    # where the PACKAGE lives. override per machine via env or constructor.
+    repo_root: Path = _package_repo_root()
+    data_dir: Path = Path("data")
+    runs_dir: Path = Path("runs")
+    knowledge_dir: Path = Path("knowledge")
+    # absolute, because the contracts ship inside the wheel
+    configs_dir: Path = _package_configs()
+
+    # the cohort root. when set, it IS the boundary - project_id is not
+    # consulted and nothing outside this directory is addressable.
+    project_dir: Path | None = None
+
+    # dev convenience only: an in-repo registry of cohorts. used when
+    # project_dir is unset, which is the fixture path, not the shipped path.
+    projects_dir: Path = Path("projects")
+
+    # a STUDY groups projects, the way GDC/Gen3 nests project under program.
+    # `program` is NOT reused: routing_contract.json already spends that word on
+    # a biological abstraction level - pathway questions are `level: program` -
+    # and the router's vocabulary should not have to share it with a directory.
+    #
+    # a project id may be flat (`tnbc-92`) or study-qualified
+    # (`bforepc/tnbc-92`). flat keeps resolving, so nothing on disk has to move
+    # for this to exist.
+    studies_dir: Path = Path("studies")
+
+    # the closed set lives in configs/data_contract.json#compute_backend, not
+    # here. it was a comment on this line and a cohort drifted outside it.
+    compute_backend: str = "in_process"
+
+    # durable execution, opt-in by presence. unset means the dispatcher runs
+    # shards in-process - not a degraded mode, the normal one for a laptop. a
+    # value here is a deliberate act, so nothing silently starts depending on a
+    # server being up.
+    temporal_address: str | None = None
+    temporal_namespace: str = "default"
+    temporal_task_queue: str = "omicstra-encode"
+
+    def resolve(self, p: Path) -> Path:
+        # relative paths resolve under repo_root; absolute passthrough
+        return p if p.is_absolute() else (self.repo_root / p)
+
+    def default_project_id(self) -> str | None:
+        reg = self.resolve(self.projects_dir) / "registry.json"
+        if not reg.exists():
+            return None
+        return json.loads(reg.read_text()).get("default")
+
+    def _bound_project_id(self, root: Path) -> str:
+        """the cohort a project_dir actually holds.
+
+        project.json is authoritative; the directory name is the fallback, since
+        `init` defaults the id to the directory name anyway.
+        """
+        cfg = root / "project.json"
+        if cfg.exists():
+            try:
+                return json.loads(cfg.read_text()).get("project_id") or root.name
+            except (json.JSONDecodeError, OSError):
+                pass
+        return root.name
+
+    def work_root(self, project_id: str | None = None) -> Path:
+        """where this server may WRITE for a cohort: ledger, figures, checkpoints.
+
+        a DIFFERENT question from where the finished grid is read, and the two
+        were conflated because on a source checkout they sit side by side.
+        `project.json#runs_dir` points at the published grid, which a cohort
+        declares read-only - aiming the one thing the server writes at the one
+        thing it must never write.
+
+        resolution, in order:
+
+            project.json#work_dir       relative to the cohort, or absolute
+            runs_dir / {project_id}     the historical path, so nothing on disk
+                                        moves for a cohort that declares nothing
+
+        the fallback resolves under `repo_root`, which is right for a source
+        checkout and wrong for an installed server with no checkout - it would
+        put a cohort's ledger beside site-packages. declaring `work_dir` is how
+        a deployment fixes that, and the default keeps every existing ledger
+        exactly where it is.
+        """
+        import json as _json
+
+        root = None
+        try:
+            root = self.project_root(project_id)
+        except (ValueError, OSError):
+            pass
+
+        if root is not None:
+            cfg = root / "project.json"
+            try:
+                declared = _json.loads(cfg.read_text()).get("work_dir") or ""
+            except (OSError, ValueError):
+                declared = ""
+            if declared:
+                p = Path(declared).expanduser()
+                return p if p.is_absolute() else (root / p).resolve()
+
+        pid = project_id or (root.name if root is not None else None) or "unrouted"
+        return self.resolve(self.runs_dir) / pid
+
+    def project_root(self, project_id: str | None = None) -> Path:
+        """the one cohort directory this call may read.
+
+        project_dir wins outright - a tool call cannot escape the boundary by
+        passing a different project_id. falls back to the in-repo registry.
+        """
+        if self.project_dir is not None:
+            root = self.resolve(self.project_dir)
+            # the boundary REFUSES; it does not substitute. winning outright
+            # while staying silent turns a security boundary into a data mixup -
+            # ask about cohort B, receive cohort A's evidence, with nothing said.
+            # that is precisely the "inheriting another cohort's winner" failure
+            # the package/project split exists to stop.
+            if project_id and project_id != self._bound_project_id(root):
+                raise ValueError(
+                    f"project_id={project_id!r} does not match the bound cohort "
+                    f"{self._bound_project_id(root)!r} (project_dir={root}). "
+                    "the boundary refuses rather than silently serving another "
+                    "cohort's data. unset OMICSTRA_PROJECT_DIR, or pass the "
+                    "matching project_id."
+                )
+            return root
+        pid = project_id or self.default_project_id()
+        if not pid:
+            raise ValueError(
+                "no cohort selected: set OMICSTRA_PROJECT_DIR (or --project-dir), "
+                "pass a project_id, or provide projects/registry.json with a default"
+            )
+        return self._resolve_project(pid)
+
+    def _resolve_project(self, pid: str) -> Path:
+        """a project id, flat or study-qualified, as a directory.
+
+        `a/b` is study `a`, project `b`. a flat id resolves as it always has,
+        and then - if exactly one study holds a project of that name - as that.
+        the second lookup is what lets a flat id keep working after the files
+        move under a study, and it REFUSES on ambiguity rather than picking:
+        two studies with a project of the same name is precisely the "served
+        another cohort's data" failure the boundary exists to stop.
+        """
+        if "/" in pid:
+            study, _, project = pid.partition("/")
+            return self.resolve(self.studies_dir) / study / "projects" / project
+
+        flat = self.resolve(self.projects_dir) / pid
+        if flat.is_dir():
+            return flat
+
+        studies = self.resolve(self.studies_dir)
+        found = sorted(p for p in studies.glob(f"*/projects/{pid}")
+                       if p.is_dir()) if studies.is_dir() else []
+        if len(found) > 1:
+            raise ValueError(
+                f"project_id={pid!r} exists under {len(found)} studies "
+                f"({', '.join(p.parents[1].name for p in found)}). qualify it as "
+                "<study>/<project> - the boundary refuses rather than picking one.")
+        return found[0] if found else flat
+
+    def study_root(self, project_id: str | None = None) -> Path | None:
+        """the study directory a project belongs to, or None if it is flat.
+
+        a project belongs to exactly one study, which is Gen3's rule and what a
+        path can express. a project in two studies would be a DECLARATION, not a
+        directory, and nothing here would represent it.
+        """
+        root = self.project_root(project_id)
+        studies = self.resolve(self.studies_dir)
+        # UNDER the studies root, not merely named `projects` - a flat cohort
+        # sits in `projects/`, whose parent is the repo, and reading that as a
+        # study would hand every flat cohort the whole tree as its parent.
+        if not (root.parent.name == "projects" and studies in root.parents):
+            return None
+        return root.parent.parent
+
+
+settings = Settings()

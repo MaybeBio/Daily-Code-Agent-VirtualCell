@@ -1,0 +1,37 @@
+experiment:
+  name: mhu21-3b_1p
+  description: MERSCOPE Human Uterine Cancer  ROCostain(dataset-id 21) | 3 batch | 1 panel | Preprocess to silver
+  study: MERSCOPE_FFPE_Human_Immuno-Oncology (https://info.vizgen.com/ffpe-showcase?submissionGuid=d4f4d370-4578-40fe-99ca-4325d6e2dfd0)
+
+paths:
+  data_directory_path: /lustre/scratch126/cellgen/team361/DATASETS
+
+dataset:
+  overwrite: false
+  source: offline
+  download_params:
+    redownload: false
+    urls: []
+  file_names:
+    - MERSCOPE_Human_Uterine_Cancer_Patient1
+    - MERSCOPE_Human_Uterine_Cancer_Patient2_RACostain
+    - MERSCOPE_Human_Uterine_Cancer_Patient2_ROCostain
+
+harmonization:
+  uns:
+    dataset_id: 21
+    assay: merfish
+    species: homo_sapiens
+    tissue: uterus
+    sample_condition_map: {
+      'MERSCOPE_Human_Uterine_Cancer_Patient1': 'adenocarcinoma', # 'uterine_cancer',
+      'MERSCOPE_Human_Uterine_Cancer_Patient2_RACostain': 'adenocarcinoma', # 'uterine_cancer',
+      'MERSCOPE_Human_Uterine_Cancer_Patient2_ROCostain': 'adenocarcinoma' # 'uterine_cancer'
+      }
+  batch:
+    split_by_batch: false
+    sample_batch_map: {}
+  key_mappings: {}
+  misc:
+    min_genes: 10
+

@@ -1,0 +1,67 @@
+resources:
+  jobs:
+    register_rfdiffusion:
+      name: register_rfdiffusion
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        # Serverless GPU (GPU_1xA10). RFdiffusion3 (RFD3) via rc-foundry runs on
+        # modern torch/CUDA, so this bypasses the classic-cluster EC2 GPU vCPU
+        # quota. (was a 14.3 LTS T4 job_cluster on the torch-1.11 / SE3-Transformer
+        # stack, which has no py3.12 wheels.) Mirrors esm2_embeddings / protein_mpnn.
+        - task_key: register_rfdiffusion_task
+          disable_auto_optimization: true
+          environment_key: gpu_env
+          max_retries: 0
+          retry_on_timeout: false
+          timeout_seconds: 7200
+          notebook_task:
+            notebook_path: ../notebooks/01_register_rfdiffusion.py
+          compute:
+            hardware_accelerator: GPU_1xA10
+
+        #this task needs serverless runtime with python 3.11
+        - task_key: import_rfdiffusion_task
+          max_retries: 0
+          disable_auto_optimization: true
+          environment_key: default
+          depends_on:
+            - task_key: register_rfdiffusion_task
+          notebook_task:
+            notebook_path: ../notebooks/02_import_model_gwb.py
+
+      environments:
+        # default = py3.11 (client '2'): 02_import_model_gwb.py installs the genesis_workbench
+        # library + databricks-sdk/sql-connector/mlflow, which no longer resolve under the
+        # py3.12 (client '4') serverless immutable constraints (PipError in import_rfdiffusion_task).
+        # py3.11 matches teddy's working import env. The register task's gpu_env stays py3.12 for RFD3.
+        - environment_key: default
+          spec:
+            client: '2'
+        - environment_key: gpu_env
+          spec:
+            client: '4'
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: model_name
+          default: rfdiffusion
+        - name: cache_dir
+          default: ${resources.volumes.rfdiffusion_cache_dir.name}
+        - name: experiment_name
+          default: ${var.module_registration_experiment_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}
+        - name: user_email
+          default: ${var.current_user}
+        - name: workload_type
+          # A10 (24 GB) serving — RFD3 all-atom diffusion (mirrors esmfold/boltz).
+          default: ${var.gpu_medium_setting}
+
+      tags: ${var.common_resource_tags}

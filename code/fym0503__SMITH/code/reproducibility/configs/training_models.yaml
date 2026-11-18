@@ -1,0 +1,14 @@
+schema_version: 1
+models:
+  smith:
+    training_backend: smith
+    entrypoint: scripts/main.py
+    description: Shared SMITH training implementation.
+    default: true
+    capabilities:
+      - forbidden_targets
+      - prior_targets
+    options:
+      dropout_rate: model_configured
+      classification_head: raw_logits
+      multitask_solver: min_norm_solver

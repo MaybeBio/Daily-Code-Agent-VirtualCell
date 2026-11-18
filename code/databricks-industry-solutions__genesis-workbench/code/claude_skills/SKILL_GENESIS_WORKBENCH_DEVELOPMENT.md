@@ -1,0 +1,693 @@
+---
+name: genesis-workbench-development
+description: How to add new models, workflows, and UI tabs to Genesis Workbench — registration patterns, deployment pipelines, job YAML structure, endpoint wiring, and UI integration.
+---
+
+# Genesis Workbench Development Skill
+
+Add new biological AI models, serving endpoints, and UI workflows to Genesis Workbench following established patterns.
+
+## Dependency hygiene (hard rule)
+
+Every pip dependency introduced anywhere in this repo — registration notebook
+`%pip install` lines, DAB `environments.spec.dependencies`, PyFunc
+`pip_requirements` / `conda_env`, orchestrator job notebooks — **must use
+exact version pins** (`pkg==X.Y.Z`). No `latest`, no `>=`, no unpinned bare
+package names. This includes transitively-important deps the upstream
+might leave loose (torch, transformers, numpy, pandas, scikit-learn, mlflow,
+cloudpickle, biopython).
+
+**Reason:** unpinned installs broke prior deploys silently — the same
+upstream package would resolve to different versions across deploys depending
+on PyPI release timing, and PyFunc artifacts logged with one resolved version
+would fail to load on a serving endpoint that resolved a different one. The
+repo lives on the `version_pinning` branch precisely as a response to that
+incident.
+
+**Pattern to mirror:** `modules/single_cell/scimilarity/scimilarity_v0.4.0_weights_v1.1/notebooks/utils.py:11-15`
+— every dep pinned including `numpy==1.26.4`, `pandas==1.5.3`, `mlflow==2.22.0`,
+`numcodecs[crc32c]==0.13.1`, `cloudpickle==2.0.0`. The four new predictor
+submodules under `modules/small_molecule/` (`netsolp_v1`, `pltnum_v1`,
+`deepstabp_v1`, `mhcflurry_v2`) and the orchestrator (`enzyme_optimization_v1`)
+follow the same exact-pin convention; copy from any of them when adding the
+next predictor.
+
+When the README's per-module dependency table is updated, every new pip dep
+gets its own row with the exact pin and license verified at the upstream
+source (not from package summary). License-disqualified deps (academic-only,
+CC-BY-NC, "research-only", `git+...` non-pinnable installs) are blockers,
+not workaround-able.
+
+---
+
+## On-demand compute (hard rule)
+
+Every workflow job in this repo runs on **on-demand** compute on every cloud,
+not spot. Spot instances get reclaimed mid-run when the cloud provider takes
+the capacity back, and GWB workflow jobs are typically minutes-to-hours long
+(predictor registration, optimization loops, batch scoring) — the spot
+reclamation rate exceeds the run completion rate often enough that spot is
+not viable for production workflows.
+
+**Pattern:** the cluster spec in `resources/<job>.yml` declares
+`node_type_id`, `spark_version`, etc. but does NOT declare `availability`.
+The per-cloud `targets:` block in `databricks.yml` overlays the right
+`<cloud>_attributes.availability` per environment:
+
+```yaml
+# databricks.yml
+targets:
+  prod_aws:
+    resources:
+      jobs:
+        my_workflow:
+          job_clusters:
+            - job_cluster_key: my_cluster
+              new_cluster:
+                aws_attributes:
+                  availability: ON_DEMAND
+
+  prod_azure:
+    resources:
+      jobs:
+        my_workflow:
+          job_clusters:
+            - job_cluster_key: my_cluster
+              new_cluster:
+                azure_attributes:
+                  availability: ON_DEMAND_AZURE
+
+  prod_gcp:
+    resources:
+      jobs:
+        my_workflow:
+          job_clusters:
+            - job_cluster_key: my_cluster
+              new_cluster:
+                gcp_attributes:
+                  availability: ON_DEMAND_GCP
+```
+
+**Reason:** A10 spot instances were reclaimed mid-run twice consecutively
+during the Phase 1.5 enzyme-optimization Accurate-path verification (~13 min
+and ~35 min into the runs). Each Accurate run is ~1-6 hours wall-clock,
+much longer than typical spot reclamation intervals. The ~30% cost premium
+of on-demand is paid only for the duration of the run and is far cheaper
+than re-running an interrupted multi-hour job.
+
+**Pattern to mirror:** `modules/large_molecule/boltz/boltz_1/databricks.yml`
+— it overlays on-demand per cloud for `register_boltz`. Every new workflow
+must do the same for every job it adds. When a submodule defines multiple
+jobs (e.g. `enzyme_optimization_v1` has both Fast and Accurate jobs), each
+job needs its own block under each cloud target — see
+`modules/small_molecule/enzyme_optimization/enzyme_optimization_v1/databricks.yml`.
+
+---
+
+## Documentation (hard rule)
+
+Every new feature (UI workflow, model, batch pipeline) ships **with three docs
+artifacts in the same PR as the code**. A feature that lands without these is
+considered incomplete and should not be merged.
+
+### 1. Per-feature doc page in `modules/core/app/docs/`
+
+One markdown file named `<module>_<feature>.md` (snake_case). Required
+sections — see [`modules/core/app/docs/README.md`](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/modules/core/app/docs/README.md)
+for the canonical template:
+
+- **What it does** (one paragraph: input, output, problem solved)
+- **How to use** (UI walkthrough — tab, form fields, expected wait, where
+  results appear)
+- **Inputs** (schema: file formats, column names, parameter ranges)
+- **Outputs** (MLflow run name + artifacts + tags, Delta tables, result dialog
+  contents)
+- **Underlying models / endpoints** (which serving endpoints, UC models, VS
+  indexes the feature depends on; link to the submodule README)
+- **Limitations and known issues**
+
+### 2. Bullet under the matching module in the root `README.md`
+
+The "Inside Genesis Workbench" section
+(`README.md#inside-genesis-workbench`) has one bullet per module listing the
+features under it. Add a bullet for the new feature linking to the doc page
+created in step 1.
+
+### 3. Dated entry in the root `CHANGELOG.md`
+
+Follow the existing pattern: a feature-name + date header
+(`## <feature-or-module> (YYYY-MM-DD) — <one-line tagline>`) followed by `###`
+subsections that explain (a) what changed and why, (b) anti-patterns avoided
+and the bug they were caused by, (c) reference implementations or files to
+mirror. Don't write a generic "added X" line — the CHANGELOG is meant to be
+read by future contributors as a record of *decisions*, not a release log.
+
+**Reference implementations** (mirror these — most recent entries are most
+representative): `guided_enzyme_creation (2026-05-07)`, `version_pinning
+(2026-04-…)` in [`CHANGELOG.md`](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/CHANGELOG.md).
+
+**Order of operations:** write the docs **before** declaring the feature
+shipped. Specifically: the user-facing doc in `/docs` is what proves the
+feature is actually usable end-to-end — if the doc can't be written without
+hand-waving, the UI / inputs / outputs / errors aren't done yet.
+
+---
+
+## Notebook authoring standard (hard rule)
+
+Every GWB notebook (registration, import/deploy, batch pipeline) is read by
+**research scientists and future contributors**, not just executed. It must read
+as a **documented narrative**, not working code with rationale crammed into
+comments. A notebook that is merely "working code" is **not** done — it is
+reviewed and bounced the same as missing docs.
+
+**Strictly follow the template — do not hand-roll structure.** Copy
+[`claude_skills/templates/TEMPLATE_01_register_model.py`](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/claude_skills/templates/TEMPLATE_01_register_model.py),
+keep the sections, fill every `<…>`/`TODO`, delete only what genuinely does not
+apply. (This mirrors how the protein-design skill scaffolds from
+`workshops/protein_design_from_paper/TEMPLATE_protein_design_notebook.py`.)
+
+**The rules (all enforced):**
+
+1. **One concern per cell.** Each logical step is its own `# COMMAND` cell.
+2. **Every code cell is introduced by a `%md` cell** (a real `# MAGIC %md`
+   markdown cell, *not* a `# DBTITLE` one-liner) that says, in prose, *what* the
+   cell does and *why*. A `# DBTITLE` may additionally label the cell, but it
+   does not replace the markdown.
+3. **Section headers.** Use `## N · Title` headers (`## 1 · Install
+   dependencies`, `## 2 · Parameters`, …) so the notebook has a visible spine,
+   exactly like the protein-design template.
+4. **Rationale lives in markdown, not in code.** The long "why cu132 / why
+   env_pack / why this FUSE path" explanations go in the preceding `%md` cell.
+   Code comments are reserved for the *surprising one-liner* next to the line it
+   explains — not multi-sentence paragraphs wedged between statements.
+5. **Readable names.** No throwaway 1–2 character names for things that live
+   more than one line (`g`, `bc`, `_r`, `_m`, `aa`, `sid`). Spell them:
+   `widget`, `build_constraint`, `install_result`, `model`, `atom_array`,
+   `sample_id`. A leading underscore for a scratch local is fine; a cryptic
+   abbreviation is not.
+6. **Standard section skeleton** for a registration notebook: title+overview →
+   1 install → 2 parameters → 3 download weights → 4 PyFunc wrapper → 5 dry-load
+   test → 6 signature+input_example → 7 log & register (or 7-Express) → 8
+   summary. Import/deploy and batch notebooks follow the same *shape* (header +
+   per-step `%md`), with their own sections.
+
+**Exemplars to mirror** (clean, well-sectioned): `large_molecule/boltz/boltz_1/
+notebooks/01_register_boltz.py` (full register) and the predictor notebooks
+`small_molecule/{deepstabp,netsolp,pltnum,mhcflurry}/.../01_register_*.py`; for
+the **Express (env_pack) register + deploy** flow, `large_molecule/rfd4_proteina/
+rfd4_proteina_v1/notebooks/01_register_rfd4_proteina.py` + `03_rfd4_register_serving.py`.
+
+**Why this standard exists:** the RFD4-Proteina notebooks originally shipped with a
+single markdown cell and hundreds of lines of dense code (crammed paragraph-comments,
+one-letter names) — the exact readability failure this rule prevents. They were
+refactored to meet this standard (documented `## N ·` sections, rationale in markdown,
+readable names) with behavior held identical, and are now the Express exemplar above.
+
+**Acceptance checklist** (every notebook, before "shipped"):
+- [ ] A title `%md` with what / compute / pipeline / honest-status.
+- [ ] Every code cell has a preceding `%md` section cell with a `## N ·` header.
+- [ ] No multi-sentence rationale paragraphs buried inside code cells.
+- [ ] No cryptic 1–2 char names surviving past one line.
+- [ ] A closing `## Summary` cell stating what was produced + the next step.
+
+---
+
+## Architecture Overview
+
+```
+Model Registration (Databricks notebook)
+  → MLflow PyFunc log_model() → Unity Catalog
+    → import_model_from_uc() → GWB models table
+      → deploy_model() → Model Serving Endpoint
+        → UI workflow calls endpoint via SDK
+```
+
+Every model in Genesis Workbench follows this pipeline. The patterns are consistent across all modules.
+
+## Adding a New Model
+
+### Step 1: Create the sub-module directory
+
+Follow existing structure. Example for a new protein model called `mymodel`:
+
+```
+modules/large_molecule/mymodel/mymodel_v1/
+├── databricks.yml          # DAB bundle config
+├── variables.yml           # Cloud-specific variables
+├── deploy.sh               # Deployment script
+├── destroy.sh              # Teardown script
+├── resources/
+│   ├── volumes.yml         # UC Volume for model artifacts
+│   └── register_mymodel.yml  # Job definition with tasks
+└── notebooks/
+    ├── 01_register_mymodel.py      # Download weights + define PyFunc + register in UC
+    └── 02_import_model_gwb.py      # Import to GWB + deploy endpoint
+```
+
+### Step 2: Write the registration notebook (01_register_mymodel.py)
+
+**Start from the template — do not hand-roll.** Copy
+[`claude_skills/templates/TEMPLATE_01_register_model.py`](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/claude_skills/templates/TEMPLATE_01_register_model.py)
+and follow the **Notebook authoring standard (hard rule)** above: a `%md`
+section cell with a `## N ·` header before every code cell, rationale in
+markdown (not crammed into code), and readable names. The skeleton below is the
+*logic* each section fills in — it is not a substitute for the template's
+structure.
+
+**Pattern** (from all existing models):
+
+```python
+# 1. Install dependencies
+# %pip install ...
+# %restart_python
+
+# 2. Widgets for parameters
+dbutils.widgets.text("catalog", "genesis_workbench", "Catalog")
+dbutils.widgets.text("schema", "genesis_schema", "Schema")
+dbutils.widgets.text("model_name", "mymodel", "Model Name")
+# ... etc
+
+# 3. Download model weights (with skip-if-exists)
+model_dir = f"/Volumes/{catalog}/{schema}/{cache_dir}/models/"
+model_file = os.path.join(model_dir, "model.pt")
+if os.path.exists(model_file) and os.path.getsize(model_file) > 0:
+    print(f"Model already exists, skipping download")
+else:
+    # Download from HuggingFace / Google Drive / NGC / Zenodo
+    ...
+
+# 4. Define MLflow PyFunc wrapper
+class MyModelWrapper(mlflow.pyfunc.PythonModel):
+    def load_context(self, context):
+        # Load model weights ONCE here (not in predict)
+        self.model = load_model(context.artifacts["model_file"])
+        self.model.float()  # Force float32 to avoid dtype issues
+        self.model.to(self.device)
+        self.model.eval()
+
+    def predict(self, context, model_input, params=None):
+        # Use self.model (pre-loaded)
+        # Return dict or DataFrame
+        ...
+
+# 5. Dry-load test
+context = PythonModelContext(artifacts={...})
+model = MyModelWrapper()
+model.load_context(context)
+
+# 6. Generate input_example (keep it small!)
+# Use 10 cells x 1500 genes, or a single short sequence
+# Large examples slow down model logging
+
+# 7. Register in Unity Catalog
+mlflow.pyfunc.log_model(
+    "mymodel",
+    python_model=MyModelWrapper(),
+    artifacts={"model_file": str(model_file)},
+    pip_requirements="../requirements.txt",
+    signature=signature,
+    input_example=(input_data, params),
+    registered_model_name=f"{catalog}.{schema}.{model_name}",
+)
+```
+
+**Key gotchas:**
+- Always pre-load model weights in `load_context()`, NOT in `predict()` — avoids re-reading GB from disk per request
+- Call `self.model.float()` after loading to avoid float16/float32 dtype mismatches
+- Keep `input_example` small — 10 cells, not 1000. Must survive HVG/preprocessing filters.
+- Use `os.path.exists()` + `os.path.getsize() > 0` to skip downloads on re-deploy
+- If the model returns a dict, handle it in the caller (don't assume tensor output)
+
+### Step 3: Write the import/deploy notebook (02_import_model_gwb.py)
+
+**Standard pattern** (identical across all models):
+
+```python
+from genesis_workbench.models import (ModelCategory, import_model_from_uc,
+                                      deploy_model, get_latest_model_version)
+from genesis_workbench.workbench import wait_for_job_run_completion
+
+model_uc_name = f"{catalog}.{schema}.{model_name}"
+model_version = get_latest_model_version(model_uc_name)
+
+gwb_model_id = import_model_from_uc(
+    user_email=user_email,
+    model_category=ModelCategory.PROTEIN_STUDIES,  # or SINGLE_CELL, SMALL_MOLECULES
+    model_uc_name=model_uc_name,
+    model_uc_version=model_version,
+    model_name="MyModel Display Name",
+    model_display_name="MyModel Display Name",
+    model_source_version="v1.0",
+    model_description_url="https://github.com/...",
+)
+
+run_id = deploy_model(
+    user_email=user_email,
+    gwb_model_id=gwb_model_id,
+    deployment_name="MyModel",
+    deployment_description="Description",
+    input_adapter_str="none",
+    output_adapter_str="none",
+    sample_input_data_dict_as_json="none",
+    sample_params_as_json="none",
+    workload_type=workload_type,  # GPU_SMALL, GPU_MEDIUM, MULTIGPU_MEDIUM, CPU
+    workload_size="Small",
+)
+
+result = wait_for_job_run_completion(run_id, timeout=3600)
+```
+
+#### Serving a torch > 2.7.1 / CUDA-13 model via Express deployments
+
+> **Express is now the standard GPU-serving path across GWB** (not just torch>2.7.1). To MIGRATE an existing
+> model's serving to Express, follow the playbook
+> [`SKILL_GENESIS_WORKBENCH_EXPRESS_MIGRATION.md`](https://github.com/databricks-industry-solutions/genesis-workbench/blob/HEAD/claude_skills/SKILL_GENESIS_WORKBENCH_EXPRESS_MIGRATION.md): the change is
+> **registration-only** — bump `mlflow>=3.12` + `databricks-sdk>=0.150`, `log_model` WITHOUT
+> `registered_model_name`, then `register_model(env_pack=EnvPackConfig(install_dependencies=False))`.
+> `deploy_model` / `02_import_model_gwb` / `model_deployments` / endpoint resolution stay UNTOUCHED
+> (`deploy_model_endpoint` just serves whatever UC version you registered — an env-packed version serves as
+> Express). Migrated: diffdock, esm2_embeddings, esmfold, proteinmpnn, rfdiffusion, scgpt, proteina_complexa,
+> teddy, deepstabp, boltz, kermt, pltnum, chemprop. NOT eligible: **scimilarity (py3.10)** + **genmol
+> (py3.11)** — a Python-version lock the serverless-v3+ (py3.12) runtime can't match → leave on standard serving.
+
+The standard `deploy_model()` path above uses Databricks' STANDARD GPU Model Serving, which rebuilds the
+container at deploy time on a **torch 2.7.1+cu118 (CUDA 11.8)** base and runs a hardcoded post-step that
+**force-reinstalls torch 2.7.1** over any pin. So a model that needs torch > 2.7.1 or CUDA > 11.8 (e.g.
+RFD4-Proteina = torch 2.14.1/cu132 + cuEquivariance-cu13) CANNOT be served the standard way — it loads on
+the register node (serverless GPU, CUDA 13) but fails at serving with `has_static_value` / `torch.optim.
+Muon` / `libnvrtc.so.13` import errors.
+
+Serve it with **Express deployments** instead (docs: `machine-learning/model-serving/express-deployments`),
+which package the serverless-GPU notebook env at REGISTRATION (`env_pack`) and restore it identically at
+serving — no deploy-time rebuild, no force-install. Reference: `large_molecule/rfd4_proteina/.../notebooks/
+01_register_rfd4_proteina.py`. Replace Step 3's `deploy_model(...)` with:
+
+```python
+# In the SAME serverless-GPU kernel that installed the model (needs mlflow>=3.12 + databricks-sdk>=0.150.0):
+import torch, mlflow
+from mlflow.utils.env_pack import EnvPackConfig
+assert torch.cuda.is_available()                     # register FROM GPU (Express is GPU-to-GPU)
+mlflow.set_registry_uri("databricks-uc")
+# Do NOT force MLFLOW_USE_DATABRICKS_SDK_MODEL_ARTIFACTS_REPO_FOR_UC="false": on MLflow 3.12+ the model logs
+# under a LoggedModel (logged_models/m-<id>) and the presigned-URL repo can't vend write-credentials for it
+# ("RESOURCE_DOES_NOT_EXIST: Run not found" → None → "NoneType object is not iterable"). Leave the default
+# (the Databricks-SDK artifact repo, which handles logged models correctly).
+
+mi = mlflow.pyfunc.log_model(                         # log WITHOUT registered_model_name
+    name=model_name, python_model=MyModelWrapper(), artifacts=artifacts, code_paths=code_paths,
+    signature=signature, input_example=example,
+    pip_requirements=["mlflow", "cloudpickle", "pandas", "numpy"])   # minimal: env_pack defines the serving env
+mv = mlflow.register_model(                           # register SEPARATELY with env_pack
+    model_uri=mi.model_uri, name=f"{catalog}.{schema}.{model_name}",
+    env_pack=EnvPackConfig(name="databricks_model_serving", install_dependencies=False))
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import (EndpointCoreConfigInput, ServedEntityInput,
+                                             ServingModelWorkloadType, EndpointTag)
+w = WorkspaceClient()
+served = [ServedEntityInput(entity_name=f"{catalog}.{schema}.{model_name}", entity_version=str(mv.version),
+            name=model_name, workload_type=ServingModelWorkloadType("GPU_XLARGE"),  # 1x H100, us-west-2, enrolled
+            workload_size="Small", scale_to_zero_enabled=False)]                    # GPU_XLARGE: no scale-to-zero
+w.serving_endpoints.create_and_wait(name=endpoint_name,
+    config=EndpointCoreConfigInput(name=endpoint_name, served_entities=served),
+    tags=[EndpointTag(key="application", value="genesis_workbench")], timeout=timedelta(minutes=120))
+```
+
+- **`install_dependencies=False`** is essential if the env has git/binary/local-tagged wheels (torch
+  `+cu132`, nvcc source builds, `cuequivariance-*-cu13`): the default `True` re-resolves them from an
+  index and fails with `No matching distribution`. `False` snapshots the installed site-packages verbatim.
+- Express deploys in **~6 min** (no 30-38 min container build).
+- Run `import_model_from_uc` (GWB app-registry metadata) in a SEPARATE cell AFTER restarting to the GWB lib
+  (mlflow 2.22/sdk 0.50) — wrap it NON-FATAL (endpoint already live) and never reference pre-restart
+  variables (e.g. `endpoint_name`) in post-restart cells (`restartPython()` wipes the kernel → `NameError`,
+  which with task `max_retries` becomes a wasteful full-notebook retry storm).
+- Because env *parity* (not the H100 base image) is the mechanism, Express should also work on cheaper
+  CUDA-13-capable tiers (GPU_LARGE=A100 / GPU_MEDIUM=A10) — test to drop the GPU_XLARGE enrollment need.
+
+### Step 4: Write the job YAML
+
+```yaml
+resources:
+  jobs:
+    register_mymodel:
+      name: register_mymodel
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+      tasks:
+        - task_key: register_mymodel_task
+          job_cluster_key: job_cluster_gpu
+          notebook_task:
+            notebook_path: ../notebooks/01_register_mymodel.py
+        - task_key: import_mymodel_task
+          depends_on:
+            - task_key: "register_mymodel_task"
+          notebook_task:
+            notebook_path: ../notebooks/02_import_model_gwb.py
+      environments:
+        - environment_key: default
+          spec:
+            client: '2'
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        # ... standard parameters
+      job_clusters:
+        - job_cluster_key: job_cluster_gpu
+          new_cluster:
+            num_workers: 0
+            node_type_id: ${var.t4_node_type}
+            spark_version: '15.4.x-gpu-ml-scala2.12'
+            # ... standard config
+```
+
+**Cluster selection:**
+- Download-only tasks: Use `cpu_node_type` + `cpu-ml` runtime
+- Model registration (needs GPU for test prediction): Use `t4_node_type` + `gpu-ml` runtime
+- Import/deploy (serverless): No cluster needed, use `environments` with `client: '2'`
+
+**Serverless vs classic — prefer serverless (`environment_key` + `environments`), but keep a task on a classic
+`job_cluster_key` when it does any of these** (all learned the hard way):
+- Runs `%sh` cells or reads/writes `/local_disk0` — neither exists on serverless.
+- Loads a large local object into Spark via `spark.createDataFrame(pandas_df)` — serverless (Spark Connect)
+  caps a cached local relation at **3 GiB** (`LOCAL_RELATION_SIZE_LIMIT_EXCEEDED`).
+- Attaches a Spark **JAR** as a cluster library (e.g. Glow) — unsupported on serverless.
+- Pins **Python 3.10** deps (serverless is 3.11/3.12; env-version 1 is the only 3.10 option).
+- Downloads many GB from a slow external host — classic egress + local disk are more forgiving (and pull big
+  public datasets from a cloud-native mirror, e.g. the AWS S3 1000 Genomes mirror, not a slow FTP/HTTPS origin).
+
+CPU classic is **not** quota-blocked on the workshop (only GPU classic is), so classic-CPU for these tasks is fine.
+
+### Step 5: Wire into the parent module deploy/destroy scripts
+
+Edit `modules/<module>/deploy.sh`:
+```bash
+for module in existing_model/existing_v1 mymodel/mymodel_v1
+```
+
+Edit `modules/<module>/destroy.sh`:
+```bash
+for module in existing_model/existing_v1 mymodel/mymodel_v1
+```
+
+## Adding a New UI Workflow
+
+### Step 1: Add endpoint mapping
+
+In `modules/core/app/backend/app/services/endpoints.py`, add to `_MODEL_ENDPOINT_MAP`:
+```python
+"MyModel Display Name": "mymodel",
+```
+
+The key must match what you pass to `hit_model_endpoint()` or `get_endpoint_name()`. Case-sensitive.
+
+### Step 2: Add endpoint wrapper function
+
+For protein studies, add to `modules/core/app/utils/protein_design.py`:
+```python
+@mlflow.trace(span_type="LLM")
+def hit_mymodel(input_data):
+    return hit_model_endpoint('MyModel Display Name', [input_data])[0]
+```
+
+For single cell, create utility functions in a dedicated file (e.g., `utils/scimilarity_tools.py`).
+
+For endpoints with complex input schemas (not just a list), call the SDK directly:
+```python
+response = workspace_client.serving_endpoints.query(
+    name=endpoint_name,
+    inputs=[{"field1": value1, "field2": value2}],  # Always use inputs=
+)
+```
+
+### Step 3: Add a FastAPI route
+
+Pick the right router under `modules/core/app/backend/app/routers/` (one of
+`large_molecule.py`, `small_molecule.py`, `single_cell.py`, `genomics.py`).
+Define your request/response models with Pydantic and add a `@router.post`
+or `@router.get` handler:
+
+```python
+class MyWorkflowRequest(BaseModel):
+    sequence: str = Field(..., min_length=1)
+
+class MyWorkflowResponse(BaseModel):
+    result: str
+    viewer_html: str | None = None
+
+@router.post("/my_workflow", response_model=MyWorkflowResponse)
+def my_workflow(payload: MyWorkflowRequest, _: CurrentUserDep) -> MyWorkflowResponse:
+    w = WorkspaceClient()  # app SP for endpoint calls; OBO tokens lack model-serving scope
+    try:
+        result = hit_mymodel(w, payload.sequence)
+    except Exception as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"MyModel call failed: {e}")
+    return MyWorkflowResponse(result=result)
+```
+
+For long-running operations that should stream stage progress to the UI,
+return a `StreamingResponse(stream_with_progress(work), media_type="text/event-stream", headers=_SSE_HEADERS)`
+instead — the existing `protein_design_stream`, `binder_design_stream`, and
+`diffdock_stream` handlers are good copy-paste references.
+
+### Step 4: Add a React tab component
+
+Create `modules/core/app/frontend/src/components/MyWorkflowTab.tsx`:
+
+```tsx
+import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
+
+export function MyWorkflowTab() {
+  const [sequence, setSequence] = useState('')
+  const run = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/large_molecule/my_workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sequence }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
+    },
+  })
+
+  return (
+    <div className="space-y-4">
+      <textarea value={sequence} onChange={(e) => setSequence(e.target.value)} />
+      <button onClick={() => run.mutate()} disabled={run.isPending}>Run</button>
+      {run.data && <pre>{run.data.result}</pre>}
+    </div>
+  )
+}
+```
+
+### Step 5: Add the tab to the page
+
+Open the relevant page under `modules/core/app/frontend/src/pages/` (e.g.
+`LargeMolecule.tsx`). Add an `import` and a new entry to the `tabs={[…]}`
+prop on `<Tabs>`:
+
+```tsx
+import { MyWorkflowTab } from '@/components/MyWorkflowTab'
+…
+<Tabs
+  tabs={[
+    …existing tabs…,
+    { id: 'my_workflow', label: 'My Workflow', content: <MyWorkflowTab /> },
+  ]}
+/>
+```
+
+## UI Patterns to Follow
+
+### Mol* 3D viewer
+The backend builds the viewer HTML and the frontend mounts it via
+`<iframe srcDoc={viewerHtml} />` or `dangerouslySetInnerHTML`. Use the
+existing helper:
+
+```python
+from app.services.molstar import molstar_html_multibody, molstar_html_singlebody
+
+viewer_html = molstar_html_singlebody(pdb, name="My prediction", with_iframe=False)
+# return viewer_html in the response model
+```
+
+### Realtime progress (SSE)
+For workflows that take more than ~5 seconds, expose a `/stream` endpoint
+and consume it from the React tab via `useSSE` (see `useSSE.ts`). The
+backend uses `stream_with_progress` which adapts a regular work function
+into stage events. The frontend's `<RealtimeProgress>` component renders
+the progress bar + per-stage messages.
+
+### Search past runs
+Mirror the existing patterns in `RunSearchSection.tsx`. The backend offers
+`/<workflow>/search?by=run_name|experiment_name&text=...` and the React
+component handles paging + the dialog that renders the View result.
+
+### React Query keys
+Use `[<module>, '<feature>', <subkey>]` as the queryKey, e.g.
+`['large_molecule', 'sequence_search', 'organism']`. Keep them stable so
+cache invalidation works across navigation.
+
+### Popovers, dropdowns, and modals — reuse, don't hand-roll (hard rule)
+Never write per-component "close on outside click / Esc" logic. There are
+shared primitives — use them so the behavior is correct and fixed in one place:
+
+- **Modals / full-screen dialogs** → `Dialog` (`Dialog.tsx`) or `Drawer`
+  (`Drawer.tsx`). They own the backdrop + Esc.
+- **Lightweight popovers / dropdowns** (e.g. `ClipboardPaste`,
+  `GeneResolveInput`) → the **`useOutsideDismiss(insideRefs, onClose, enabled)`**
+  hook (`hooks/useOutsideDismiss.ts`). Pass the **button + panel** refs, NOT a
+  wrapper:
+
+  ```tsx
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  useOutsideDismiss([btnRef, panelRef], () => setOpen(false), open)
+  return (
+    <div className="relative inline-block">
+      <button ref={btnRef} onClick={() => setOpen(o => !o)}>…</button>
+      {open && <div ref={panelRef} className="absolute …">…</div>}
+    </div>
+  )
+  ```
+
+**Why these exact choices (each fixed a real bug):**
+1. **Anchor to the button + panel, never the wrapper.** A wrapper div can stretch
+   to its flex/row width, so `wrapper.contains(click)` is true for clicks far
+   away → the popover never closes. The button and panel are content-sized.
+2. **Capture-phase `pointerdown`** (not bubble `mousedown`): a bubble listener can
+   be silently blocked by an ancestor's `stopPropagation()` (outside-click stops
+   closing it, only Esc works).
+3. **Never** use a `fixed inset-0` backdrop on a non-modal popover — if it sticks
+   it blocks all page interaction.
+
+The hook bakes in all three; copying the logic per page re-introduces them.
+
+## Model Categories
+
+When registering models, use the correct `ModelCategory`:
+- `ModelCategory.LARGE_MOLECULE` — protein structure/design models
+- `ModelCategory.SINGLE_CELL` — single cell genomics models
+- `ModelCategory.SMALL_MOLECULE` — drug discovery models
+- `ModelCategory.GENOMICS` — variant calling / GWAS / VCF ingestion / annotation models
+
+## Instructions
+
+1. When a user wants to add a new model, walk them through the 5-step process above.
+2. Emphasize: always pre-load in `load_context()`, always `model.float()`, always small input_example.
+3. For endpoint input format issues, check `_MODEL_ENDPOINT_MAP` case sensitivity and use `inputs=` (never `dataframe_split=`).
+4. For UI, follow the module's existing pattern — separate workflow files with `render()` functions.
+5. Always add the endpoint mapping in the endpoint map in `services/endpoints.py` before the UI can call it.
+6. Test the model locally (dry-load + predict) before registering in UC.
+
+## When to Use This Skill
+
+- User wants to add a new biological AI model to Genesis Workbench
+- User wants to create a new UI workflow or tab
+- User asks about the model registration pipeline or deployment pattern
+- User needs to understand how endpoints are wired to the UI
+- User is extending an existing module with a new sub-module

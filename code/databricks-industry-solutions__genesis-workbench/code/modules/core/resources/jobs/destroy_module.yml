@@ -1,0 +1,37 @@
+resources:
+  jobs:
+    destroy_module_job:
+      name: dbx_gwb_destroy_module_job
+
+      email_notifications:
+        on_failure:
+          - ${var.current_user}
+
+      tasks:
+        - task_key: destroy_module_task
+          disable_auto_optimization: true
+          notebook_task:
+            notebook_path: ../../notebooks/destroy_module.py
+          max_retries: 0 
+
+      environments:
+        - environment_key: default
+          spec:
+            client: '4'
+
+      max_concurrent_runs: 2
+
+      parameters:
+        - name: catalog
+          default: ${var.core_catalog_name}
+        - name: schema
+          default: ${var.core_schema_name}
+        - name: sql_warehouse_id
+          default: ${var.sql_warehouse_id}          
+        - name: module
+          default: 'none' 
+        - name: destroy_user_email
+          default: a@b.com
+      
+      tags: ${var.common_resource_tags}
+

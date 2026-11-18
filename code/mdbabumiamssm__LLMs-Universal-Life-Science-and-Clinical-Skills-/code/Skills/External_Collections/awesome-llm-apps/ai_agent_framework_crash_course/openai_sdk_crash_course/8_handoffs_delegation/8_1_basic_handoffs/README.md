@@ -1,0 +1,91 @@
+<!--
+# COPYRIGHT NOTICE
+# This file is part of the "Universal Biomedical Skills" project.
+# Copyright (c) 2026 MD BABU MIA, PhD <md.babu.mia@mssm.edu>
+# All Rights Reserved.
+#
+# This code is proprietary and confidential.
+# Unauthorized copying of this file, via any medium is strictly prohibited.
+#
+# Provenance: Authenticated by MD BABU MIA
+
+-->
+
+# Basic Handoffs
+
+Demonstrates fundamental agent-to-agent task delegation using the OpenAI Agents SDK handoff system.
+
+## 🎯 What This Demonstrates
+
+- **Agent Handoffs**: Simple task delegation between specialized agents
+- **Automatic Tool Creation**: Handoffs automatically create transfer tools
+- **Triage Patterns**: Intelligent routing based on request type
+- **Specialized Agents**: Different agents for billing and technical support
+
+## 🚀 Quick Start
+
+1. **Install OpenAI Agents SDK**:
+   ```bash
+   pip install openai-agents
+   ```
+
+2. **Set up environment**:
+   ```bash
+   cp ../env.example .env
+   # Edit .env and add your OpenAI API key
+   ```
+
+3. **Run the agent**:
+   ```python
+   import asyncio
+   from agent import main
+   
+   # Test basic handoffs
+   asyncio.run(main())
+   ```
+
+## 💡 Key Concepts
+
+- **Handoff Definition**: Adding agents to the `handoffs` parameter
+- **Tool Generation**: Automatic creation of `transfer_to_*` tools
+- **Agent Specialization**: Different expertise areas for different agents
+- **Intelligent Routing**: LLM decides which agent to transfer to
+
+## 🧪 Available Examples
+
+### Billing Agent Handoff
+- "I was charged twice for my subscription"
+- "Can you help me get a refund?"
+- "What are my payment options?"
+
+### Technical Support Handoff
+- "My app keeps crashing"
+- "I can't upload photos"
+- "The app won't load"
+
+### No Handoff Needed
+- "What are your customer service hours?"
+- "How do I contact support?"
+- "What services do you offer?"
+
+## 💻 Agent Architecture
+
+```python
+# Specialized agents
+billing_agent = Agent(name="Billing Agent", instructions="Handle billing issues")
+technical_agent = Agent(name="Technical Support Agent", instructions="Handle technical issues")
+
+# Triage agent with handoffs
+triage_agent = Agent(
+    name="Customer Service Triage Agent",
+    handoffs=[billing_agent, technical_agent]  # Creates tools automatically
+)
+```
+
+## 🔗 Next Steps
+
+- [Advanced Handoffs](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-apps/ai_agent_framework_crash_course/openai_sdk_crash_course/8_handoffs_delegation/8_2_advanced_handoffs/README.md) - Custom configuration and callbacks
+- [Tutorial 9: Multi-Agent Orchestration](https://github.com/mdbabumiamssm/LLMs-Universal-Life-Science-and-Clinical-Skills-/blob/HEAD/Skills/External_Collections/awesome-llm-apps/ai_agent_framework_crash_course/openai_sdk_crash_course/9_multi_agent_orchestration/README.md) - Complex workflows
+
+
+<!-- AUTHOR_SIGNATURE: 9a7f3c2e-MD-BABU-MIA-2026-MSSM-SECURE -->

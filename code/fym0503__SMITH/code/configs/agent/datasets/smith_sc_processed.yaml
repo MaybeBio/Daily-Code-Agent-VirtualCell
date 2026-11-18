@@ -1,0 +1,13 @@
+id: smith_sc_processed
+path: data/smith/SC_dataset_processed.h5ad
+description: Single-cell reference dataset used in SMITH panel-selection examples.
+species: homo_sapiens
+tissue: brain
+modality: scRNA-seq
+tasks:
+- classification
+- regression
+aliases:
+- sc_processed
+metadata:
+  data_status: external_not_packaged

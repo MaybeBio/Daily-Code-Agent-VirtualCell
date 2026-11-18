@@ -1,0 +1,517 @@
+# Current project status
+
+Last updated 2026-11-14. This page says where Liatir stands and what comes next. How each piece got
+here is in the [status log, July to September 2026](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/status-log-2026-07-to-2026-09.md)
+and in the plans under `history/`; the readiness of each product area, with its evidence, is in
+[Beta 1 readiness](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/beta-readiness.md).
+
+## Active implementation
+
+**Liatir 1.0.0 workbench** — authorized 2026-11-11, on `main` since 2026-11-13 and
+**published for macOS and Linux on 2026-11-14** (GitHub release v1.0.0 and the update feed);
+the MSIX is handed to the owner for Partner Center. Evidence: the
+[1.0.0 release checkpoint](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md#100-release-checkpoint-2026-11-13). Plugins are shared across workspaces (existing IDs kept);
+Python Scripts stay workspace-owned with mandatory SDK I/O validation, direct and
+pipeline execution and independent copies; seven simulation presets; Quenta's
+16 GB/32 GB profiles (download only on choice) and Quenta's **Stage** mode: a chat beside
+a live Stage, where the model fills in a page document (one scrolling page of sections,
+45 element types, numbers read from the Results' tables) that the Stage kit draws —
+React, shadcn/ui, Chart.js, Tailwind — downloadable as HTML; see
+[Stage pages are documents](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/stage-pages-are-documents-not-code.md).
+Direct runs survive a workspace switch; leaving with a running pipeline asks first.
+Root version 1.0.0, release notes in `docs/release-notes-v1.md`. Verify, Rust and
+UI gates pass (one cold-start test flake, passing on rerun). After a measured
+comparison the owner kept `qwen3.5:9b` for the 16 GB profile instead of
+`gemma4:12b`; the 32 GB profile is `qwen3.8:27b`. Excluded: long-workflow
+validation. Evidence: [implementation ledger](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/liatir-1.0.md).
+
+**Next (owner, 2026-11-12):** write and carry out the
+[shadcn migration of the app](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/shadcn-ui.md) with shadcn-svelte.
+
+**Scientific Simulation Suite** — the owner asked on 2026-11-03 for a local, validated suite of
+molecular docking and virtual screening (AutoDock Vina, RDKit, Meeko, PDBFixer, Ringtail), neural
+pose scoring (GNINA), trajectory and interaction analysis (MDAnalysis, ProLIF), biochemical networks
+(PySB, BioNetGen), metabolic modeling (COBRApy) and multicellular simulation (PhysiCell), Linux and
+Windows through WSL2 only, developed entirely inside WSL2. The canonical plan, verified versions,
+box boundaries, blockers and progress are in the
+[Scientific Simulation Suite plan](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/scientific-simulation-suite.md). Phase 1 (feasibility)
+is complete. Phase 2: the `molecular-docking` box (Vina, Meeko, PDBFixer, Ringtail, RDKit) is built,
+scientifically validated on a development-signed build — imatinib redocks within 0.4 Å of the 1IEP
+crystal pose — integrated as Receptor Preparation, Molecular Docking and Docked Complex, all three of
+which passed the real-app lifecycle on native Linux and in the Windows app through WSL2. Phase 3: the
+`molecular-analysis` box (MDAnalysis, ProLIF) is scientifically validated the same way — its measures
+match an independent computation to 5 × 10⁻⁵ Å and ProLIF's 61 official test vectors pass — and
+integrated as Trajectory Analysis and Interaction Fingerprint, which passed the real-app lifecycle on
+native Linux. The whole chain — dock imatinib, take
+the pose to OpenMM on the GPU in explicit water, analyse the trajectory — passes, with the crystal's
+hinge hydrogen bond held in every frame. Phase 4B: the `metabolic-modeling` box (COBRApy with HiGHS,
+confirmed by GLPK) reproduces COBRApy's own published results for E. coli core, settles solver
+disagreements on genome-scale models in exact arithmetic, is integrated as Metabolic Modeling, and
+passed the real-app lifecycle on native Linux.
+Phase 4A: the `biochemical-simulation` box (PySB with BioNetGen) matches the reference solution of
+Robertson's stiff problem, an exact solution and the expected stochastic statistics, refuses a model
+whose reaction network never closes instead of running for hours, and is integrated as Biochemical
+Simulation, which passed the real-app lifecycle on native Linux once Scrollcase 1.5.0 let the box mark
+the programs it unpacks from BioNetGen's release executable (B5, resolved 2026-11-05). Phase 4C: the `physicell` box carries a
+PhysiCell executable Liatir compiles reproducibly for any Linux with glibc 2.17; its runner writes the
+settings PhysiCell runs itself (PhysiCell turns paths in its settings into shell commands), and the
+validator holds cell division, death and substrate decay to the models' own parameters exactly or
+within statistical bounds. It is integrated as Multicellular Simulation, which passed the real-app lifecycle on native Linux. Phase 3, GNINA: the owner decided on 2026-11-04 that Liatir
+never redistributes GNINA; the installer now downloads GNINA's own release asset beside the box and
+verifies it, and the signer signs only on-demand files its policy names. The `gnina` box carries
+the CUDA libraries the binary needs; GNINA passes its own regression tests on this GPU, agrees with
+itself on the CPU, and in Liatir's 1IEP screen ranks every pose near crystal imatinib above every
+wrong one, where Vina did not. It is integrated as Neural Pose Rescoring, which passed the real-app
+lifecycle on native Linux, and it needs NVIDIA driver 570.26 ([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/gnina-cuda-driver-floor.md)). On 2026-11-05 every suite tool also passed its
+real-app lifecycle in the Windows app through WSL2, GNINA on the GPU. **Published 2026-11-05:**
+all six boxes are released to production on the `beta` channel from `main`, verified from their
+public URLs, and in the product catalog; users receive them with desktop 0.4.0 (below). Runs and
+digests are in the plan's [production releases](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/scientific-simulation-suite.md#production-releases-2026-11-05).
+The WSL2 checkout is `/home/lorenzo/liatir-stack-gate8-mcp`. The owner told the agent on 2026-11-03
+to proceed autonomously without asking for permissions, and authorized every publication step on
+2026-11-05.
+
+**The AI section of the public docs was incomplete and is now complete (2026-11-06).** Reviewing it
+after the 0.4.0 release found that four published surfaces had no page at all: the MHCflurry Class I
+Presentation AI Model, and the MHC-I Epitope Prediction, Structure Prediction and Protein–Ligand
+Affinity AI Tools — the last two described only inside Boltz-2's and Protenix's pages. pVACseq's
+Neoantigen Prioritization Tool Runtime was undocumented too. All five pages are written, every
+overview, the AI guide and the sidebar list them, and
+[conventions](https://github.com/Liatir/liatir-app/blob/HEAD/.context/truth/conventions.md#documentation-surfaces) now require a page per AI Model and AI
+Tool and say which surface each belongs to. This gap predates 0.4.0 — the structure models shipped
+in September — so the release itself is unaffected; the fix is docs-only and needs no new version.
+
+The public docs now explicitly use the owner's supplied cover for link previews on every page,
+through global Open Graph and Twitter card metadata; see
+[documentation conventions](https://github.com/Liatir/liatir-app/blob/HEAD/.context/truth/conventions.md#public-markdown-and-page-actions).
+The image is byte-identical to the supplied PNG and its 1280 × 640 dimensions were checked.
+`syngraphe check` passed. Docs build and `test:verify` were attempted but could not run:
+this checkout has no installed development dependencies (`vitepress` and `tsc` are missing).
+The change has not been published.
+
+**OpenMM CUDA publication** — the owner asked on 2026-10-27 for OpenMM's `linux-x86_64-cuda12.9`
+box to be published, CUDA only, for Linux and for Windows through WSL2. The persistent plan,
+findings, decisions and progress are in
+[OpenMM CUDA publication](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/openmm-cuda-publication.md). The pre-release check found the
+box's NVIDIA driver floor wrong (575.51.03, not 525.60.13 —
+[decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/openmm-cuda-needs-the-cuda-12-9-driver.md)) and the CUDA release evidence
+unable to pass; both are corrected (`f81fef2b`) and rehearsed on this GPU. **It is published on
+`beta` since 2026-10-28** by release run 40622962439, after the owner re-enabled billing on the
+Google Cloud project that holds the signer (it had stopped every Runtime Box release) and after a
+release-workflow gap that would have stopped any release at the product test binary was closed
+(`69c91d20`). Public channel, release signature and archive bytes were verified independently.
+The product now offers Molecular Relaxation and Molecular Dynamics. The Windows rehearsal also
+found that **every Runtime Box installed through WSL2 looked
+broken to the Windows app** since the move to box format version 3: the WSL2 consumer's status
+check read a version 2 field. It is fixed and tested, and the full OpenMM lifecycle then passed in
+the real Windows app through WSL2 on CUDA. The 0.3.0 MSIX carries the old consumer; the 0.3.1
+MSIX (see Desktop release 0.3.1) carries the fixed one and replaces it for Partner Center.
+
+[R and Native Plugin runtimes](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/r-and-native-plugin-runtime-support.md) are implemented
+in implementation commit `aeacb806` and documentation commit `449964c1`: CLI
+scaffolding/build/dev, managed R libraries,
+Native executable variants and permission, complete Plugin bridge access, Jobs and
+mixed-runtime pipeline files use the existing contracts. macOS arm64 validation passed
+all seven verify suites (91 files / 708 unit tests), 119 Rust tests, and all seven
+available UI suites. The ordinary native suite passed 51 cases, including the three
+new subprocess/pipeline cases. Linux/Windows execution remains unverified here; R
+requires a compatible local installation. See the plan and
+[decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/r-and-native-plugin-processes.md) for checkpoints and limits.
+The documentation follow-up integrates R and Native throughout the common public
+Plugin guides, the CLI README and Quenta's generated documentation corpus. The
+public site build, executable/compiled examples and all seven verify suites
+passed (708 unit tests); evidence is recorded in the same plan.
+The reviewed branch was integrated into local `main` at `e7f6a929`, including
+introductory/support pages. The owner then clarified that all runtimes must share
+the same documentation structure: the separate combined runtime page is removed,
+with its dependency, executable and transport details moved into the existing
+setup, format and bridge guides. The shared contract remains unchanged.
+Compiled-language API examples now use `Native/WASM` with nested Rust/C++ tabs,
+a short compatibility notice and an explicit Native-only bridge distinction.
+C++ authoring now uses a CLI-managed SDK: `liatir init --native --cpp` and
+`--wasm --cpp` supply contract/validation headers and a CMake project. Builds
+refresh the library and reuse existing extraction, packaging, bridge and Results
+contracts. Documentation names only supplied languages (JavaScript/TypeScript,
+Python, R, Rust and C++). Rust defaults, the shared I/O contract and app startup
+prerequisites remain unchanged. Final verify passed all seven suites (92 unit
+files / 718 tests), both docs sites build, and two new native desktop scenarios
+passed, including a C++ Native -> WASM file pipeline. Native host signoff here
+is macOS arm64; the plan records the remaining platform/release boundaries.
+On 2026-10-26 the owner authorized pushing all current `main` commits to
+`origin/main`. Desktop and npm releases remain separate actions.
+
+## Desktop release 0.4.0
+
+**0.4.0 is published for macOS and Linux** since 2026-11-06, explicitly authorized by the owner:
+[public release](https://github.com/Liatir/liatir-releases/releases/tag/v0.4.0), built by
+[run 42138532598](https://github.com/Liatir/liatir-app/actions/runs/42138532598) at
+`e7b089f86f73d090c535030ef8842127ce82072d`. It ships the Scientific Simulation Suite. Local verify
+passed all seven suites (104 files / 798 tests); both updater signatures, macOS notarization and
+tickets, all seven public digests and the live feed bytes were verified. The macOS job needed three
+attempts: stapling failed on a dropped connection to Apple, and Tauri ignores a failed staple of the
+app, so one green build had no ticket. The release script now checks it. The MSIX
+`Liatir_0.4.0_x64.msix` (version `0.4.0.0`, SHA-256 `c6a990da…`) carries the WSL2 consumer built by
+that run, which GNINA's install needs; the owner uploads it to Partner Center. Neither the MSIX on
+Windows nor a suite box from the released app was tested. Details in the
+[release ledger](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md).
+
+## Desktop release 0.3.1
+
+**0.3.1 is published for macOS and Linux** since 2026-10-28, explicitly authorized by the owner:
+[public release](https://github.com/Liatir/liatir-releases/releases/tag/v0.3.1), built by all five
+jobs of [run 40683744337](https://github.com/Liatir/liatir-app/actions/runs/40683744337) at
+`11215878a412da8bd18b1bfcf8c8d8bc0f923241`. It ships the OpenMM Tool Runtime and, for Windows,
+the corrected WSL2 consumer. Local verify passed all seven suites (92 files / 718 tests); both
+updater signatures, macOS notarization, all seven public digests and the live feed bytes were
+verified. The MSIX `Liatir_0.3.1_x64.msix` (version `0.3.1.0`, SHA-256 `109951e5…`) carries a
+consumer byte-identical to the run's Native Tools artifact, with no version 2 field; the owner
+uploads it to Partner Center. Its Runtime Box behaviour inside the MSIX container was not tested
+(no Windows machine in that session). Details in the
+[release ledger](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md).
+
+## Desktop release 0.3.0
+
+**0.3.0 was published for macOS and Linux**, explicitly authorized by the owner on
+2026-10-27: [public release](https://github.com/Liatir/liatir-releases/releases/tag/v0.3.0).
+All five jobs in [run 40425839349](https://github.com/Liatir/liatir-app/actions/runs/40425839349)
+passed at app revision `622647f806a52bb71de88dafff94d0212ceb4600`. Both updater
+signatures, macOS signing/notarization and the Store package identity were independently
+verified. All seven public download sizes and GitHub digests match the local files;
+the public homepage shows 0.3.0. The two-platform updater feed is live, read back
+byte-for-byte against the generated file and the R2 object with `no-cache`.
+
+The first attempt exposed a clean-checkout test prerequisite; `test:unit` now builds
+core before plain-Node spec-loading checks. The failure and regression guard were
+observed before the fix; corrected local verify passed all seven suites (92 files /
+718 tests, report `2026-10-27T00-20-01-927Z`). Package builds also passed their verify
+gates on every platform. No heavy AI/GPU workflow was run.
+
+The verified `Liatir_0.3.0_x64.msix` (version `0.3.0.0`) was prepared for Partner Center, but
+it carries the WSL2 consumer whose status check fails for every Runtime Box (found 2026-10-27,
+see Active implementation); it must not be submitted — 0.3.1 replaces it.
+Store submission/certification remains manual: no integration or credentials for
+that action are configured here. This desktop release did not publish npm packages;
+the subsequent Plugin npm release is recorded below. Clean-machine install/update and other-host runtime execution
+signoff are still open. See the [release ledger](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md).
+
+## Plugin npm release 1.10.0
+
+**`@liatir/api` and `@liatir/cli` 1.10.0 are published** on the public npm
+registry with `latest=1.10.0`, publisher `suffro`, explicitly authorized by the
+owner on 2026-10-27. The package versions, lockfile identity fields and Node
+scaffold dependency ranges are synchronized in commit `42e59dec`. Desktop
+version 0.3.0 and the shared Plugin contract are unchanged.
+
+The release dry run passed with all managed SDK assets, including R and C++.
+The full verify gate also passed (report `2026-10-27T01-10-52-641Z`, seven suites,
+718 unit tests). After the owner requested fewer checks, no further tests or CI
+were run: the final check read back both public package identities, latest tags,
+publisher and tarball hashes. An initial account-permission failure was resolved
+when the owner requested retrying with `suffro` after updating access; npm's
+browser confirmation and subsequent asynchronous publication completed for both.
+See the [runtime plan](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/r-and-native-plugin-runtime-support.md).
+
+## Website sharing
+
+The owner requested complete removal of the third-party sharing widget. The
+public site now uses its own accessible floating button and the browser's native
+OS share sheet, with an explicitly labeled clipboard action when that API is
+unavailable. Native cancellation leaves the clipboard untouched. The external
+script, old component and vendor styles are removed; mobile keeps the control.
+Both site builds and all seven verify suites pass (709 unit tests), report
+`2026-10-26T20-18-44-392Z`. Browser checks cover native API invocation from a
+trusted click, current title/URL after navigation, duplicate clicks, cancellation,
+errors, explicit clipboard behavior and mobile visibility. No ShareThis request
+or reference remains in the built site. Headless tests substitute the browser
+share API; an actual OS dialog was not opened by automation. Syngraphe passes.
+
+## Where Liatir stands
+
+The release-blocking product scenarios in
+[Beta 1 readiness](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/beta-readiness.md) are covered by native automated tests against a
+real compiled app — pipelines, Jobs, Results and provenance, Native Tools, Plugins, API Connectors,
+Nextflow, Local MCP and the AI Models — with the platforms each one covers listed there. What stands between the app
+and complete platform signoff is the [signed public distribution gate](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md).
+macOS and Linux 0.3.0 are already publicly distributed; clean-machine installation,
+real signed update evidence and Store certification remain open in that gate.
+
+**Thirteen Runtime Box targets across eight components are on the public `beta` channel** —
+AI Models plus the pVACseq and OpenMM Tool Runtimes — all Scrollcase v3, KMS-signed and with
+retained release evidence under `runtime-boxes/evidence/`:
+
+| Component | Published targets |
+| --- | --- |
+| Geneformer V1 10M | `macos-aarch64-metal`, `linux-x86_64-cuda12.9` |
+| scGPT whole-human | `macos-aarch64-metal`, `linux-x86_64-cpu`, `linux-x86_64-cuda12.9` |
+| UCE 4-layer | `macos-aarch64-metal` |
+| MHCflurry class I presentation | `macos-aarch64-metal`, `linux-x86_64-cpu` |
+| pVACseq | `macos-aarch64-cpu`, `linux-x86_64-cpu` |
+| Boltz-2 | `linux-x86_64-cuda12.9` |
+| Protenix base v1.0.0 | `linux-x86_64-cuda12.6` |
+| OpenMM 8.5.1 (Tool Runtime) | `linux-x86_64-cuda12.9` |
+
+Every Linux target also serves Windows through WSL2; there are no native Windows targets
+([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/no-native-windows-runtime-box-targets.md)). `runtime-boxes/catalog.json`
+is the source of truth for the exact releases and runs.
+
+The Scrollcase v3 migration is closed: the app reads only v3 since `2ea19a7`, every published box
+was republished as v3 (2026-09-24 to 2026-09-26), and the 127 stale v2 objects, about 215 GB, were
+deleted from R2 on 2026-09-27 — see [Scrollcase v3 adoption](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/scrollcase-v3-adoption.md).
+
+## Completed scientific showcase
+
+The [single-cell foundation-model study](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/liatir_single_cell_showcase_codex_plan.md)
+is complete with two documented UCE blockers: its original Mac checkpoint
+exceeded the then-approved 2 GiB cap, and the PC has no published signed Linux
+target. All ten feasible configurations ran through real native Liatir on the
+complete PBMC (11,990 cells) and pancreas (16,382 cells) datasets. Nine Mac
+representations and their original costs were reused byte for byte; only unfinished
+pancreas scGPT inference ran anew on the explicitly approved RTX 4060 Ti profile,
+six threads / batch 16, guarded 16 GiB RAM / 6 GiB whole-GPU memory, zero workload
+swap. It completed in 515.536567396 seconds; whole-GPU peak was 4,799,332,352
+bytes. The new CUDA checkpoint contains all 16,382 cells. Real interruption/resume
+and changed-identity/guard refusal passed before full inference. Historical Mac
+interruption and the separate 2,066-cell PC CPU checkpoint remain attached.
+
+The twelve-row tables, all biological/batch/compute measurements, 22 reviewed
+figures and [measured report](https://github.com/Liatir/liatir-app/blob/86a4542a2554032c8d1f79d6f07ef855e07af712/showcases/single-cell-foundation-benchmark/report/results.md)
+are tracked. Independent metric reproduction passed at 1e-9 / 1e-8 tolerances;
+canonical count/split checks were exact. The final seven-gate verify passed
+87 unit files / 676 tests, and all 18 scientific regressions passed. Three relevant
+native UI suites passed: ordinary native 48/0/32 explicit platform/heavy skips,
+plus signed-index and two-process restart checks. The actual virtual Linux app
+used its authorized development frontend; this is WSL2 native verification,
+rather than a Windows release/package gate.
+
+The complete portable export is in both checkouts' ignored showcase
+`transfer/completed-study-final-wsl2-2026-10-05`. All 382 copied files were
+SHA-256 verified, and the portable tools validated the actual Windows ZIP,
+405,019,914 bytes, SHA-256
+`184475f893e7f23efd24d095dccaccac8deefb79a525c0c7aa3d55a193f06de3`.
+See [completion evidence](https://github.com/Liatir/liatir-app/blob/86a4542a2554032c8d1f79d6f07ef855e07af712/showcases/single-cell-foundation-benchmark/validation/completed-study/completion.json),
+[tested reproduction](https://github.com/Liatir/liatir-app/blob/86a4542a2554032c8d1f79d6f07ef855e07af712/showcases/single-cell-foundation-benchmark/report/reproduction-validation.md)
+and the [closed execution record](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/single-cell-showcase-wsl2-execution.md).
+Study completion on 2026-10-05 performed no paid job, GPU CI, new target
+publication, release or remote push. On 2026-10-06 the user explicitly authorized
+publishing all completed study commits to
+`origin/handoff/single-cell-wsl2-2026-10-05`. The pending root ignore rules for the
+original Mac archive and directory now use Git's forward-slash paths. Scientific
+results and their validated portable ZIP remain unchanged. The full ignored
+export is the recommended complete backup; its ZIP suffices for inspecting and
+reproducing the measured scores. The separate canonical source cache exists
+only in the Linux checkout and is needed for offline original-source checks.
+The regular push succeeded and the remote revision was verified as
+`0688d0be9f25a51b1857f84563038bbd4c55df03`, including the scientific completion
+commit `86a4542a2554032c8d1f79d6f07ef855e07af712`. This verification receipt is
+published by the following context-only commit on the same branch.
+
+The study now has an official public **Scientific Showcases** section, with an
+[overview](https://liatir.com/showcases/overview) and
+[study page](https://liatir.com/showcases/single-cell-foundation-benchmark), first-class
+navigation and machine-readable indexes. The root README and
+[technical package navigation](https://github.com/Liatir/liatir-app/blob/main/showcases/single-cell-foundation-benchmark/README.md)
+link the owner-supplied [Zenodo archive DOI](https://doi.org/10.5281/zenodo.23187931).
+The approximately 1.8 GB external archive is separate from the original 405 MB
+scientific ZIP; no upload or scientific rerun was performed. All 412 protected
+scientific files stayed byte-identical. Public docs build and all seven repository
+verify suites passed, including 87 unit files / 676 tests. On 2026-10-06 the owner
+explicitly authorized committing and pushing the integration. Commit
+`9e2f5c0142778c4c7358ffd81aa1a07c6969c296` was pushed to
+`origin/handoff/single-cell-wsl2-2026-10-05` and the remote branch hash was verified.
+On the same date the owner authorized merging the full handoff into `main`.
+The fast-forward merge brought all 14 handoff commits into `main` without conflicts
+or changes to the validated source and scientific results. Website deployment is
+not claimed.
+Showcase reproduction guidance follows the visual Liatir workflow through AI
+Models, Tools, Jobs and Results, using general stages rather than detailed button
+sequences. Terminal and developer setup instructions were removed from the user
+reproduction path; frozen scientific source and validation evidence are retained.
+See the [integration record](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/single-cell-showcase-docs-integration.md).
+
+## Public homepage DNA preview integration
+
+On 2026-10-07 the owner supplied the authoritative HTML preview after rejecting
+the earlier homepage artwork. `docs/.vitepress/theme/HeroDna.vue`
+ports its drawing geometry, fading and mouse response:
+58 nodes and 3.1 turns in the full model. The owner subsequently authorized the desktop composition
+with text on the left and one larger helix on the right, which is now applied;
+the second helix is removed. Enlargement scales the vertical span, line widths
+and dots by the same factor as the radius, so fewer turns are visible without
+flattening the helix and the lines are thicker. At widths of 768 pixels and
+above, the owner's refinement adds 25% vertical development and a 10-degree
+tilt around the helix center. Base-pair lines retain the 40% thickness increase;
+both strand backbones and dot diameters are now doubled relative to that
+refinement, as explicitly requested. The owner approved this appearance and
+requested the same proportions, tilt, strand thickness and dot sizing on tablets.
+The existing grid is retained and the old moving blocks are replaced. Homepage
+text, logo and site navigation are preserved.
+The owner accepted the integration and requested a constant slow
+rotation and monochrome artwork in the brand color. All strands, base pairs and
+glows now read `--vp-c-brand-1`; rotation is 0.25 radians per second (about 25
+seconds per turn), independent of screen refresh rate, with no mouse-triggered
+acceleration. The remaining mouse response and reduced-motion behavior are
+retained. The owner's mobile readability refinement now removes the DNA canvas
+entirely at widths up to 767 pixels and pauses its drawing and animation there;
+this supersedes the initial 7% opacity. Text stays centered on mobile; only the
+hero status row's GitHub link and its separator are hidden at that breakpoint.
+The Plugins card, "Can be extended endlessly", now uses the puzzle-piece icon in
+`docs/.vitepress/theme/HomeIcon.vue`, selected by
+[home content](https://github.com/Liatir/liatir-app/blob/HEAD/docs/.vitepress/theme/home-content.ts). The API connectors
+card retains its plug icon; the owner's existing card copy is preserved.
+Keep future artwork changes faithful to the supplied design and these accepted
+refinements. No tests, builds or browser checks were run, as requested.
+
+## What is open, in order
+
+1. **Signed distribution** — [the release gate](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md), in
+   progress for `0.1.0` ([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/desktop-distribution-channel.md)): updates from
+   `updates.liatir.com` (R2 bucket `liatir-updates`) for macOS and Linux, downloads from the public
+   `Liatir/liatir-releases` repository, Windows only through the Microsoft Store. The app checks for
+   a newer version at startup and offers it in a notice. The bundled Native Tools are signed and
+   notarized inside their box with Scrollcase 1.4.0. **0.1.0 is published** for macOS
+   and Linux (release `v0.1.0`, feed live). The public site (`docs/`) has a Download page (`/download`)
+   that reads the latest release from GitHub; the waiting list was removed on 2026-09-29, and the
+   `liatir-mailing-list` D1 database, still holding its subscribers, was left untouched. Open: the Store submission, proof that Runtime Boxes
+   work inside the MSIX container, and a real A-to-B update with 0.1.1.
+   **0.1.1, published for macOS and Linux on 2026-10-01, fixes these 0.1.0 defects** (all three
+   platforms now build on GitHub Actions, macOS signed and notarized there). First, the 3D Structure and trajectory viewers are blank under the production security
+   policy, and the JBrowse genome viewer never started anywhere, because it could reach neither Web
+   Storage nor local files from its sandbox
+   ([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/viewers-run-in-a-static-sandbox-host-page.md)). The genome viewer now has
+   native coverage with the real JBrowse (`tests/e2e/specs/genome-viewer.e2e.mjs`, network needed for
+   the install). Second, the
+   Single-cell Reference Index shows "unsupported signed single-cell index catalog document". The
+   published catalog still has the v2 envelope, which `2ea19a7` stopped reading. Its signature
+   covers only the payload, so `npm run single-cell-index -- migrate-catalog` republishes it
+   unchanged in the v3 envelope. The admin token exists only in the `runtime-box-production`
+   GitHub environment, so it runs there through `single-cell-index-catalog-migrate.yml`. **Done
+   2026-10-01** (run 36863963482): the catalog at `models.liatir.com` now has the v3 envelope, the
+   same payload (`cb8e66ca…2022d64`) and verifies against the production key, which fixes the page
+   for 0.1.0 installations too.
+   **Neither 0.1.0 nor 0.1.1 can install any Runtime Box**: every published box requires Liatir
+   0.2.1. **0.2.1, published for macOS and Linux on 2026-10-01**, fixes it and is offered as an
+   update to both ([details](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/release-signed-distribution.md)). It also lets the AI
+   Models page offer a Linux CUDA box through WSL2 on Windows: Geneformer showed as unavailable
+   there because the page considered only CPU boxes for WSL2, although the installer already
+   routed CUDA ones. Its MSIX, not the 0.1.1 one, is the one to submit to the Store.
+2. **OpenMM.** `linux-x86_64-cuda12.9` is published (2026-10-28, run 40622962439) — see
+   [OpenMM CUDA publication](https://github.com/Liatir/liatir-app/blob/HEAD/.context/history/openmm-cuda-publication.md). `linux-x86_64-cpu` stays
+   `native-lifecycle-validated` and `macos-aarch64-cpu` `planned`, both deliberately unpublished;
+   earlier evidence is in [Phase 3 implementation status](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/phase3-implementation-status.md).
+3. **The partial product areas** in [Beta 1 readiness](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/beta-readiness.md): the Quenta
+   evaluation against a real local Ollama model, useful Plugin templates, and the structure pages' unexercised paths (the 56-atom warning, local
+   file validation, PAE/PDE output). Also: the Native Tools boxes with the h5repack step single-cell
+   quantification now runs were built, self-tested and signed in CI on 2026-09-28 (run
+   36422000331, both targets); a Linux or Windows package must take the Linux box from that run —
+   see the [single-cell vertical](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/single-cell-rnaseq-vertical.md); and on macOS a wide
+   pipeline sometimes opens unframed, so the pipeline editor's framing test is intermittent there.
+4. **Not built yet**: Protenix v2, which waits on ByteDance publishing its checkpoint
+   ([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/protenix-ships-v1-while-v2-waits.md)); Protenix Mini Default, whose
+   files are public but whose box has not been authored; and the MHCflurry
+   `linux-x86_64-cuda12.9` target, still `planned`.
+5. **Deferred**: Phase 4 of the [integration plan](https://github.com/Liatir/liatir-app/blob/HEAD/.context/state/roadmap/new-ai-models-integration-plan.md),
+   RFdiffusion3 and ProteinMPNN, not started.
+
+One decision is still owed: whether UCE `beta.1`, unselected and v2-incompatible, belongs in the
+revocations.
+
+## Website download click tracking
+
+On 2026-10-12, the owner requested minimal Cloudflare-backed download click counts
+and terminal-only execution. The five final download buttons now send a non-blocking
+POST to the existing Pages site. A single EU-jurisdiction D1 table aggregates UTC
+day, selected button and click count; it stores no visitor identity or individual
+events. Preview deployments omit the production binding. The database identity and
+remote schema have been verified. Production deployment
+`a61178d8-c3fd-4005-96ec-27394c12e389` is active on `liatir.com`; a live POST returned
+204 and incremented the expected D1 row. The single synthetic click was subtracted
+and zero remaining test clicks verified. All seven `test:verify` gates passed
+(88 unit files / 687 tests), as did the public docs build, terminal-driven browser
+checks and Syngraphe. The site was deployed directly from the reviewed working
+tree based on `63bf9f3`. The owner subsequently authorized committing and pushing
+all reviewed changes to `origin/main`. Implementation commit
+`fdc9821022c21cccdb3b387e485ddc0063f43e95` was pushed normally and the exact
+remote branch hash read back. This context-only publication receipt follows it.
+See [implementation and terminal query](https://github.com/Liatir/liatir-app/blob/HEAD/.context/truth/download-click-tracking.md).
+
+## Operational facts still in force
+
+- **Repository context passes Syngraphe 0.4.1's strict check** as of 2026-09-29.
+  The manifest now declares `protocol: repository-context`, and the outdated managed
+  `AGENTS.md` block was refreshed by the CLI after a dry-run plan showed only that patch.
+  Two archived references were corrected to the current AI Model ledger and state path.
+  `syngraphe check --strict` reports no errors or warnings; a second initialization dry run
+  has no operations. Existing context documents and VitePress/static assets were preserved.
+  Public legal links in the internal site now use their public URLs, with repository source
+  paths retained separately. The internal docs build and all seven `test:verify` gates passed
+  (83 unit files / 654 tests).
+- **Public legal pages distinguish Website rules from GNU GPL v3 software rights** as of
+  2026-09-29. Both pages link to the official license; Website content restrictions,
+  feedback, warranty/liability and access termination clauses preserve the applicable
+  software license. Optional analytics and mailing list consent are not conditions for
+  exercising software rights. See [legal page conventions](https://github.com/Liatir/liatir-app/blob/HEAD/.context/truth/conventions.md#public-legal-pages-and-software-licensing).
+  Validation: public docs build and both rendered HTML/Markdown license notices and links
+  passed; all seven `test:verify` gates passed (83 unit files / 654 tests).
+- **Public docs have generated Markdown copies and page actions** as of 2026-09-28:
+  each documentation page offers Markdown Copy/View and Ask an AI; the build generates
+  the copies alongside the existing AI index. Website deployment has not been verified.
+  See [documentation conventions](https://github.com/Liatir/liatir-app/blob/HEAD/.context/truth/conventions.md#public-markdown-and-page-actions).
+  Validation: 65 published pages and their copies checked; ten Markdown generation/HTTP tests;
+  headless browser checks for copy, View, AI prompt URLs, navigation and mobile width; docs build,
+  Pages Functions compilation, and `test:verify` passed (83 unit files / 654 tests, seven gates).
+  On 2026-09-29, the Cloudflare build of `97ee849` was reproduced in an isolated docs-only
+  installation: math rendering needed `markdown-it-mathjax3`, which was declared only at the
+  repository root. The docs manifest now declares it too, with its own lockfile updated.
+  An isolated `npm ci` followed by the full docs build passed after the change, including
+  the Quenta prebuild and all Markdown copies; all seven `test:verify` gates passed.
+  A successful Cloudflare deployment of the dependency fix is still to be verified.
+- **The repositories are `Liatir/liatir-app` and `Liatir/liatir-sdk`** since 2026-09-28 (formerly
+  `liatir-stack` and `sdk`); Runtime Box signing was re-bound to the new name
+  ([decision](https://github.com/Liatir/liatir-app/blob/HEAD/.context/decisions/repository-names.md)).
+- **A Runtime Box release runs on a self-hosted ephemeral runner, one at a time**, through
+  `runtime-box-release.yml`: the Linux targets from the Windows host's WSL2, the macOS targets from
+  the Mac. A runner does not survive its machine sleeping — on the Mac launch it under
+  `caffeinate -dimsu`, lid open, on AC; in WSL2 start it with `setsid nohup … < /dev/null`, because
+  a plain `nohup … &` dies with its `wsl.exe` session. Closing the Liatir window a lifecycle spec
+  opens ends the run.
+- **UCE needs about 20 GB free on the runner**; the release frees its build directory after
+  publication so the lifecycle install fits.
+- **Deleting from R2 by hand needs a current `wrangler login`**: an older token on the Mac lacked
+  R2 access and every delete answered 403. Uploads still go only through GitHub Actions.
+- **On Windows, `test:tauri:prepare` can fail with `EPERM`** while VS Code holds the frontend's
+  native `.node` modules mapped; with the binary current, run the `ui` suites without
+  `tauri-prepare`.
+
+## Standing constraints
+
+- No paid, remote, publishing, or release action from memory — read back the
+  exact workflow, inputs, and revision first (see `AGENTS.md` and the Runtime Box
+  plan's operating rules). GPU runners are manual-only and need explicit cost
+  approval.
+- Keep user-owned roadmap edits out of technical commits.
+- Update this file and the Runtime Box ledger whenever a gate changes state.
+- **Windows path length is a shared budget, and the product owns most of it.** The
+  app spends 84 characters between the app data directory and the box's own tree
+  (`.liatir\.main\data\ai-runtimes\<runtime-id>` plus staging), and a packaged conda
+  environment brings paths over 110 more. A real install of the largest box reaches
+  245 characters for a five-character user name and 258 for an eighteen-character
+  one, against Windows' 260 limit for anything not long-path aware — which includes
+  the box's Python. Shortening that prefix would return thirty characters, but every
+  installed box already lives there, so it is a migration and not a cleanup. Do not
+  answer a MAX_PATH failure by enabling long paths on a machine: that fixes one host
+  and no user.
+- **CPU support per AI Model is not mandatory.** A CPU Runtime Box ships only if
+  the model finishes a realistic reference dataset inside an acceptable wall-clock
+  time. The decision is per-model and based on measured throughput, never on the
+  binary "it runs". If CPU takes hours, the CPU box is not shipped and the UI says
+  the model needs a GPU or Metal. Shipping a technically-working but hours-slow box
+  is a false promise to a non-technical user. Maintainer decision, 2026-07-23; the
+  reference dataset size and the acceptable wall-clock are still to be set.
+- **Scrollcase's maintainer is Liatir's maintainer.** Where a plan says "stop and
+  ask the Scrollcase maintainer", that is an upstream API design conversation with
+  them, not an external blocker. The vendor-neutrality rule still holds: Scrollcase
+  never learns Liatir vocabulary, credentials or policy, and this repository never
+  deep-imports or edits Scrollcase source.
+- **Never assert the shape of a failure before reading its cause.** Install status,
+  job status and install errors are all recorded by the app; on an ephemeral runner
+  they disappear with the job. Read the error, then assert.

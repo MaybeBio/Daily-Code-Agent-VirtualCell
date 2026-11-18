@@ -1,0 +1,283 @@
+---
+name: genesis-workbench-troubleshooting
+description: Troubleshoot common Genesis Workbench deployment failures, model registration errors, serving endpoint issues, and runtime errors across all modules.
+---
+
+# Genesis Workbench Troubleshooting Skill
+
+Diagnose and fix common issues when deploying, registering models, or running workflows in Genesis Workbench.
+
+## Model Registration Failures
+
+### Any module: `AttributeError: module 'numpy._core' has no attribute 'multiarray'` during `log_model`
+**Symptom:** Register job fails inside `mlflow.pyfunc.log_model(...)` → `load_context` → `import lightning` / `import transformers`, with a stack trace ending in either `accelerate/utils/other.py:225` or `accelerate/utils/bnb.py:29` → `np._core.multiarray._reconstruct`.
+**Root cause:** Older `transformers` versions transitively import `accelerate` during module import. DBR 15.x ships `accelerate==1.5.2`, which hits a numpy 2.x API mismatch on `np._core.multiarray._reconstruct`.
+**Wrong fix (do NOT do this):** Pinning a newer `accelerate` (e.g. `accelerate==1.8.1`). The crash still happens, just from a different line in the newer `accelerate/utils/bnb.py` import chain — any `import accelerate` keeps triggering the bug under DBR's numpy.
+**Correct fix:** Pin `transformers>=5.5.0` and do NOT install `accelerate` at all. `transformers==5.5.0` does not transitively import `accelerate` during import, so the crash path is never entered.
+```python
+# in %pip install:
+%pip install -q ... transformers==5.5.0 ...   # NO accelerate
+
+# in conda_env:
+"pip": [..., "transformers==5.5.0", ...]      # NO accelerate
+```
+Cross-check by asking the user for the docker build pip-install log from a known-working serving endpoint of the same model — the `Successfully installed ...` line is the ground-truth version set. That line notably lacks `accelerate` when transformers 5.5.0 is in play.
+Confirmed on 2026-04-20 for `modules/small_molecule/proteina_complexa/proteina_complexa_v1/notebooks/01_register_proteina_complexa.py`. Grep other register notebooks importing `lightning`/`transformers` and apply the same pattern.
+
+### scGPT: RuntimeError mat1 and mat2 must have the same dtype
+**Symptom:** `predict()` fails with `RuntimeError: mat1 and mat2 must have the same dtype` in `F.linear`.
+**Root cause:** Model checkpoint has float16 weights (from GPU training), but `nn.Embedding` outputs float32. The `ContinuousValueEncoder` has `nn.Linear` layers that reject mixed dtypes.
+**Fix:** Call `self.model.float()` after loading weights and before `.to(device)`:
+```python
+self.model.float()  # Force all parameters to float32
+self.model.to(self.device)
+self.model.eval()
+```
+
+### scGPT: ContinuousValueEncoder expects float, not long
+**Symptom:** `F.linear` fails because `value_encoder` receives integer tensor.
+**Root cause:** The `value_encoder` in scGPT is `ContinuousValueEncoder` (with Linear layers), NOT `nn.Embedding`. It expects continuous float expression values, not discrete integer bin indices.
+**Fix:** Pass `torch.float32` tensors to value_encoder:
+```python
+control_tensor = torch.tensor(expression_values, dtype=torch.float32).to(self.device)
+```
+
+### scGPT: ExprDecoder returns dict, not tensor
+**Symptom:** `AttributeError: 'dict' object has no attribute 'squeeze'`
+**Root cause:** The `expr_decoder` returns a dict (e.g., `{"pred": tensor}`) not a raw tensor.
+**Fix:** Extract the tensor from the dict:
+```python
+result = decoder(output)
+if isinstance(result, dict):
+    for key in ("pred", "mlm_output", "output"):
+        if key in result and torch.is_tensor(result[key]):
+            return result[key]
+```
+
+### scGPT: input_example too large or HVG filtering fails
+**Symptom:** Model logging is very slow, or `n_top_genes > number of normalized dispersions` warning followed by errors.
+**Root cause:** input_example has too few genes for HVG filtering (subset_hvg defaults to 1200).
+**Fix:** Use `adata[:10, :1500]` — 10 cells, 1500 genes. Enough genes to survive HVG filtering, small enough for fast logging.
+
+### SyntaxError: invalid character (U+201C or U+201D)
+**Symptom:** `SyntaxError: invalid character '"' (U+201D)` when running notebook.
+**Root cause:** Smart/curly quotes got into the Python code (from copy-paste or AI-generated code).
+**Fix:** Replace all curly quotes with straight ASCII quotes:
+```python
+content = content.replace('\u201c', '"').replace('\u201d', '"')
+content = content.replace('\u2018', "'").replace('\u2019', "'")
+```
+
+## Serving Endpoint Issues
+
+### Model needs torch > 2.7.1 / CUDA > 11.8 (e.g. RFD4-Proteina): ImportError at serving load
+**Symptom:** The model logs + registers fine and generates on the register node (serverless GPU, CUDA 13),
+but the serving endpoint fails to load with `ImportError: cannot import name 'has_static_value' from
+torch.fx.experimental.symbolic_shapes`, `AttributeError: module 'torch.optim' has no attribute 'Muon'`,
+or `libcue_ops.so: libnvrtc.so.13: cannot open shared object file`. The MLflow log warns "current
+2.7.1+cu118, required 2.14.1".
+**Root cause:** STANDARD GPU Model Serving builds a container at DEPLOY time on a fixed **torch 2.7.1+cu118
+(CUDA 11.8)** base, and runs a HARDCODED post-step `conda run -n mlflow-env pip install torch torchvision
+--no-index --find-links=/package-repo/pip-repo` that force-reinstalls torch 2.7.1 over whatever you
+pinned. No `pip_requirements` / `conda_env` / inline `--extra-index-url` trick can override it. So any
+model needing torch > 2.7.1 or CUDA > 11.8 cannot run on the standard serving path.
+**Fix: use Express deployments (`env_pack`)** — they PACKAGE the serverless-GPU notebook env at
+REGISTRATION and RESTORE it identically at serving (no deploy-time rebuild, no force-install), so the
+serving env == your register env. Requires `mlflow>=3.12` + `databricks-sdk>=0.150.0`, registering FROM
+serverless GPU. See `large_molecule/rfd4_proteina` `01_register_*.py` and the Development skill's
+"Serving a torch>2.7.1 / CUDA-13 model via Express" pattern. Key points:
+```python
+# register FROM serverless GPU; log WITHOUT registered_model_name, then register_model separately
+assert torch.cuda.is_available()
+mi = mlflow.pyfunc.log_model(name=model_name, python_model=..., code_paths=[...],
+                             pip_requirements=["mlflow","cloudpickle","pandas","numpy"])  # minimal: env_pack governs serving env
+from mlflow.utils.env_pack import EnvPackConfig
+mv = mlflow.register_model(model_uri=mi.model_uri, name=uc_model_name,
+        env_pack=EnvPackConfig(name="databricks_model_serving", install_dependencies=False))  # False: don't re-resolve git/binary/local-tagged pkgs
+w.serving_endpoints.create_and_wait(..., ServedEntityInput(workload_type=ServingModelWorkloadType("GPU_XLARGE"),
+        workload_size="Small", scale_to_zero_enabled=False), tags=[...])
+```
+`install_dependencies=False` is essential when the env has git/binary/local-tagged wheels (torch
+`+cu132`, nvcc source builds) — the default `True` re-resolves them from an index and fails with
+`No matching distribution`. Express deploys in ~6 min (vs 30-38 min for a standard build). GPU_XLARGE =
+1× H100, us-west-2 + account-team enrolled, no scale-to-zero.
+
+**Migrating an EXISTING model's serving to Express** — see the playbook
+`SKILL_GENESIS_WORKBENCH_EXPRESS_MIGRATION.md` (registration-only; keep `deploy_model`). Serving model-LOAD
+failures you'll hit + fixes:
+- `ImportError: cannot import name X from <pkg>` at model load (env drift): env_pack snapshots the REGISTER
+  kernel, so if the register install leaves deps unpinned while the model's `conda_env` pins them, the LATEST
+  versions get captured and break the import (real case: proteina's unpinned `atomworks` → latest dropped
+  `AtomSelectionStack`). Fix: pin the register install to the `conda_env` versions.
+- `No module named 'mlflow.utils.env_pack'` at `register_model`: a package installed AFTER the `mlflow>=3.12`
+  bump downgraded it (real case: boltz's `dbboltz[gpu]`). Fix: reinstall `mlflow>=3.12` as the LAST `%pip`
+  before `restartPython()`.
+- The service log for a FAILED **pending** deploy is UI-only — CLI `serving-endpoints logs`/`build-logs` key
+  to the ACTIVE config (absent for a never-started deploy) and return "Served entity … does not exist with
+  config version 0". Read the UI service log's `DATABRICKS_MODEL_LOAD_DIAGNOSTIC_V1` line for the exact import.
+- Python-version lock (scimilarity py3.10, genmol py3.11 — pinned deps with no py3.12 wheels): Express can't
+  reproduce it from the serverless-v3+ (py3.12) runtime → leave on standard serving.
+- Compute parity: a model that registers on CPU but serves on GPU (e.g. genmol) can't go Express without
+  moving its register task to serverless GPU (CPU-packaged deps fail to start a GPU endpoint).
+**Gotcha:** the GWB `import_model_from_uc` step runs after a `restartPython()` to the GWB lib (mlflow
+2.22/sdk 0.50) — put it in its own cell, wrap it non-fatal (the endpoint is already live), and do NOT
+reference pre-restart variables (e.g. `endpoint_name`) in post-restart cells → `NameError`. With
+`max_retries` on the task, such a bug becomes a wasteful full-notebook retry storm.
+
+### SCimilarity: Request size cannot exceed 16777216 bytes
+**Symptom:** `Request size cannot exceed 16777216 bytes` when calling GetEmbedding.
+**Root cause:** Sending too many cells in a single request. Each cell has ~18K gene values at ~10 bytes/float in JSON.
+**Fix:** Batch cells into groups of 5 per request:
+```python
+EMBEDDING_BATCH_SIZE = 5
+for batch_start in range(0, total, EMBEDDING_BATCH_SIZE):
+    batch = normed.iloc[batch_start:batch_start + EMBEDDING_BATCH_SIZE]
+    result = get_cell_embeddings(batch)
+```
+
+### SCimilarity: 'dict' object has no attribute 'as_dict'
+**Symptom:** Error when calling SCimilarity endpoints via the Databricks SDK.
+**Root cause:** Passing `dataframe_split=` kwarg to `serving_endpoints.query()`. The SDK only supports `inputs=`.
+**Fix:** Use `inputs=` for all payloads:
+```python
+response = workspace_client.serving_endpoints.query(
+    name=endpoint_name,
+    inputs=payload,  # NOT dataframe_split=
+)
+```
+
+### SCimilarity: NoneType has no attribute 'items' in GetEmbedding
+**Symptom:** `AttributeError: 'NoneType' object has no attribute 'items'` inside the GetEmbedding endpoint.
+**Root cause:** Passing `"null"` as `celltype_sample_obs` JSON. The model calls `pd.read_json("null")` which returns None.
+**Fix:** Pass an empty DataFrame JSON instead of `"null"`:
+```python
+empty_obs = pd.DataFrame(index=normed_df.index)
+obs_json = empty_obs.to_json(orient="split")
+```
+
+### SCimilarity: GetEmbedding expects celltype_subsample format
+**Symptom:** Empty or wrong embeddings returned.
+**Root cause:** The model expects `celltype_sample` as a JSON DataFrame where each row has a `celltype_subsample` column containing a list of expression values — NOT a raw gene-column DataFrame.
+**Fix:** Wrap expression values:
+```python
+dense_rows = normed_df.values.tolist()
+celltype_subsample_pdf = pd.DataFrame(
+    [{"celltype_subsample": row} for row in dense_rows],
+    index=normed_df.index,
+)
+celltype_sample_json = celltype_subsample_pdf.to_json(orient="split")
+```
+
+### Boltz: Missing inputs 'input', 'msa', 'use_msa_server'
+**Symptom:** `Model is missing inputs ['input', 'msa', 'use_msa_server']`
+**Root cause:** Passing a plain sequence string instead of the expected dict format.
+**Fix:** Wrap the sequence in Boltz's expected format:
+```python
+payload = [{
+    "input": f"protein_A:{sequence}",
+    "msa": "no_msa",
+    "use_msa_server": "True",
+}]
+```
+
+### Endpoint model name case sensitivity
+**Symptom:** `Unknown model 'boltz'` or similar.
+**Root cause:** `_MODEL_ENDPOINT_MAP` keys are case-sensitive. `"Boltz"` != `"boltz"`.
+**Fix:** Match the exact case in the map when calling `get_endpoint_name()`.
+
+### SearchNearest takes very long
+**Symptom:** Cell type annotation or similarity search hangs during neighbor search.
+**Root cause:** Too many cells * too many neighbors = thousands of REST calls.
+**Fix:** Reduce defaults: `cells_per_cluster=10`, `k_neighbors=20` is sufficient for annotation. Each search call hits the 23M-cell FAISS index.
+
+## Deployment Optimization
+
+### SCimilarity: 60+ minute download on every deploy
+**Symptom:** wget step takes 60+ minutes every time.
+**Root cause:** No check for existing files — always re-downloads from Zenodo.
+**Fix:** Check for extracted model file before downloading:
+```python
+if os.path.exists(gene_order_path):
+    logger.info("Model already extracted, skipping download")
+    return
+```
+
+### scGPT: Model weights re-loaded on every predict() call
+**Symptom:** First request takes 60-90s, subsequent requests also slow.
+**Root cause:** `torch.load()` called inside `predict()` instead of `load_context()`.
+**Fix:** Pre-load model in `load_context()` and reference `self._loaded_model` in `predict()`.
+
+### GPU nodes used for download/CPU tasks
+**Symptom:** Expensive GPU hours wasted on I/O-bound or CPU-bound tasks.
+**Fix:** Use `cpu_node_type` and `cpu-ml-scala2.12` runtime for wget and GeneOrder job clusters.
+
+## AWS-Specific Issues
+
+### ON_DEMAND not enforced on initial deploy
+**Symptom:** Job clusters use SPOT despite YAML specifying ON_DEMAND.
+**Root cause:** DAB bug on initial deployment.
+**Fix:** Check and fix via CLI:
+```bash
+databricks jobs get <job_id>
+databricks jobs reset --json '<updated_spec>'
+```
+
+### AlphaFold download failures
+**Symptom:** FTP/rsync downloads fail or produce empty files.
+**Root cause:** VPC may block FTP. Figshare/Zenodo may reject non-browser user agents.
+**Fix:** Use HTTPS URLs and `api.figshare.com/v2/file/download/` instead of `ndownloader` URLs.
+
+## UI Issues
+
+### Mol* viewer inconsistent styling
+**Symptom:** Some viewers have dark background, others have white/light background.
+**Root cause:** `molstar_tools.py` was missing the `MOLSTAR_DARK_CSS` that `small_molecule_tools.py` has.
+**Fix:** Add `MOLSTAR_DARK_CSS` to `molstar_tools.py` `<head>` section and standardize viewer div to `width: 100%; height: 500px`.
+
+### destroy.sh fails with "rm: .deployed: No such file"
+**Symptom:** destroy.sh exits with error if module was never deployed.
+**Fix:** Use `rm -f .deployed` (force flag) in all destroy.sh scripts.
+
+## Serverless Migration & Genomics Data
+
+### Genomics setup: download hangs/times out on `ftp.1000genomes.ebi.ac.uk`
+**Symptom:** `gwas_initial_setup_job` / `variant_annotation_initial_setup_job` times out (30–60 min) pulling the reference genome / FASTQ / VCF; files end up missing or partial. NCBI/ClinVar downloads on the same job succeed.
+**Root cause:** EBI's HTTPS is too slow from the workshop for multi-GB files (host-specific, not compute).
+**Fix:** Pull from the AWS Open Data S3 mirror instead — `https://1000genomes.s3.amazonaws.com/<path after /vol1/ftp/>`. Verified on S3: reference FASTA + `.fai` + full BWA index (`.amb/.ann/.bwt/.pac/.sa`) and the HG00096 FASTQs. For the sample chr6 VCF, the `20190312_biallelic_SNV_and_INDEL` release is **not** on that bucket, but the Phase 3 GRCh38-lifted genotypes **are** — use `release/20130502/supporting/GRCh38_positions/ALL.chr6.phase3_shapeit2_mvncall_integrated_v3plus_nounphased.rsID.genotypes.GRCh38_dbSNP_no_SVs.vcf.gz` (GRCh38 coords, same 2504 samples as `breast_cancer_phenotype.tsv`). To find any file on the mirror, list it: `https://1000genomes.s3.amazonaws.com/?list-type=2&prefix=<path>`.
+
+### Serverless job fails: `/local_disk0` missing or `%sh` unsupported
+**Symptom:** A job converted to serverless (`environment_key`) fails immediately in a `%sh` cell or on a `/local_disk0/...` path.
+**Root cause:** Serverless has no `/local_disk0` and limited shell support. `gwas 01_download_reference_genome.py` relies on both.
+**Fix:** Keep that task on a **classic single-node** `job_cluster_key` (CPU classic is not quota-blocked; only GPU is). Don't blanket-convert download/shell-heavy setup tasks to serverless.
+
+### Serverless: `LOCAL_RELATION_SIZE_LIMIT_EXCEEDED` (Spark Connect)
+**Symptom:** `CONNECT_INVALID_PLAN.LOCAL_RELATION_SIZE_LIMIT_EXCEEDED — Cached local relation size (… bytes) exceeds the limit (3221225472 bytes)`.
+**Root cause:** `spark.createDataFrame(pandas_df)` on serverless ships the frame to the service as a cached local relation, capped at 3 GiB. Classic (in-JVM) had no such cap. (Hit by scanpy `download_cellxgene` doing a whole-census `createDataFrame`.)
+**Fix:** Don't materialize a >3 GiB pandas object into Spark. Aggregate in pandas first, fetch known IDs directly, or run the task on classic. scanpy now stages the HGSOC demo h5ad directly (no census scan).
+
+### `databricks fs ls` shows 0-byte / "missing" files that actually have content
+**Symptom:** `fs ls -o json` reports `file_size: null`/0 for files on a UC Volume, or a file looks empty.
+**Root cause:** The size field is unreliable for UC Volume paths — it does **not** reflect real size. (Led to a false "FASTQ is 0-byte" diagnosis.)
+**Fix:** Verify by **content**, not size: `databricks fs cat <path> | head -c 16 | xxd` (magic bytes: `1f8b` gzip, `89484446` HDF5). An empty **directory listing** (no entries) is reliable = genuinely absent.
+
+### Single Cell tab: default demo h5ad missing
+**Symptom:** Single Cell → Run New Analysis prefills `raw_h5ad/hgsoc_demo_15k.h5ad` but the file isn't there.
+**Root cause:** `download_cellxgene` didn't complete (see the createDataFrame issue above), or the module wasn't deployed.
+**Fix:** Re-run `download_cellxgene_gwb` (stages the HGSOC demo directly), or copy `hgsoc_demo_15k.h5ad` from an existing workspace's `raw_h5ad` volume (download with one profile, upload with the target profile).
+
+## Instructions
+
+1. When a user reports a deployment error, first identify which module and which step failed (download, registration, endpoint deployment, or UI).
+2. Check if the error matches one of the patterns above.
+3. For model registration failures, the traceback usually points to the `predict()` or `load_context()` method — look for dtype mismatches, missing attributes, or wrong input formats.
+4. For endpoint failures, check the endpoint logs in the Databricks workspace (Serving → endpoint name → Logs tab).
+5. For UI errors, check the genesis-workbench app logs in the Databricks App logs.
+6. Always check `CHANGELOG.md` for the latest known issues and fixes.
+
+## When to Use This Skill
+
+- User reports an error during Genesis Workbench deployment or model registration
+- User sees endpoint failures or timeout errors
+- User encounters dtype mismatches, schema errors, or serialization issues
+- User needs to optimize deployment speed or reduce costs
+- User has Mol* viewer display issues

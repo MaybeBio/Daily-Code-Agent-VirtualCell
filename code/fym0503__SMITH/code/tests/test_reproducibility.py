@@ -1,0 +1,816 @@
+from __future__ import annotations
+
+import io
+import tarfile
+from dataclasses import replace
+from pathlib import Path
+
+import anndata as ad
+import nbformat
+import numpy as np
+import pandas as pd
+import pytest
+import yaml
+
+from smith.reproducibility import check_case, load_cases, run_case
+from scripts.download_tutorial_data import safe_extract
+from scripts.build_tutorial_archives import case_files
+from reproducibility.workflows.ribomap_transfer.analysis import (
+    bh_adjust,
+    bias_group,
+    bias_pairwise_tests,
+    bias_table_from_objects,
+    jaccard_similarity,
+    jaccard_from_panel_records,
+    ribomap_bias,
+)
+from reproducibility.workflows.ribomap_transfer.evaluate_outputs import (
+    evaluate_panel_loaded as evaluate_ribomap_panel_loaded,
+    prepare_shared_adata,
+)
+from smith_agent.benchmarking import (
+    cell_type_evaluation_loaded,
+    mean_expression_loaded,
+    prepare_agent_adata,
+    spatial_coordinate_evaluation_loaded,
+)
+from smith_agent.panel_rank_aggregation import (
+    aggregate_reference_panel_ranks_loaded,
+    rank_genes_from_adata_loaded,
+    tune_reference_aggregation_loaded,
+)
+from smith_agent.feasibility.preflight import probe_backend_preflight
+from smith_agent.feasibility.manuscript import (
+    MANUSCRIPT_FIGURE6G_GENES,
+    manuscript_offtarget_examples,
+    manuscript_pass_rates,
+    ranked_gene_universe,
+)
+from reproducibility.workflows.regulatory_activity.analysis import paired_wilcoxon, statistical_analysis
+from reproducibility.workflows.regulatory_activity.evaluate_outputs import evaluate_loaded
+from reproducibility.workflows.regulatory_activity.paper_analysis import (
+    coactivity_from_objects,
+    coactivity_reconstruction,
+    module_coverage,
+    module_miss_rate,
+    normalize_module_table,
+    tf_scrna_correlation_from_objects,
+    tf_scrna_correlation,
+)
+from reproducibility.workflows.regulatory_activity.plot_figure3 import plot as plot_figure3
+
+
+EXPECTED_CASES = {"02_regulatory_activity", "03_ribomap_transfer", "05_agent"}
+
+
+def test_public_case_registry_has_only_approved_chapters():
+    cases = load_cases()
+    assert set(cases) == EXPECTED_CASES
+    assert [case.order for case in cases.values()] == [2, 3, 5]
+    assert all("fixture" not in str(item).lower() for case in cases.values() for item in case.inputs)
+    assert all(not check_case(cases[case_id])["ready"] for case_id in EXPECTED_CASES)
+
+
+def test_regulatory_manifest_lists_current_tutorial_coverage():
+    root = Path(__file__).resolve().parents[1]
+    manifest = yaml.safe_load(
+        (root / "reproducibility/manifests/02_regulatory_activity.yaml").read_text()
+    )
+    assert manifest["figure_coverage"] == ["Figure 3c-d", "Figure 3g", "Figure 3j-k"]
+    assert manifest["analysis_scope"]["training_splits"] == 5
+    assert manifest["analysis_scope"]["training_method"] == "SMITH"
+
+
+def test_data_root_drives_readiness(tmp_path: Path):
+    original = load_cases()["02_regulatory_activity"]
+    case = replace(original, inputs=tuple({"path": item["path"], "kind": "data"} for item in original.inputs))
+    for item in case.inputs:
+        path = tmp_path / item["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"h5ad-placeholder")
+    status = check_case(case, data_root=tmp_path)
+    assert status["ready"]
+    assert all(item["kind"] == "data" for item in status["inputs"])
+
+
+def test_missing_data_cannot_run(tmp_path: Path):
+    with pytest.raises((FileNotFoundError, RuntimeError)):
+        run_case(load_cases()["02_regulatory_activity"], tmp_path / "out", data_root=tmp_path)
+
+
+def test_data_manifest_has_sizes_checksums_and_published_zenodo():
+    root = Path(__file__).resolve().parents[1]
+    manifest = yaml.safe_load((root / "reproducibility" / "data_manifest.yaml").read_text())
+    assert manifest["zenodo_record_url"] == "https://zenodo.org/records/24137308"
+    assert manifest["publication_status"] == "published"
+    assert manifest["complete_archive"]["archive_bytes"] == 7101594667
+    assert len(manifest["complete_archive"]["archive_sha256"]) == 64
+    assert set(manifest["cases"]) == EXPECTED_CASES
+    for case in manifest["cases"].values():
+        assert case["archive_url"] is None
+        assert case["files"]
+        for item in case["files"]:
+            assert item["path"].endswith(".h5ad")
+            assert item["bytes"] > 0
+            assert len(item["sha256"]) == 64
+    paper_inputs = manifest["cases"]["02_regulatory_activity"]["paper_inputs"]
+    assert paper_inputs["status"] == "prepared"
+    assert len(paper_inputs["files"]) == 3
+    assert all(item["bytes"] > 0 and len(item["sha256"]) == 64 for item in paper_inputs["files"])
+    assert len(case_files(manifest["cases"]["02_regulatory_activity"])) == (
+        len(manifest["cases"]["02_regulatory_activity"]["files"]) + 3
+    )
+
+
+def test_agent_download_and_archive_include_all_tutorial_inputs():
+    from scripts.download_tutorial_data import file_specs
+    from scripts.publish_tutorial_data import selected_packages
+    root = Path(__file__).resolve().parents[1]
+    manifest = yaml.safe_load((root / "reproducibility/data_manifest.yaml").read_text())
+    case = manifest["cases"]["05_agent"]
+    files = case_files(case)
+    assert len(files) == 8
+    assert file_specs(case) == files
+    assert len([f for f in files if "/references/" in f["path"]]) == 5
+    assert selected_packages(manifest, ["05_agent"]) == [("05_agent", case)]
+    required = {f["path"] for f in load_cases()["05_agent"].inputs}
+    assert required <= {f["path"] for f in files}
+
+
+def test_safe_extract_rejects_path_traversal(tmp_path: Path):
+    archive = tmp_path / "unsafe.tar.gz"
+    with tarfile.open(archive, "w:gz") as handle:
+        payload = b"unsafe"
+        member = tarfile.TarInfo("../outside.txt")
+        member.size = len(payload)
+        handle.addfile(member, io.BytesIO(payload))
+    with pytest.raises(ValueError, match="escapes data root"):
+        safe_extract(archive, tmp_path / "extract")
+
+
+def test_notebooks_train_panels_and_load_documented_reference_tables():
+    root = Path(__file__).resolve().parents[1]
+    sources = sorted(
+        path for path in (root / "docs" / "source" / "tutorials" / "notebooks").glob("**/*_source.ipynb")
+        if not path.name.startswith("._")
+    )
+    assert len(sources) == 3
+    for path in sources:
+        notebook = nbformat.read(path, as_version=4)
+        text = "\n".join(str(cell.source) for cell in notebook.cells)
+        if path.name.startswith("02_SMITH_Regulatory"):
+            assert 'PROFILE["parameter_set"]' in text and "loaded_splits" in text
+            assert "subprocess.run" not in text
+            assert "run_smith(" in text
+            assert "evaluate_loaded(" in text
+            assert "run_manifest.json\").read" not in text
+            assert "pd.read_csv(FIGURE_DATA" not in text
+            assert "pd.read_csv(CASE_OUTPUT" not in text
+        elif path.name.startswith("03_SMITH_RIBOMap"):
+            assert "subprocess.run" not in text
+            assert 'PROFILE["parameter_set"]' in text
+            assert 'protocol="paper"' in text
+            assert "prepare_shared_adata" in text
+            assert "evaluate_panel_loaded" in text
+            assert "ribomap_panel_overlap.tsv" in text
+            assert "bias_table_from_objects" in text
+            assert 'run_manifest.json").read' not in text
+            assert "pd.read_csv(FIGURE_DATA" not in text
+            assert "pd.read_csv(CASE_OUTPUT" not in text
+        elif path.name.startswith("05_SMITH_Agent"):
+            assert "subprocess.run" not in text
+            assert "run_smith(" in text
+            assert "prepare_smith_input" in text
+            assert "aggregate_reference_panel_ranks_loaded" in text
+            assert "tune_reference_aggregation_loaded(" not in text
+            assert 'PROFILE_PARAMETERS["training_seeds"]' in text
+            assert 'PROFILE_PARAMETERS["source_weight"]' in text
+            assert 'PROFILE_PARAMETERS["reference_weight"]' in text
+            assert 'PROFILE_PARAMETERS["epochs"]' in text
+            assert "run_probe_feasibility_loaded" not in text
+            assert "Figure 6f-g" in text
+            assert "agent_full_tool_pass_summary.tsv" in text
+            assert "agent_probedealer_offtarget_examples.tsv" in text
+            assert "probe_status" not in text
+            assert "probe_values" not in text
+            assert '"status": "reference_output"' in text
+            assert '"status": "completed", "scope": "manuscript_figure6_f_g"' not in text
+            assert "agent_plan" not in text
+            assert "cell_type_evaluation_loaded" in text
+            assert 'run_manifest.json").read' not in text
+            assert "pd.read_csv(FIGURE_DATA" not in text
+            assert "pd.read_csv(CASE_OUTPUT" not in text
+        else:
+            raise AssertionError(f"Unexpected tutorial source: {path.name}")
+        if not path.name.startswith(("05_SMITH_Agent", "03_SMITH_RIBOMap", "02_SMITH_Regulatory")):
+            assert "reference_outputs" not in text
+        assert "verify_fixture" not in text
+        assert "Provenance Analysis" not in text
+
+
+def test_tutorial_sources_target_manuscript_panels():
+    root = Path(__file__).resolve().parents[1]
+    expected = {
+        "02_SMITH_Regulatory_Activity_source.ipynb": ("Regulatory programs and cross-modality transfer in C. elegans", "plot_figure3.py"),
+        "03_SMITH_RIBOMap_Transfer_source.ipynb": ("Cross-modality brain panel transfer to RIBOMap", "plot_figure4.py"),
+        "05_SMITH_Agent_Evaluation_source.ipynb": ("Liver panel design with five spatial references", "_draw_violin_panel"),
+    }
+    sources = (
+        path for path in (root / "docs" / "source" / "tutorials" / "notebooks").glob("**/*_source.ipynb")
+        if not path.name.startswith("._")
+    )
+    for path in sources:
+        notebook = nbformat.read(path, as_version=4)
+        text = "\n".join(str(cell.source) for cell in notebook.cells)
+        figure, plotter = expected[path.name]
+        assert figure in text
+        assert "Reproduce SMITH Figure" not in text
+        assert plotter in text or "_draw_bar_panel" in text or "_draw_performance" in text or "_draw_violin_panel" in text
+        assert "TUTORIAL_PROFILE" in text
+        assert "CASE_OUTPUT" in text
+        assert "display(df" not in text
+        assert "display(dataframe" not in text.lower()
+        if path.name.startswith("02_SMITH_Regulatory"):
+            assert "display(Image" not in text and "display(figure" in text
+        else:
+            assert "display(Image" in text or "display(figure" in text
+
+
+def test_executed_tutorials_include_rendered_figure_outputs():
+    root = Path(__file__).resolve().parents[1]
+    executed = sorted(
+        path for path in (root / "docs" / "source" / "tutorials" / "notebooks").glob("**/*_executed.ipynb")
+        if not path.name.startswith("._")
+    )
+    assert len(executed) == 3
+    for path in executed:
+        notebook = nbformat.read(path, as_version=4)
+        source = nbformat.read(str(path).replace("_executed.ipynb", "_source.ipynb"), as_version=4)
+        assert [cell.source for cell in notebook.cells] == [cell.source for cell in source.cells]
+        for cell in notebook.cells:
+            if any("image/png" in output.get("data", {}) for output in cell.get("outputs", [])):
+                assert "display(" in cell.source, f"{path} has an image attached to a non-display cell"
+        image_outputs = [
+            output
+            for cell in notebook.cells
+            for output in cell.get("outputs", [])
+            if output.output_type == "display_data" and "image/png" in output.get("data", {})
+        ]
+        assert image_outputs, f"{path} has no rendered example figures"
+
+
+def test_tutorials_do_not_embed_manuscript_figure_crops():
+    root = Path(__file__).resolve().parents[1]
+    notebook_root = root / "docs" / "source" / "tutorials" / "notebooks"
+    forbidden = ("Published Figure", "tutorial_manuscript_reference", "pixel-identical reference")
+    for path in notebook_root.glob("**/*_*.ipynb"):
+        if path.name.startswith("._"):
+            continue
+        notebook = nbformat.read(path, as_version=4)
+        text = "\n".join(str(cell.source) for cell in notebook.cells)
+        assert not any(marker in text for marker in forbidden), path
+
+
+def test_release_source_has_no_workstation_paths_or_internal_audits():
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "docs/internal").exists()
+    assert not (root / "reproducibility/source_audit.yaml").exists()
+    assert not (root / "reproducibility/validation").exists()
+    for folder in ("configs", "manifests", "reproducibility", "src/smith_agent/resources"):
+        for path in (root / folder).rglob("*"):
+            if path.is_file() and path.suffix in {".yaml", ".yml", ".md", ".json", ".tsv"}:
+                assert ("/workspace/" + "fanyimin/") not in path.read_text(errors="replace"), path
+    for path in (root / "docs/source/tutorials/notebooks").rglob("*.ipynb"):
+        text = path.read_text(errors="replace")
+        assert ("/workspace/" + "fanyimin/") not in text, path
+        assert ("/home/" + "yiminfan/") not in text, path
+
+
+def test_public_tutorial_copy_describes_current_workflows():
+    root = Path(__file__).resolve().parents[1]
+    docs = (root / "docs/source/tutorials/index.md").read_text()
+    assert "five tf lineage splits" in docs.lower()
+    assert "12 accuracy endpoints" in docs
+    assert "30/30 panels and expression points" in docs
+    assert "0.000332" in docs
+    for path in (root / "docs/source/tutorials/notebooks").rglob("*_source.ipynb"):
+        notebook = nbformat.read(path, as_version=4)
+        markdown = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "markdown")
+        for phrase in ("Validation status", "Do not use them to validate", "not full manuscript reproductions", "pixel-identical reference"):
+            assert phrase not in markdown, (path, phrase)
+
+
+def test_agent_probe_reference_outputs_are_complete_and_consistent():
+    root = Path(__file__).resolve().parents[1]
+    reference_root = root / "reproducibility" / "reference_outputs"
+    summary = pd.read_csv(reference_root / "agent_full_tool_pass_summary.tsv", sep="\t")
+    expected_counts = {
+        "ODT_property_ge20": 12057,
+        "OligoMiner_geneaware_specific_ge10": 11332,
+        "ProbeDealer_target_final_ge20": 11069,
+        "three_tool_feasibility": 10873,
+    }
+    observed = summary.set_index("gate")["pass_count"].to_dict()
+    assert {gate: observed[gate] for gate in expected_counts} == expected_counts
+    assert set(summary["total_count"]) == {12160}
+
+    examples = pd.read_csv(
+        reference_root / "agent_probedealer_offtarget_examples.tsv", sep="\t"
+    ).sort_values("example_order")
+    assert examples["gene_symbol"].tolist() == list(MANUSCRIPT_FIGURE6G_GENES)
+    assert np.array_equal(
+        examples["target_compatible"]
+        + examples["known_offtarget"]
+        + examples["unknown"],
+        examples["total_probe_count"],
+    )
+
+
+def test_regulatory_tutorial_interleaves_code_and_figures():
+    root = Path(__file__).resolve().parents[1]
+    notebook = nbformat.read(
+        root / "docs/source/tutorials/notebooks/regulatory_section/02_SMITH_Regulatory_Activity_source.ipynb",
+        as_version=4,
+    )
+    display_cells = [
+        index
+        for index, cell in enumerate(notebook.cells)
+        if cell.cell_type == "code" and "display(figure)" in str(cell.source)
+        and not str(cell.source).lstrip().startswith("from pathlib")
+    ]
+    assert len(display_cells) == 1
+    text = "\n".join(str(cell.source) for cell in notebook.cells)
+    assert "render_figure3_panel" not in text
+    assert "Methods used in the panel comparisons" not in text
+    assert "METHOD_COLORS" not in text
+    assert "figure3_i_coactivity" not in text
+    assert "_draw_coactivity" not in text
+    assert "Render the manuscript panels" not in "\n".join(str(cell.source) for cell in notebook.cells)
+    assert "`TF_profile`" in text and "five lineage splits" in text
+    assert "90 epochs" in text and "seed 8013" in text
+    assert "mirna" not in text.lower()
+    assert "module_miss_rate" not in text
+
+
+def test_ribomap_plot_has_no_placeholder_panel():
+    root = Path(__file__).resolve().parents[1]
+    plotter = (root / "reproducibility" / "workflows" / "ribomap_transfer" / "plot_figure4.py").read_text()
+    assert "Pathway enrichment" not in plotter
+    assert "versioned Reactome/GO" not in plotter
+
+
+def test_plotters_export_independent_manuscript_panels():
+    root = Path(__file__).resolve().parents[1]
+    expected = {
+        "regulatory_activity/plot_figure3.py": ["figure3_c", "figure3_d", "figure3_e", "figure3_f", "figure3_g", "figure3_h", "figure3_i", "figure3_j", "figure3_k"],
+        "ribomap_transfer/plot_figure4.py": [
+            "figure4_c", "figure4_d", "figure4_e", "figure4_f", "figure4_g", "figure4_h"
+        ],
+        "agent/plot_figure6.py": ["figure6_c", "figure6_d"],
+    }
+    workflow_root = root / "reproducibility" / "workflows"
+    for relative, stems in expected.items():
+        text = (workflow_root / relative).read_text()
+        assert "--output-dir" in text
+        assert "--output-prefix" not in text
+        dynamic_prefix = "figure3" if relative.startswith("regulatory_activity") else "figure4"
+        if relative.startswith(("regulatory_activity", "ribomap_transfer")):
+            assert f'outputs[f"{dynamic_prefix}_{{letter}}"]' in text
+        for stem in stems:
+            suffix = stem.rsplit("_", 1)[-1]
+            assert stem in text or f'outputs[f"{dynamic_prefix}_{{letter}}"]' in text
+
+
+def test_ribomap_analysis_formulas_are_manuscript_defined():
+    assert jaccard_similarity({"A", "B"}, {"B", "C"}) == pytest.approx(1 / 3)
+    ribomap_values = np.array([1.0, 3.0, 9.0])
+    starmap_values = np.array([1.0, 2.0, 8.0])
+    expected_ribo = (np.log1p(ribomap_values) - np.mean(np.log1p(ribomap_values))) / np.std(np.log1p(ribomap_values))
+    expected_star = (np.log1p(starmap_values) - np.mean(np.log1p(starmap_values))) / np.std(np.log1p(starmap_values))
+    assert np.allclose(ribomap_bias(ribomap_values, starmap_values), expected_ribo - expected_star)
+    assert np.allclose(bh_adjust([0.01, 0.04, 0.2]), [0.03, 0.06, 0.2])
+
+
+def test_ribomap_bias_groups_and_tests_match_figure4h():
+    assert bias_group("R", {"R", "S"}, {"S", "T"}) == "RIBOMap-only"
+    assert bias_group("S", {"R", "S"}, {"S", "T"}) == "Shared"
+    assert bias_group("T", {"R", "S"}, {"S", "T"}) == "STARmap-only"
+    assert bias_group("B", {"R", "S"}, {"S", "T"}) == "Background"
+
+    rows = []
+    groups = {
+        "RIBOMap-only": [3.0, 4.0, 5.0, 6.0],
+        "Shared": [1.0, 1.5, 2.0, 2.5],
+        "STARmap-only": [-2.0, -1.5, -1.0, -0.5],
+        "Background": [0.0, 0.2, 0.4, 0.6],
+    }
+    for group, values in groups.items():
+        rows.extend({"panel_size": 128, "group": group, "ribomap_bias": value} for value in values)
+    result = bias_pairwise_tests(pd.DataFrame(rows))
+    assert set(zip(result["group_a"], result["group_b"])) == {
+        ("RIBOMap-only", "STARmap-only"),
+        ("RIBOMap-only", "Background"),
+        ("STARmap-only", "Background"),
+        ("Shared", "Background"),
+    }
+    assert set(result["alternative"]) == {"two-sided"}
+    assert result["qvalue_bh"].notna().all()
+    primary = result[(result["group_a"] == "RIBOMap-only") & (result["group_b"] == "STARmap-only")].iloc[0]
+    assert primary["median_diff_a_minus_b"] > 0
+    assert primary["qvalue_bh"] >= primary["pvalue"]
+
+
+def test_ribomap_loaded_analysis_uses_current_objects():
+    rng = np.random.default_rng(3)
+    n = 30
+    labels = np.repeat(["a", "b", "c"], 10)
+    obs = pd.DataFrame({"celltype": labels, "region": np.repeat(["r1", "r2", "r3"], 10)})
+    genes = ["G1", "G2", "G3", "G4"]
+    source = ad.AnnData(rng.poisson(1, (n, 4)).astype(float), obs=obs, var=pd.DataFrame(index=genes))
+    source.obsm["spatial"] = rng.normal(size=(n, 2))
+    target = ad.AnnData(source.X[:, 1:], obs=obs.copy(), var=pd.DataFrame(index=genes[1:]))
+    prepared = prepare_shared_adata(source, target)
+    assert list(prepared.var_names) == genes[1:]
+    metrics, predictions = evaluate_ribomap_panel_loaded(target, ["G2", "G3"], 2, 7, label_column="celltype")
+    assert metrics["panel_size_evaluated"] == 2
+    assert not predictions.empty
+    bias = bias_table_from_objects(target, prepared)
+    assert set(bias["gene_symbol"]) == set(genes[1:])
+    overlap = jaccard_from_panel_records([
+        {"source": "Deep-RIBOmap", "panel_size": 2, "panel_genes": ["G1", "G2"]},
+        {"source": "STARmap", "panel_size": 2, "panel_genes": ["G2", "G3"]},
+    ])
+    assert overlap.iloc[0]["jaccard"] == pytest.approx(1 / 3)
+
+
+def test_agent_loaded_analysis_and_rank_aggregation():
+    rng = np.random.default_rng(4)
+    n = 30
+    labels = np.repeat(["a", "b", "c"], 10)
+    obs = pd.DataFrame({"Cell_Type": labels})
+    genes = ["G1", "G2", "G3"]
+    data = ad.AnnData(rng.poisson(1, (n, 3)).astype(float), obs=obs, var=pd.DataFrame(index=genes))
+    data.obsm["spatial"] = rng.normal(size=(n, 2))
+    prepared = prepare_agent_adata(data, genes, require_spatial=True)
+    classification, _ = cell_type_evaluation_loaded(prepared, ["G1", "G2"], panel_size=2)
+    spatial, _ = spatial_coordinate_evaluation_loaded(prepared, ["G1", "G2"], panel_size=2)
+    assert "cell_type_accuracy" in classification["metrics"]
+    assert "spatial_mae" in spatial["metrics"]
+    assert set(mean_expression_loaded(prepared)) == set(genes)
+    ranking = pd.DataFrame({"gene_symbol": genes, "rank_score": [0.9, 0.7, 0.2]})
+    aggregated = aggregate_reference_panel_ranks_loaded(ranking, [ranking], panel_size=2)
+    assert len(aggregated["source_panel_genes"]) == 2
+    assert len(aggregated["integrated_panel_genes"]) == 2
+
+
+def test_agent_tuning_and_probe_preflight_use_live_objects():
+    rng = np.random.default_rng(11)
+    labels = np.repeat(["a", "b", "c"], 10)
+    genes = ["G1", "G2", "G3", "G4"]
+    target = ad.AnnData(
+        rng.poisson(1, (30, 4)).astype(float),
+        obs=pd.DataFrame({"Cell_Type": labels}),
+        var=pd.DataFrame(index=genes),
+    )
+    target.obsm["spatial"] = rng.normal(size=(30, 2))
+    ranking = pd.DataFrame({"gene_symbol": genes, "rank_score": [0.9, 0.8, 0.7, 0.6]})
+    tuned = tune_reference_aggregation_loaded(
+        ranking,
+        [ranking],
+        target,
+        panel_sizes=(2, 3),
+        source_weights=(0.25, 0.75),
+        label_column="Cell_Type",
+    )
+    assert len(tuned["results"]) == 4
+    assert tuned["best"]["panel_size"] in {2, 3}
+    statuses = probe_backend_preflight()
+    assert statuses
+    assert all({"backend", "available", "requirements", "reason"} <= set(row) for row in statuses)
+
+
+def test_manuscript_probe_pass_rates_use_three_live_gates():
+    table = pd.DataFrame(
+        {
+            "gene_symbol": ["A", "B", "C"],
+            "transcript_resolved": [True, True, False],
+            "odt_property_probe_count": [20, 19, 50],
+            "oligominer_geneaware_specific_probe_count": [10, 20, 20],
+            "probedealer_target_final_probe_count": [20, 20, 20],
+        }
+    )
+    result = manuscript_pass_rates(table)
+    assert result.set_index("tool").loc["ODT", "pass_count"] == 2
+    assert result.set_index("tool").loc["OligoMiner", "pass_count"] == 3
+    assert result.set_index("tool").loc["ProbeDealer", "pass_count"] == 3
+    assert result.set_index("tool").loc["Integrated", "pass_count"] == 1
+
+
+def test_manuscript_offtarget_examples_are_ordered_and_partitioned():
+    genes = list(MANUSCRIPT_FIGURE6G_GENES)
+    risk = pd.DataFrame(
+        {
+            "gene_symbol": genes,
+            "symbol_target_only_probe_count_known": [10] * len(genes),
+            "clean_different_symbol_probe_count": [5] * len(genes),
+            "unknown_symbol_probe_count": [2] * len(genes),
+            "no_hit_probe_count": [3] * len(genes),
+            "initial_probe_count": [20] * len(genes),
+            "top_cross_symbols": ["OFF:5"] * len(genes),
+        }
+    )
+    result = manuscript_offtarget_examples(risk)
+    assert result["gene_symbol"].tolist() == genes
+    assert (result[["target_compatible", "known_offtarget", "unknown"]].sum(axis=1) == 20).all()
+    assert result["total_probe_count"].eq(20).all()
+    assert result["offtarget_symbol"].eq("OFF").all()
+
+
+def test_ranked_gene_universe_deduplicates_without_reordering():
+    ranking = pd.DataFrame({"gene_symbol": ["B", "A", "B", "C"], "score": [1, 2, 3, 4]})
+    result = ranked_gene_universe(ranking)
+    assert result["gene_symbol"].tolist() == ["B", "A", "C"]
+
+
+def test_loaded_source_ranking_preserves_gene_metadata_and_filters():
+    adata = ad.AnnData(
+        X=np.array([[1, 0, 2], [0, 3, 0], [1, 1, 1]], dtype=float),
+        var=pd.DataFrame({"feature_name": ["GENE_A", "GENE_B", "GENE_C"]}),
+    )
+    ranking = rank_genes_from_adata_loaded(
+        adata,
+        dataset_id="synthetic",
+        symbol_column="feature_name",
+        min_detection_rate=0.3,
+        max_cells=0,
+        spatial_weight=0.0,
+    )
+    assert set(ranking["gene_symbol"]) == {"GENE_A", "GENE_B", "GENE_C"}
+    assert ranking["rank"].tolist() == [1, 2, 3]
+    assert ranking["dataset_id"].eq("synthetic").all()
+
+
+def test_regulatory_paired_test_uses_split_as_pairing_unit():
+    values = pd.DataFrame([
+        {"dataset": "elegans_tf", "split": "split_1", "panel_size": 32, "method": "SMITH", "metric": 0.8},
+        {"dataset": "elegans_tf", "split": "split_1", "panel_size": 32, "method": "PERSIST-class", "metric": 0.6},
+        {"dataset": "elegans_tf", "split": "split_2", "panel_size": 32, "method": "SMITH", "metric": 0.9},
+        {"dataset": "elegans_tf", "split": "split_2", "panel_size": 32, "method": "PERSIST-class", "metric": 0.7},
+    ])
+    result = paired_wilcoxon(values.rename(columns={"metric": "cell_type_accuracy"}), "cell_type_accuracy")
+    assert len(result) == 1
+    assert result.iloc[0]["n_pairs"] == 2
+
+
+def test_regulatory_statistical_analysis_accepts_current_results():
+    values = pd.DataFrame([
+        {"dataset": "elegans_tf", "split": split, "panel_size": 32, "method": method,
+         "cell_type_accuracy": score, "developmental_time_pearson": score}
+        for split, scores in (("split_1", (0.8, 0.6)), ("split_2", (0.9, 0.7)))
+        for method, score in zip(("SMITH", "PERSIST-class"), scores, strict=True)
+    ])
+    result = statistical_analysis(values)
+    assert set(result["metric"]) == {"cell_type_accuracy", "developmental_time_pearson"}
+    assert set(result["n_pairs"]) == {2}
+
+
+def test_regulatory_module_miss_rate_uses_selected_panel_only():
+    modules = pd.DataFrame([
+        {"module_id": "muscle_early", "gene_symbol": "MyoD"},
+        {"module_id": "muscle_early", "gene_symbol": "HLH-1"},
+        {"module_id": "neuron_late", "gene_symbol": "UNC-30"},
+    ])
+    assert module_miss_rate(["myod"], modules) == pytest.approx(0.5)
+
+
+def test_regulatory_module_normalization_preserves_progenitor_modules():
+    modules = pd.DataFrame([
+        {"tissue": "Muscle", "progenitor_lineage": "MSa", "temporal_module": "Module-I", "gene_symbol": "TF1"},
+        {"tissue": "Muscle", "progenitor_lineage": "MSp", "temporal_module": "Module-I", "gene_symbol": "TF2"},
+        {"tissue": "Neuron", "progenitor_lineage": "AB", "temporal_module": "Module-I", "gene_symbol": "TF3"},
+    ])
+    normalized = normalize_module_table(modules)
+    assert set(normalized["module_id"]) == {
+        "Muscle|MSa|Module-I", "Muscle|MSp|Module-I", "Neuron|AB|Module-I"
+    }
+
+
+def test_regulatory_in_memory_panel_evaluation_and_coverage(tmp_path: Path):
+    genes = ["TF1", "TF2", "TF3"]
+    train_obs = pd.DataFrame({
+        "cell_type": ["a", "a", "b", "b"],
+        "absolute_time": [1.0, 2.0, 3.0, 4.0],
+    }, index=[f"train_{index}" for index in range(4)])
+    test_obs = pd.DataFrame({
+        "cell_type": ["a", "b"], "absolute_time": [1.5, 3.5],
+    }, index=["test_a", "test_b"])
+    train = ad.AnnData(
+        np.array([[0, 0, 1], [0.1, 0, 1], [1, 1, 0], [0.9, 1, 0]], dtype="float32"),
+        obs=train_obs, var=pd.DataFrame(index=genes),
+    )
+    test = ad.AnnData(
+        np.array([[0.05, 0, 1], [0.95, 1, 0]], dtype="float32"),
+        obs=test_obs, var=pd.DataFrame(index=genes),
+    )
+    payload, celltype, time = evaluate_loaded(
+        train, test, ["TF1", "TF2"], 2, neighbors=1, output_dir=tmp_path,
+    )
+    assert payload["metrics"]["cell_type_accuracy"] == pytest.approx(1.0)
+    assert celltype["prediction"].tolist() == ["a", "b"]
+    assert len(time) == 2
+    assert (tmp_path / "metrics.json").is_file()
+
+    modules = pd.DataFrame([
+        {"module_id": "module_a", "gene_symbol": "TF1"},
+        {"module_id": "module_b", "gene_symbol": "TF3"},
+    ])
+    panels = pd.DataFrame([{
+        "dataset": "elegans_tf", "panel_size": 2, "method": "SMITH",
+        "panel_genes": ["TF1", "TF2"],
+    }])
+    coverage = module_coverage(panels, modules)
+    assert coverage.iloc[0]["module_miss_rate"] == pytest.approx(0.5)
+
+
+def test_regulatory_module_coverage_rejects_incomplete_manuscript_grid():
+    modules = pd.DataFrame([
+        {"module_id": "module_a", "gene_symbol": "TF1"},
+    ])
+    panels = pd.DataFrame([
+        {
+            "dataset": "elegans_tf",
+            "split": "split_1",
+            "method": "SMITH",
+            "panel_size": 16,
+            "panel_genes": ["TF1"],
+        },
+    ])
+    with pytest.raises(ValueError, match="Incomplete module-coverage input"):
+        module_coverage(
+            panels,
+            modules,
+            expected_methods=("SMITH", "PERSIST-class"),
+            expected_splits=("split_1", "split_2"),
+            expected_panel_sizes=(16, 24, 32),
+            expected_training_seeds=(1, 2),
+            require_complete=True,
+        )
+
+
+def test_regulatory_paper_analysis_reconstructs_coactivity_and_tf_transfer(tmp_path: Path):
+    rng = np.random.default_rng(4)
+    genes = ["TF1", "TF2", "TF3", "TF4"]
+    lineages = [f"lineage_{index // 2}" for index in range(16)]
+    train_obs = pd.DataFrame({
+        "cell_type": ["muscle"] * 8 + ["neuron"] * 8,
+        "cell_name": lineages,
+        "random_precise_lineage": lineages,
+    })
+    test_obs = train_obs.copy()
+    train = ad.AnnData(rng.normal(size=(16, 4)).astype("float32"), obs=train_obs, var=pd.DataFrame(index=genes))
+    test = ad.AnnData(rng.normal(size=(16, 4)).astype("float32"), obs=test_obs, var=pd.DataFrame(index=genes))
+    train_file, test_file = tmp_path / "train.h5ad", tmp_path / "test.h5ad"
+    train.write_h5ad(train_file)
+    test.write_h5ad(test_file)
+    panel_file = tmp_path / "panel.tsv"
+    pd.DataFrame({"gene_symbol": ["TF1", "TF2"]}).to_csv(panel_file, sep="\t", index=False)
+    pair_file = tmp_path / "pairs.tsv"
+    pair_table = pd.DataFrame({"gene_a": ["TF1", "TF2"], "gene_b": ["TF3", "TF4"]})
+    pair_table.to_csv(pair_file, sep="\t", index=False)
+    in_memory_coactivity = coactivity_from_objects(
+        train, test, ["TF1", "TF2"], pairs=pair_table, method="ridge"
+    )
+    assert set(in_memory_coactivity["lineage"]) == {"muscle", "neuron"}
+    coactivity_file = tmp_path / "coactivity.tsv"
+    coactivity_reconstruction(
+        train_file, test_file, panel_file, coactivity_file, pair_file=pair_file, method="ridge"
+    )
+    coactivity = pd.read_csv(coactivity_file, sep="\t")
+    assert set(coactivity["lineage"]) == {"muscle", "neuron"}
+    correlation_file = tmp_path / "correlation.tsv"
+    tf_scrna_correlation(train_file, test_file, correlation_file, n_clusters=2)
+    correlation = pd.read_csv(correlation_file, sep="\t").iloc[0]
+    assert correlation["shared_genes"] == 4
+    assert correlation["shared_lineages"] == 8
+    assert (tmp_path / correlation["matrix_file"]).is_file()
+    in_memory_correlation, matrices = tf_scrna_correlation_from_objects(train, test, n_clusters=2)
+    assert in_memory_correlation.iloc[0]["shared_genes"] == 4
+    assert matrices["tf"].shape == (4, 4)
+    assert matrices["scrna"].shape == (4, 4)
+
+
+def test_figure3_plotter_consumes_generated_analysis_outputs(tmp_path: Path):
+    values = []
+    for dataset, sizes in (("elegans_tf", (32, 64, 128)), ("elegans_mirna", (16, 24, 32))):
+        for size in sizes:
+            values.append({
+                "dataset": dataset, "split": "split_1", "panel_size": size,
+                "method": "SMITH", "cell_type_accuracy": 0.65,
+                "developmental_time_pearson": 0.9,
+            })
+    values_path = tmp_path / "values.tsv"
+    pd.DataFrame(values).to_csv(values_path, sep="\t", index=False)
+
+    modules_path = tmp_path / "modules.tsv"
+    pd.DataFrame([
+        {"module_id": "muscle|M|early", "tissue": "muscle", "progenitor_lineage": "M",
+         "temporal_module": "early", "gene_symbol": "TF1"},
+        {"module_id": "neuron|AB|late", "tissue": "neuron", "progenitor_lineage": "AB",
+         "temporal_module": "late", "gene_symbol": "TF2"},
+    ]).to_csv(modules_path, sep="\t", index=False)
+    coverage_path = tmp_path / "coverage.tsv"
+    pd.DataFrame([
+        {"method": "SMITH", "panel_size": size, "module_miss_rate": 0.4 - size / 200}
+        for size in (16, 24, 32)
+    ]).to_csv(coverage_path, sep="\t", index=False)
+    coactivity_path = tmp_path / "coactivity.tsv"
+    pd.DataFrame([
+        {"method": method, "lineage": lineage, "pearson": 0.5}
+        for method in ("SMITH", "PERSIST") for lineage in ("muscle", "neuron", "pharynx", "skin")
+    ]).to_csv(coactivity_path, sep="\t", index=False)
+    matrix_path = tmp_path / "figure3_j_correlation_matrices.npz"
+    np.savez_compressed(matrix_path, genes=np.array(["TF1", "TF2"]), tf=np.eye(2), scrna=np.eye(2))
+    correlation_path = tmp_path / "correlation.tsv"
+    pd.DataFrame([{
+        "mean_rowwise_pearson": 0.38, "matrix_file": matrix_path.name,
+    }]).to_csv(correlation_path, sep="\t", index=False)
+    transfer_path = tmp_path / "transfer.tsv"
+    pd.DataFrame([
+        {"method": method, "source_modality": source, "panel_size": size, "cell_type_accuracy": 0.6}
+        for method in ("SMITH", "PERSIST-class") for source in ("TF-TF", "RNA-TF")
+        for size in (32, 64, 128)
+    ]).to_csv(transfer_path, sep="\t", index=False)
+
+    outputs = plot_figure3(
+        values_path, tmp_path / "figures", modules_path=modules_path,
+        module_coverage_path=coverage_path, coactivity_path=coactivity_path,
+        correlation_path=correlation_path, transfer_path=transfer_path,
+    )
+    assert {f"figure3_{letter}" for letter in "cdefghijk"}.issubset(outputs)
+    assert all(Path(outputs[f"figure3_{letter}"]["png"]).is_file() for letter in "cdefghijk")
+
+
+def test_repro_cli_accepts_options_after_case_and_forwards_workflow_args(monkeypatch, tmp_path, capsys):
+    from smith.reproducibility import cli
+    import sys
+
+    received = {}
+    case = object()
+    monkeypatch.setattr(cli, "load_cases", lambda root: {"05_agent": case})
+
+    def fake_run(selected, output, root, data, extra):
+        received.update(selected=selected, output=output, data=data, extra=extra)
+        return {"status": "completed"}
+
+    monkeypatch.setattr(cli, "run_case", fake_run)
+    monkeypatch.setattr(sys, "argv", [
+        "smith-repro", "run", "05_agent", "--data-root", "data/tutorials",
+        "--output-dir", str(tmp_path), "--", "--training-seeds", "1,2,3,4,5",
+    ])
+    cli.main()
+    assert received == {
+        "selected": case, "output": tmp_path, "data": "data/tutorials",
+        "extra": ["--training-seeds", "1,2,3,4,5"],
+    }
+    assert '"status": "completed"' in capsys.readouterr().out
+
+
+def test_notebook_validation_rejects_stale_sources_and_failed_outputs():
+    from scripts.build_tutorial_notebooks import validate_pair
+    source = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell('x = 1')])
+    executed = nbformat.from_dict(source)
+    validate_pair(source, executed)
+    stale = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell('x = 2')])
+    with pytest.raises(ValueError, match='differ'):
+        validate_pair(source, stale)
+    failed = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell('x = 1', outputs=[
+        nbformat.v4.new_output('error', ename='RuntimeError', evalue='failed', traceback=[])
+    ])])
+    with pytest.raises(ValueError, match='failed cell'):
+        validate_pair(source, failed)
+
+
+def test_complete_archive_strips_root_and_preserves_existing_files(tmp_path):
+    import hashlib
+    from scripts.download_tutorial_data import install_archive
+    archive = tmp_path / 'bundle.tar.gz'
+    content = b'tutorial input'
+    with tarfile.open(archive, 'w:gz') as handle:
+        for name, body in [('SMITH_tutorial_complete/agent/input.h5ad', content),
+                           ('SMITH_tutorial_complete/assembly_report.json', b'private paths')]:
+            member = tarfile.TarInfo(name)
+            member.size = len(body)
+            handle.addfile(member, io.BytesIO(body))
+    spec = {'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+            'archive_bytes': archive.stat().st_size, 'archive_root': 'SMITH_tutorial_complete'}
+    case = {'files': [{'path': 'agent/input.h5ad', 'bytes': len(content),
+                      'sha256': hashlib.sha256(content).hexdigest()}]}
+    dest = tmp_path / 'inputs'
+    (dest / 'agent').mkdir(parents=True)
+    (dest / 'agent/user.txt').write_text('keep')
+    install_archive(archive, dest, spec, [case])
+    assert (dest / 'agent/input.h5ad').read_bytes() == content
+    assert (dest / 'agent/user.txt').read_text() == 'keep'
+    assert not (dest / 'assembly_report.json').exists()
+    with pytest.raises(ValueError, match='checksum'):
+        install_archive(archive, dest, {**spec, 'archive_sha256': 'bad'}, [case])

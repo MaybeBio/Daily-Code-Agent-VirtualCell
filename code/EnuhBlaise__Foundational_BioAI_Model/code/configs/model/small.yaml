@@ -1,0 +1,33 @@
+# ~1M params. Sized for a laptop and for fast ablations.
+d_model: 128            # propagates to stem, backbone and heads
+pool: mean
+normalize_embedding: false
+stem:
+  name: expression
+  n_genes: AUTO         # filled from the gene vocabulary at runtime
+  n_value_bins: AUTO
+  dropout: 0.1
+backbone:
+  name: set_transformer
+  n_layers: 4
+  n_heads: 4
+  mlp_ratio: 4.0
+  dropout: 0.1
+heads:
+  masked_value:
+    name: masked_value
+    n_value_bins: AUTO
+    mode: classification
+    loss_weight: 1.0
+  cell_type:
+    enabled: false      # keep pretraining self-supervised by default
+    name: cell_type
+    n_classes: AUTO
+    loss_weight: 1.0
+  batch_adversarial:
+    enabled: false      # see src/models/heads/batch_adversarial.py
+    name: batch_adversarial
+    n_batches: AUTO
+    loss_weight: 0.1
+    lambd: 1.0
+    warmup_steps: 500

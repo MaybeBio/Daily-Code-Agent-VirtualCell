@@ -1,0 +1,12 @@
+# @package _global_
+# Full synthetic pretraining run; the reference configuration for ablations.
+defaults:
+  - override /data: synthetic
+  - override /model: small
+  - override /execution: local_cpu
+
+seed: 0
+train:
+  epochs: 20
+  lr: 3e-4
+  early_stop_patience: 4

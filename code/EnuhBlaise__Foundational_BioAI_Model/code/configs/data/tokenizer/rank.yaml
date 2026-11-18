@@ -1,0 +1,5 @@
+# Geneformer-style rank-value encoding. Discards magnitude entirely.
+# Pair with model=continuous (no discrete bins are produced).
+name: rank
+max_genes: 512
+normalize_ranks: true
