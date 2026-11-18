@@ -1,5 +1,5 @@
-topic: idr-repos
-title: IDR 相关仓库追踪
+topic: vc-repos
+title: 虚拟细胞 相关仓库追踪
 # 课题词(领域定义)不在这里——它硬编码在 prompts.yaml 的 score/system 与 code_card/system 里。
 # 换课题时改 prompts.yaml 的这两处措辞,以及下面的 search.queries / 命名。
 # 抓取窗口长度(天)。窗口 = [运行日-window_days, 运行日-1](不含运行当天),
@@ -18,9 +18,9 @@ ingest:
 site_base_url: ""
 # 本模板仓库的 owner/name + 默认分支,用于构造 wiki 快照的 GitHub blob 链接
 # (指向 code/{repo}/wikis/{date}/{source}/llms.txt)。
-github_repo: MaybeBio/Daily-Code-Agent-Template
+github_repo: MaybeBio/Daily-Code-Agent-VirtualCell
 github_branch: main
-search_placeholder: 如 相分离、intrinsically disordered、Python
+search_placeholder: 如 虚拟细胞、虚拟器官、世界模型、foundation model
 llm:
   concurrency: 8
   min_score: 5
@@ -60,21 +60,36 @@ search:
   #    (awesome 清单、黑洞/天体生物、CVE 复现等)。带 --updated 时间窗后 readme 不会超限
   #    (单短语约几十~百余条)。想省 LLM 成本时,把 search.queries 里的 readme, 去掉即可。
   queries:
-    - '"intrinsically disordered" in:name,description,readme,topics'
-    - '"disordered protein" in:name,description,readme,topics'
-    - '"disordered proteins" in:name,description,readme,topics'
-    - '"disordered region" in:name,description,readme,topics'
-    - '"disordered regions" in:name,description,readme,topics'
-    - '"biomolecular condensate" in:name,description,readme,topics'
-    - '"biomolecular condensates" in:name,description,readme,topics'
-    - '"phase separation" in:name,description,readme,topics'
-    # topic: 是「仓库标签」精确匹配(非子串),是补充召回最稳的一路。但只能用全称 topic ——
-    # 缩写 topic 被别的含义占满(topic:idp=Identity Provider、topic:idr=印尼盾/Image Data
-    # Resource、topic:idps=入侵检测系统),加进来全是噪声。(具体命中数见 2026-10-06 探测。)
-    - 'topic:intrinsically-disordered-proteins'   # 18
-    - 'topic:intrinsically-disordered-regions'    # 4
-    - 'topic:disordered-proteins'                 # 6
-    - 'topic:protein-disorder'                    # 10
-    - 'topic:biomolecular-condensates'            # 7
-    - 'topic:llps'                                # 8
-    - 'topic:phase-separation'                    # 19(含少量软物质物理,由打分阶段过滤)
+    # ==== 基础交集：scRNA-seq + foundation model 系列 ====
+    - '"single-cell RNA sequencing" AND "foundation model" in:name,description,readme,topics'
+    - '"scRNA-seq" AND "foundation model" in:name,description,readme,topics'
+    - '"single cell" AND "foundation model" in:name,description,readme,topics'
+    - '"spatial transcriptomics" AND "foundation model" in:name,description,readme,topics'
+
+    # ==== 交集：单细胞/空间转录组 + biological large language model / bio LLM ====
+    - '"single-cell RNA sequencing" AND "language model" in:name,description,readme,topics'
+    - '"scRNA-seq" AND "language model" in:name,description,readme,topics'
+    - '"single cell" AND "language model" in:name,description,readme,topics'
+    - '"spatial transcriptomics" AND "language model" in:name,description,readme,topics'
+
+    # ==== 交集：单细胞/空间转录组 + agent（生物智能Agent） ====
+    - '"single-cell RNA sequencing" AND "agent" in:name,description,readme,topics'
+    - '"scRNA-seq" AND "agent" in:name,description,readme,topics'
+    - '"single cell" AND "agent" in:name,description,readme,topics'
+    - '"spatial transcriptomics" AND "agent" in:name,description,readme,topics'
+
+    # 虚拟细胞+虚拟器官
+    - '"virtual cell" AND "foundation model" in:name,description,readme,topics'
+    - '"virtual cell" AND "agent" in:name,description,readme,topics'
+    - '"virtual cell" AND "language model" in:name,description,readme,topics'
+    - '"virtual organ" AND "foundation model" in:name,description,readme,topics'
+    - '"virtual organ" AND "agent" in:name,description,readme,topics'
+    - '"virtual organ" AND "language model" in:name,description,readme,topics'
+
+    # ==== topic 标签检索（topic本身是精确标签，这里也优先是同时覆盖两个方向的仓库，作为补充召回） ====
+    - 'topic:single-cell-foundation-model'
+    - 'topic:bio-foundation-model'
+    - 'topic:single-cell-language-model'
+    - 'topic:single-cell-agent'
+    - 'topic:virtual-cell'
+    - 'topic:virtual-organ'
