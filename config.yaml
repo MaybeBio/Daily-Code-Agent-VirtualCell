@@ -72,18 +72,14 @@ search:
     - '"single cell" AND "language model" in:name,description,readme,topics'
     - '"spatial transcriptomics" AND "language model" in:name,description,readme,topics'
 
-    # ==== 交集：单细胞/空间转录组 + agent（生物智能Agent） ====
-    - '"single-cell RNA sequencing" AND "agent" in:name,description,readme,topics'
-    - '"scRNA-seq" AND "agent" in:name,description,readme,topics'
-    - '"single cell" AND "agent" in:name,description,readme,topics'
-    - '"spatial transcriptomics" AND "agent" in:name,description,readme,topics'
+    # 注:agent 相关查询已整体移除(2026-11)。"single cell"/"spatial transcriptomics"
+    # + "agent" 在 README 里命中面极大(实测单条 500 条原始结果),且多是通用 AI agent
+    # 项目;需要 Bio Agent 召回时,再加回只针对 scRNA-seq / virtual cell 的精确组合。
 
     # 虚拟细胞+虚拟器官
     - '"virtual cell" AND "foundation model" in:name,description,readme,topics'
-    - '"virtual cell" AND "agent" in:name,description,readme,topics'
     - '"virtual cell" AND "language model" in:name,description,readme,topics'
     - '"virtual organ" AND "foundation model" in:name,description,readme,topics'
-    - '"virtual organ" AND "agent" in:name,description,readme,topics'
     - '"virtual organ" AND "language model" in:name,description,readme,topics'
 
     # ==== topic 标签检索（topic本身是精确标签，这里也优先是同时覆盖两个方向的仓库，作为补充召回） ====
