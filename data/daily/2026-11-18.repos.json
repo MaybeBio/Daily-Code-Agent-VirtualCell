@@ -1,0 +1,1055 @@
+[
+  {
+    "full_name": "torvalds/linux",
+    "who": [
+      "torvalds"
+    ],
+    "event": "push",
+    "stars": 256172,
+    "language": "C",
+    "description": "Linux kernel source tree",
+    "url": "https://github.com/torvalds/linux"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "Abubkr12",
+      "RAVEN-MA",
+      "am2rican5",
+      "ddhh-gif",
+      "hehewenyuan",
+      "mintakson",
+      "nordluf",
+      "okamifish",
+      "sakurastone",
+      "sodbilig",
+      "thanhhh"
+    ],
+    "event": "mixed",
+    "stars": 54116,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "bendlang/bend",
+    "who": [
+      "vitkl"
+    ],
+    "event": "star",
+    "stars": 25463,
+    "language": "TypeScript",
+    "description": "Bend 2: a fast language that blocks AI mistakes via proof. Install: curl -fsSL https://bend-lang.com/install.sh | sh",
+    "url": "https://github.com/bendlang/bend"
+  },
+  {
+    "full_name": "DeanChensj/jiangshan-map",
+    "who": [
+      "xiaomin-D"
+    ],
+    "event": "star",
+    "stars": 7833,
+    "language": "JavaScript",
+    "description": "江山时序 · 中国历史交互地图时间轴 (403 BCE – Present) | Interactive Historical Atlas of China across 18 dynasties, 198 territory snapshots, ancient-to-modern place genealogy & classical poetry routes",
+    "url": "https://github.com/DeanChensj/jiangshan-map"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "Soli-code",
+      "bhaimunabhai706-code"
+    ],
+    "event": "star",
+    "stars": 4450,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "scverse/scanpy",
+    "who": [
+      "Zethson",
+      "carlosvega",
+      "rpinho",
+      "selmanozleyen"
+    ],
+    "event": "mixed",
+    "stars": 2619,
+    "language": "Python",
+    "description": "Single-cell analysis in Python. Scales to >100M cells.",
+    "url": "https://github.com/scverse/scanpy"
+  },
+  {
+    "full_name": "coreos/go-oidc",
+    "who": [
+      "Mic92"
+    ],
+    "event": "mixed",
+    "stars": 2506,
+    "language": "Go",
+    "description": "A Go OpenID Connect client.",
+    "url": "https://github.com/coreos/go-oidc"
+  },
+  {
+    "full_name": "alibaba/yalantinglibs",
+    "who": [
+      "Shinryuuji"
+    ],
+    "event": "star",
+    "stars": 2189,
+    "language": "C++",
+    "description": "A collection of modern C++ libraries, include coro_http, coro_rpc, compile-time reflection, struct_pack, struct_json, struct_xml, struct_pb, easylog, async_simple etc.",
+    "url": "https://github.com/alibaba/yalantinglibs"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "akiyamanman",
+      "dianyo"
+    ],
+    "event": "star",
+    "stars": 1668,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "rtp-llm-review-bot"
+    ],
+    "event": "pr",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "bowang-lab/U-Mamba",
+    "who": [
+      "zeeeela"
+    ],
+    "event": "star",
+    "stars": 1033,
+    "language": "Python",
+    "description": "U-Mamba: Enhancing Long-range Dependency for Biomedical Image Segmentation",
+    "url": "https://github.com/bowang-lab/U-Mamba"
+  },
+  {
+    "full_name": "hyparam/hyparquet",
+    "who": [
+      "fear-rush"
+    ],
+    "event": "star",
+    "stars": 979,
+    "language": "JavaScript",
+    "description": "parquet file parser for javascript",
+    "url": "https://github.com/hyparam/hyparquet"
+  },
+  {
+    "full_name": "COMBINE-lab/salmon",
+    "who": [
+      "rob-p"
+    ],
+    "event": "push",
+    "stars": 946,
+    "language": "Rust",
+    "description": "🐟 🍣 🍱 Highly-accurate & wicked fast transcript-level quantification from RNA-seq reads using selective alignment",
+    "url": "https://github.com/COMBINE-lab/salmon"
+  },
+  {
+    "full_name": "harbor-framework/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "issue",
+    "stars": 940,
+    "language": "Python",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/harbor-framework/terminal-bench-science"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "YirenWangSdutcm"
+    ],
+    "event": "star",
+    "stars": 740,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "who": [
+      "TankTechnology",
+      "sebmathbio"
+    ],
+    "event": "star",
+    "stars": 606,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/OmicsML/awesome-foundation-model-single-cell-papers"
+  },
+  {
+    "full_name": "scverse/spatialdata",
+    "who": [
+      "jan-glx"
+    ],
+    "event": "pr",
+    "stars": 410,
+    "language": "Python",
+    "description": "An open and interoperable data framework for spatial omics data",
+    "url": "https://github.com/scverse/spatialdata"
+  },
+  {
+    "full_name": "bowang-lab/BioReason",
+    "who": [
+      "fhhjhhg"
+    ],
+    "event": "star",
+    "stars": 407,
+    "language": "Jupyter Notebook",
+    "description": "BioReason: Incentivizing Multimodal Biological Reasoning within a DNA-LLM Model  |  NeurIPS '25",
+    "url": "https://github.com/bowang-lab/BioReason"
+  },
+  {
+    "full_name": "OmicsML/dance",
+    "who": [
+      "fhhjhhg"
+    ],
+    "event": "star",
+    "stars": 391,
+    "language": "Python",
+    "description": "DANCE: a deep learning library and benchmark platform for single-cell analysis",
+    "url": "https://github.com/OmicsML/dance"
+  },
+  {
+    "full_name": "theislab/ehrapy",
+    "who": [
+      "Zethson",
+      "eroell",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 374,
+    "language": "Python",
+    "description": "Electronic Health Record Analysis with Python.",
+    "url": "https://github.com/theislab/ehrapy"
+  },
+  {
+    "full_name": "scverse/pertpy",
+    "who": [
+      "Zethson",
+      "dependabot"
+    ],
+    "event": "pr",
+    "stars": 360,
+    "language": "Python",
+    "description": "Single-cell perturbation analysis",
+    "url": "https://github.com/scverse/pertpy"
+  },
+  {
+    "full_name": "bowang-lab/EchoJEPA",
+    "who": [
+      "zsong46"
+    ],
+    "event": "star",
+    "stars": 356,
+    "language": "Python",
+    "description": "EchoJEPA: A Latent Predictive Foundation Model for Echocardiography",
+    "url": "https://github.com/bowang-lab/EchoJEPA"
+  },
+  {
+    "full_name": "theislab/single-cell-transformer-papers",
+    "who": [
+      "jacquelyne-sun88"
+    ],
+    "event": "star",
+    "stars": 344,
+    "language": "HTML",
+    "description": "",
+    "url": "https://github.com/theislab/single-cell-transformer-papers"
+  },
+  {
+    "full_name": "Mic92/niks3",
+    "who": [
+      "Mic92"
+    ],
+    "event": "mixed",
+    "stars": 328,
+    "language": "Go",
+    "description": "S3-backed Nix binary cache with garbage collection",
+    "url": "https://github.com/Mic92/niks3"
+  },
+  {
+    "full_name": "bowang-lab/MedSAMSlicer",
+    "who": [
+      "6berry"
+    ],
+    "event": "star",
+    "stars": 308,
+    "language": "Python",
+    "description": "3D Slicer Plugin for Segment anything in medical images",
+    "url": "https://github.com/bowang-lab/MedSAMSlicer"
+  },
+  {
+    "full_name": "Genentech/scimilarity",
+    "who": [
+      "MaybeBio"
+    ],
+    "event": "star",
+    "stars": 271,
+    "language": "Python",
+    "description": "A unifying representation of single cell expression profiles that quantifies similarity between expression states and generalizes to represent new studies without additional training.",
+    "url": "https://github.com/Genentech/scimilarity"
+  },
+  {
+    "full_name": "alibaba/aacr-bench",
+    "who": [
+      "MagicFox"
+    ],
+    "event": "star",
+    "stars": 263,
+    "language": "Python",
+    "description": "An Alibaba open-source multi-language benchmark for evaluating LLMs in repository-level automatic code review, featuring an AI-assisted and expert-verified dataset.",
+    "url": "https://github.com/alibaba/aacr-bench"
+  },
+  {
+    "full_name": "alibaba/loongsuite-pilot",
+    "who": [
+      "Copilot"
+    ],
+    "event": "other",
+    "stars": 263,
+    "language": "TypeScript",
+    "description": "Local-first telemetry collector for AI coding agents — unified OpenTelemetry events for Claude Code, Codex, Cursor and more. Token usage, cost, traces and security audit, exported anywhere.",
+    "url": "https://github.com/alibaba/loongsuite-pilot"
+  },
+  {
+    "full_name": "stjude-rust-labs/sprocket",
+    "who": [
+      "adthrasher",
+      "claymcleod"
+    ],
+    "event": "other",
+    "stars": 223,
+    "language": "Rust",
+    "description": "A bioinformatics workflow engine built on top of the Workflow Description Language (WDL).",
+    "url": "https://github.com/stjude-rust-labs/sprocket"
+  },
+  {
+    "full_name": "theislab/nicheformer",
+    "who": [
+      "mzabolocki"
+    ],
+    "event": "star",
+    "stars": 180,
+    "language": "Jupyter Notebook",
+    "description": "Repository for Nicheformer: a foundation model for single-cell and spatial omics",
+    "url": "https://github.com/theislab/nicheformer"
+  },
+  {
+    "full_name": "theislab/anndata2ri",
+    "who": [
+      "flying-sheep"
+    ],
+    "event": "mixed",
+    "stars": 154,
+    "language": "Python",
+    "description": "Convert between AnnData and SingleCellExperiment",
+    "url": "https://github.com/theislab/anndata2ri"
+  },
+  {
+    "full_name": "Lotfollahi-lab/nichecompass",
+    "who": [
+      "PoudNoOt",
+      "haonguyenthai"
+    ],
+    "event": "mixed",
+    "stars": 136,
+    "language": "Python",
+    "description": "End-to-end analysis of spatial multi-omics data",
+    "url": "https://github.com/Lotfollahi-lab/nichecompass"
+  },
+  {
+    "full_name": "open-guji/luatex-cn",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 135,
+    "language": "Lua",
+    "description": "基于LuaTeX的中文排版宏包，支持古籍版式精确复刻，以及符合W3C《中文排版需求》的现代中文排版",
+    "url": "https://github.com/open-guji/luatex-cn"
+  },
+  {
+    "full_name": "sokrypton/py2Dmol",
+    "who": [
+      "sokrypton"
+    ],
+    "event": "push",
+    "stars": 114,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/sokrypton/py2Dmol"
+  },
+  {
+    "full_name": "scverse/cookiecutter-scverse",
+    "who": [
+      "Zethson",
+      "grst"
+    ],
+    "event": "mixed",
+    "stars": 91,
+    "language": "Python",
+    "description": "Cookiecutter template for scverse",
+    "url": "https://github.com/scverse/cookiecutter-scverse"
+  },
+  {
+    "full_name": "stanford-star/plurel",
+    "who": [
+      "mahayasa"
+    ],
+    "event": "star",
+    "stars": 90,
+    "language": "Python",
+    "description": "A synthetic tabular and relational data generation framework",
+    "url": "https://github.com/stanford-star/plurel"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra",
+    "who": [
+      "MaybeBio",
+      "sebastianbirk"
+    ],
+    "event": "mixed",
+    "stars": 79,
+    "language": "Python",
+    "description": "Spatial transcriptomics foundation model based on Graph Transformer and JEPA",
+    "url": "https://github.com/Lotfollahi-lab/terra"
+  },
+  {
+    "full_name": "refgenie/refgenie",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 74,
+    "language": "Python",
+    "description": "Reference genome resource manager",
+    "url": "https://github.com/refgenie/refgenie"
+  },
+  {
+    "full_name": "scverse/annbatch",
+    "who": [
+      "codecov",
+      "dependabot"
+    ],
+    "event": "mixed",
+    "stars": 72,
+    "language": "Python",
+    "description": "Minibatch loading for on-disk anndata files, co-developed by Lamin Labs and scverse",
+    "url": "https://github.com/scverse/annbatch"
+  },
+  {
+    "full_name": "Mic92/nix-grpc-store",
+    "who": [
+      "Mic92"
+    ],
+    "event": "mixed",
+    "stars": 71,
+    "language": "C++",
+    "description": "Nix remote store and build farm over gRPC: faster nix copy than ssh-ng, with mTLS and a scheduler for builders",
+    "url": "https://github.com/Mic92/nix-grpc-store"
+  },
+  {
+    "full_name": "databio/pepatac",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 61,
+    "language": "Python",
+    "description": "A modular, containerized pipeline for ATAC-seq data processing",
+    "url": "https://github.com/databio/pepatac"
+  },
+  {
+    "full_name": "sokrypton/localfold",
+    "who": [
+      "sokrypton"
+    ],
+    "event": "pr",
+    "stars": 52,
+    "language": "JavaScript",
+    "description": "",
+    "url": "https://github.com/sokrypton/localfold"
+  },
+  {
+    "full_name": "ClassicMiniDIY/UltraLog",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 47,
+    "language": "Rust",
+    "description": "Better Log viewer for all Aftermarket ECUs",
+    "url": "https://github.com/ClassicMiniDIY/UltraLog"
+  },
+  {
+    "full_name": "biomap-research/PFMBench",
+    "who": [
+      "timini"
+    ],
+    "event": "issue",
+    "stars": 45,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/biomap-research/PFMBench"
+  },
+  {
+    "full_name": "Lotfollahi-lab/Perturbgen",
+    "who": [
+      "delshadv",
+      "read-the-docs-community"
+    ],
+    "event": "mixed",
+    "stars": 35,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/Perturbgen"
+  },
+  {
+    "full_name": "theislab/multigrate",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 35,
+    "language": "Python",
+    "description": "Multigrate: multiomic data integration for single-cell genomics",
+    "url": "https://github.com/theislab/multigrate"
+  },
+  {
+    "full_name": "thelovelab/fishpond",
+    "who": [
+      "mikelove"
+    ],
+    "event": "issue",
+    "stars": 33,
+    "language": "R",
+    "description": "Differential expression and allelic analysis, nonparametric statistics",
+    "url": "https://github.com/thelovelab/fishpond"
+  },
+  {
+    "full_name": "anti43/openyabs",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 28,
+    "language": "Java",
+    "description": "Yet another business software on github",
+    "url": "https://github.com/anti43/openyabs"
+  },
+  {
+    "full_name": "theislab/cellink",
+    "who": [
+      "LArnoldt"
+    ],
+    "event": "other",
+    "stars": 25,
+    "language": "Python",
+    "description": "Scalable framework for integrating single-cell omics with genetic data using AnnData.",
+    "url": "https://github.com/theislab/cellink"
+  },
+  {
+    "full_name": "Genentech/AssayBench",
+    "who": [
+      "tokzpl0x"
+    ],
+    "event": "star",
+    "stars": 20,
+    "language": "Python",
+    "description": "AssayBench: An Assay-Level Virtual Cell Benchmark for LLMs and Agents",
+    "url": "https://github.com/Genentech/AssayBench"
+  },
+  {
+    "full_name": "COMBINE-lab/sshash-rs",
+    "who": [
+      "rob-p"
+    ],
+    "event": "other",
+    "stars": 20,
+    "language": "Rust",
+    "description": "A Rust implementation of SSHash",
+    "url": "https://github.com/COMBINE-lab/sshash-rs"
+  },
+  {
+    "full_name": "DiscoAILab/OSWorld-Science",
+    "who": [
+      "HelloWorldLTY"
+    ],
+    "event": "mixed",
+    "stars": 17,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/DiscoAILab/OSWorld-Science"
+  },
+  {
+    "full_name": "Genentech/jmpost",
+    "who": [
+      "danielinteractive",
+      "github-actions"
+    ],
+    "event": "push",
+    "stars": 17,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/jmpost"
+  },
+  {
+    "full_name": "Genentech/scallops",
+    "who": [
+      "joshua-gould"
+    ],
+    "event": "mixed",
+    "stars": 16,
+    "language": "Python",
+    "description": "SCALLOPS (Scalable Library for Optical Pooled Screens) is a comprehensive Python package designed to streamline and scale the analysis of Optical Pooled Screens (OPS) for biological data. ",
+    "url": "https://github.com/Genentech/scallops"
+  },
+  {
+    "full_name": "theislab/ehrdata",
+    "who": [
+      "eroell"
+    ],
+    "event": "branch",
+    "stars": 16,
+    "language": "Python",
+    "description": "A datastructure for EHR data",
+    "url": "https://github.com/theislab/ehrdata"
+  },
+  {
+    "full_name": "immcantation/immcantation",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 15,
+    "language": "Jupyter Notebook",
+    "description": "The Immcantation Portal",
+    "url": "https://github.com/immcantation/immcantation"
+  },
+  {
+    "full_name": "COMBINE-lab/piscem-rs",
+    "who": [
+      "rob-p"
+    ],
+    "event": "push",
+    "stars": 15,
+    "language": "Rust",
+    "description": "",
+    "url": "https://github.com/COMBINE-lab/piscem-rs"
+  },
+  {
+    "full_name": "theislab/interscale",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 14,
+    "language": "Python",
+    "description": "InterScale: multi-scale cellular interaction analysis model for spatial transcriptomics",
+    "url": "https://github.com/theislab/interscale"
+  },
+  {
+    "full_name": "CellArr/cellarr",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 12,
+    "language": "Python",
+    "description": "Store collections of experimental data based on TileDB",
+    "url": "https://github.com/CellArr/cellarr"
+  },
+  {
+    "full_name": "lucidrains/supermimic-pytorch",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 11,
+    "language": "Python",
+    "description": "Unofficial implementation of Supermimic, Scaling Humanoid Whole-Body Control with One Differentiable World Model, from Qiayuan Liao et al. of Berkeley",
+    "url": "https://github.com/lucidrains/supermimic-pytorch"
+  },
+  {
+    "full_name": "acidgenomics/koopa",
+    "who": [
+      "mjsteinbaugh"
+    ],
+    "event": "push",
+    "stars": 11,
+    "language": "Python",
+    "description": "Shell bootloader for data science.",
+    "url": "https://github.com/acidgenomics/koopa"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "who": [
+      "azure80",
+      "michaleldar",
+      "sebastianbirk"
+    ],
+    "event": "mixed",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the TERRA manuscript",
+    "url": "https://github.com/Lotfollahi-lab/terra-reproducibility"
+  },
+  {
+    "full_name": "theislab/gh-dashboard",
+    "who": [
+      "github-actions"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "HTML",
+    "description": "A dashboard of everything in the theislab GitHub repository",
+    "url": "https://github.com/theislab/gh-dashboard"
+  },
+  {
+    "full_name": "LTLA/BiocSingular",
+    "who": [
+      "LTLA"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "R",
+    "description": "Clone of the Bioconductor repository for the BiocSingular package.",
+    "url": "https://github.com/LTLA/BiocSingular"
+  },
+  {
+    "full_name": "anvilproject/anvil-docker",
+    "who": [
+      "vjcitn"
+    ],
+    "event": "push",
+    "stars": 7,
+    "language": "Shell",
+    "description": "Docker containers for Anvil Project",
+    "url": "https://github.com/anvilproject/anvil-docker"
+  },
+  {
+    "full_name": "elixir-europe-training/ELIXIR-Training-SPLASH",
+    "who": [
+      "GeertvanGeest"
+    ],
+    "event": "push",
+    "stars": 6,
+    "language": "HTML",
+    "description": "",
+    "url": "https://github.com/elixir-europe-training/ELIXIR-Training-SPLASH"
+  },
+  {
+    "full_name": "scverse/cookiecutter-scverse-instance",
+    "who": [
+      "scverse-pr-creator"
+    ],
+    "event": "pr",
+    "stars": 5,
+    "language": "Python",
+    "description": "Example repository generated from https://github.com/scverse/cookiecutter-scverse. This repo is updated automatically to match the latest version of the template.",
+    "url": "https://github.com/scverse/cookiecutter-scverse-instance"
+  },
+  {
+    "full_name": "Lotfollahi-lab/squint",
+    "who": [
+      "dineshmdh"
+    ],
+    "event": "star",
+    "stars": 4,
+    "language": "Python",
+    "description": "Discrete tokenization for spatial transcriptomics tissue sections",
+    "url": "https://github.com/Lotfollahi-lab/squint"
+  },
+  {
+    "full_name": "kanidm/kanidm_ppa_automation",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "other",
+    "stars": 4,
+    "language": "Shell",
+    "description": "The magic that makes kanidm/kanidm_ppa work",
+    "url": "https://github.com/kanidm/kanidm_ppa_automation"
+  },
+  {
+    "full_name": "scverse/cupy-stubs",
+    "who": [
+      "laser101"
+    ],
+    "event": "issue",
+    "stars": 4,
+    "language": "Python",
+    "description": "Type stubs for CuPy",
+    "url": "https://github.com/scverse/cupy-stubs"
+  },
+  {
+    "full_name": "pepkit/pipestat",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 4,
+    "language": "Python",
+    "description": "Pipeline results reporting package",
+    "url": "https://github.com/pepkit/pipestat"
+  },
+  {
+    "full_name": "uraraworks/SBO2003",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 4,
+    "language": "C++",
+    "description": "",
+    "url": "https://github.com/uraraworks/SBO2003"
+  },
+  {
+    "full_name": "theislab/donordata",
+    "who": [
+      "LArnoldt"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "Python",
+    "description": "Single-cell experiments measure cells but are designed around donors: patients, samples, guides, compounds. DonorData keeps these levels together in one object and aligned under every operation.",
+    "url": "https://github.com/theislab/donordata"
+  },
+  {
+    "full_name": "theislab/spatialdata-db-client",
+    "who": [
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/theislab/spatialdata-db-client"
+  },
+  {
+    "full_name": "immcantation/alakazam",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "R",
+    "description": "Alakazam is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq) and provides a set of tools to investigate lymphocyte receptor clonal lineages, diversity, gene usage, and other repertoire level properties, with a focus on high-throughput immunoglobulin (Ig) sequencing.",
+    "url": "https://github.com/immcantation/alakazam"
+  },
+  {
+    "full_name": "BiocPy/scrnaseq",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 3,
+    "language": "Python",
+    "description": "Collection of public single-cell RNA-seq datasets",
+    "url": "https://github.com/BiocPy/scrnaseq"
+  },
+  {
+    "full_name": "noetl/ai-meta",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 2,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/noetl/ai-meta"
+  },
+  {
+    "full_name": "ErikEnglesson/UncertaintyInAIWorkshop",
+    "who": [
+      "Radzim"
+    ],
+    "event": "fork",
+    "stars": 2,
+    "language": "",
+    "description": "A workshop on uncertainty estimation in AI part of the accelerate programme for scientific discovery",
+    "url": "https://github.com/ErikEnglesson/UncertaintyInAIWorkshop"
+  },
+  {
+    "full_name": "iSEE/iUSEiSEE",
+    "who": [
+      "federicomarini"
+    ],
+    "event": "pr",
+    "stars": 1,
+    "language": "TeX",
+    "description": "A workshop to learn how to use the iSEE package",
+    "url": "https://github.com/iSEE/iUSEiSEE"
+  },
+  {
+    "full_name": "immcantation/enchantr",
+    "who": [
+      "Vivian0105",
+      "ggabernet",
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 1,
+    "language": "R",
+    "description": "enchantR provides additional quality control and reporting functions for other R packages in the Immcantation framework and is part of the magic behind nf-co.re/airrflow, a start-to-finish Nextflow pipeline to analyze AIRR-seq data.",
+    "url": "https://github.com/immcantation/enchantr"
+  },
+  {
+    "full_name": "scverse/repo-health",
+    "who": [
+      "flying-sheep"
+    ],
+    "event": "pr",
+    "stars": 1,
+    "language": "Python",
+    "description": "Automated checks for security and consistency on scverse.org github repositories",
+    "url": "https://github.com/scverse/repo-health"
+  },
+  {
+    "full_name": "iSEE/iSEEde",
+    "who": [
+      "federicomarini"
+    ],
+    "event": "mixed",
+    "stars": 1,
+    "language": "R",
+    "description": "iSEE extension for panels related to differential expression analysis ",
+    "url": "https://github.com/iSEE/iSEEde"
+  },
+  {
+    "full_name": "Lotfollahi-lab/tripso_reproducibility",
+    "who": [
+      "mariemoullet"
+    ],
+    "event": "mixed",
+    "stars": 0,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/tripso_reproducibility"
+  },
+  {
+    "full_name": "theislab/squidpy-ports",
+    "who": [
+      "selmanozleyen"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "Python",
+    "description": "Reference implementations and fixture generators for squidpy ports",
+    "url": "https://github.com/theislab/squidpy-ports"
+  },
+  {
+    "full_name": "bowang-lab/CryoDINO",
+    "who": [
+      "charlesgchen"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "Jupyter Notebook",
+    "description": "  3DINO pretraining on Cryo-electron tomograms with fine-tuning for particle and organelle identification using cutting-edge decoders.                                                                                          ",
+    "url": "https://github.com/bowang-lab/CryoDINO"
+  },
+  {
+    "full_name": "immcantation/presto",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 0,
+    "language": "Python",
+    "description": "pRESTO is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq). pRESTO is a bioinformatics toolkit for processing high-throughput lymphocyte receptor sequencing data.",
+    "url": "https://github.com/immcantation/presto"
+  },
+  {
+    "full_name": "tatami-inc/tatami_test",
+    "who": [
+      "github-actions"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "C++",
+    "description": "Test utilities for tatami libraries",
+    "url": "https://github.com/tatami-inc/tatami_test"
+  },
+  {
+    "full_name": "immcantation/lab",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "issue",
+    "stars": 0,
+    "language": "",
+    "description": "",
+    "url": ""
+  },
+  {
+    "full_name": "brentp/SeqLib",
+    "who": [
+      "brentp"
+    ],
+    "event": "branch",
+    "stars": 0,
+    "language": "",
+    "description": "C++ htslib/bwa-mem/fermi interface for interrogating sequence data",
+    "url": "https://github.com/brentp/SeqLib"
+  },
+  {
+    "full_name": "michaelliao/zcode-cli",
+    "who": [
+      "michaelliao"
+    ],
+    "event": "mixed",
+    "stars": 0,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/michaelliao/zcode-cli"
+  },
+  {
+    "full_name": "slowkow/STdeconvolve",
+    "who": [
+      "slowkow"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "",
+    "description": "Reference-free cell-type deconvolution of multi-cellular spatially resolved transcriptomics data",
+    "url": "https://github.com/slowkow/STdeconvolve"
+  },
+  {
+    "full_name": "EperLuo/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/EperLuo/terminal-bench-science"
+  },
+  {
+    "full_name": "Team-likelion-3rd-Project/likelion-devops-7th-3rd-team03",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "Java",
+    "description": "",
+    "url": "https://github.com/Team-likelion-3rd-Project/likelion-devops-7th-3rd-team03"
+  }
+]

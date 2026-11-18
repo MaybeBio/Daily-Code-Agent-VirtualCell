@@ -1,0 +1,94 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-18 22:48:31 | ⭐️ MaybeBio starred Lotfollahi-lab/terra
+2026-11-18 22:37:41 | ⭐️ MaybeBio starred Genentech/scimilarity
+2026-11-18 21:08:44 | ⭐️ PoudNoOt starred Lotfollahi-lab/nichecompass
+2026-11-18 21:03:41 | 🐛 timini opened issue in biomap-research/PFMBench: 'Which ESM3 input produced the ProteinGym zero-shot score in Table 4?'
+2026-11-18 17:09:39 | ⭐️ tokzpl0x starred Genentech/AssayBench
+2026-11-18 15:04:13 | ⭐️ zeeeela starred bowang-lab/U-Mamba
+2026-11-18 12:31:31 | ⭐️ jacquelyne-sun88 starred theislab/single-cell-transformer-papers
+2026-11-18 11:54:17 | ⭐️ mzabolocki starred theislab/nicheformer
+2026-11-18 10:22:45 | ⭐️ akiyamanman starred bowang-lab/scGPT
+2026-11-18 09:25:31 | ⭐️ bhaimunabhai706-code starred bowang-lab/MedSAM
+2026-11-18 07:35:49 | ⭐️ zsong46 starred bowang-lab/EchoJEPA
+2026-11-18 01:52:22 | 🚀 LArnoldt pushed to theislab/donordata
+    - [1c47b6a] (expanded) Restore fast donor selection and guard writes from zarr-backed matrices
+2026-11-18 01:46:06 | 🆕 LArnoldt created branch 'fix/LA-release-sel-and-write-guard' at theislab/donordata
+2026-11-18 01:02:13 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [6d5d109] (expanded) test
+2026-11-17 23:59:03 | 🔹 joshua-gould performed DeleteEvent on Genentech/scallops
+2026-11-17 23:50:44 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [de09dc9] (expanded) Remove label names
+2026-11-17 23:34:22 | 🔀 michaleldar opened PR in Lotfollahi-lab/terra-reproducibility
+2026-11-17 23:27:37 | 🆕 timtreis created branch 'catalog-capture-source-image-channels' at theislab/spatialdata-db-client
+2026-11-17 23:24:15 | 🚀 michaleldar pushed to Lotfollahi-lab/terra-reproducibility
+    - [c529343] (expanded) Keep only the four main-figure datasets in the human niche benchmark
+2026-11-17 23:22:56 | 🚀 LArnoldt pushed to theislab/donordata
+    - [2825325] (expanded) Merge pull request #8 from eroell/ehrdata-write-read-elem
+2026-11-17 23:17:03 | 🚀 michaleldar pushed to Lotfollahi-lab/terra-reproducibility
+    - [da80b32] (expanded) Keep only the four main-figure datasets in the human niche benchmark
+2026-11-17 23:16:31 | 🆕 joshua-gould created branch 'stats-cleanup' at Genentech/scallops
+2026-11-17 23:14:43 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [aa315ab] (expanded) Remove label names
+2026-11-17 23:05:31 | 🆕 azure80 created branch 'human-niche-benchmark-zero-shot' at Lotfollahi-lab/terra-reproducibility
+2026-11-17 23:00:01 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 23:00:01 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:59 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:58 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:57 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:53 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:38 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:59:35 | 🔹 LArnoldt performed DeleteEvent on theislab/cellink
+2026-11-17 22:55:46 | 🚀 LArnoldt pushed to theislab/donordata
+    - [4cc4343] (expanded) Count cells with a missing group as the group nan in composition and pseudobulk
+2026-11-17 22:51:50 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [6cbc4fe] (expanded) Doc updates. Zarr metadata cleanup
+2026-11-17 22:46:44 | 🔹 sebastianbirk performed MemberEvent on Lotfollahi-lab/terra
+2026-11-17 22:46:00 | 🔹 sebastianbirk performed MemberEvent on Lotfollahi-lab/terra-reproducibility
+2026-11-17 22:42:34 | 🆕 mariemoullet created branch '1-add-code-for-revisions' at Lotfollahi-lab/tripso_reproducibility
+2026-11-17 22:42:09 | 🐛 mariemoullet opened issue in Lotfollahi-lab/tripso_reproducibility: 'add code for revisions'
+2026-11-17 22:30:52 | 🚀 timtreis pushed to theislab/spatialdata-db-client
+    - [c9a71d3] (expanded) feat(loader): TissueMask keeps TMA cores and warns on an empty mask; StainNormalize takes max_angle_deg (#86)
+2026-11-17 22:22:46 | 🆕 eroell created branch 'fix/feature-type-no-inplace' at theislab/ehrdata
+2026-11-17 22:22:40 | 🆕 eroell created branch 'fix/non-scanpy-warnings' at theislab/ehrapy
+2026-11-17 22:22:38 | 🆕 eroell created branch 'fix/scanpy-1.13-pca-mask' at theislab/ehrapy
+2026-11-17 21:33:00 | 🚀 delshadv pushed to Lotfollahi-lab/Perturbgen
+    - [cfdaf97] (expanded) Merge pull request #102 from Lotfollahi-lab/docs/gseapy-organism-lowercase
+2026-11-17 21:32:59 | 🔀 delshadv merged PR in Lotfollahi-lab/Perturbgen
+2026-11-17 21:29:31 | 💬 read-the-docs-community created issue 'docs: pass organism='human' to gseapy.enrichr in the tutorials' in Lotfollahi-lab/Perturbgen
+2026-11-17 21:24:42 | 🔀 delshadv opened PR in Lotfollahi-lab/Perturbgen
+2026-11-17 21:24:41 | 🆕 delshadv created branch 'docs/gseapy-organism-lowercase' at Lotfollahi-lab/Perturbgen
+2026-11-17 20:10:12 | 🚀 github-actions pushed to theislab/gh-dashboard
+    - [5854756] (expanded)  2026-11-17 12:10:10 UTC
+2026-11-17 18:54:32 | 🔹 Zethson performed DeleteEvent on theislab/ehrapy
+2026-11-17 18:43:35 | 🚀 selmanozleyen pushed to theislab/squidpy-ports
+    - [051106c] (expanded) Merge pull request #7 from selmanozleyen/imputation-notebooks
+2026-11-17 17:50:55 | 💬 haonguyenthai created issue 'nichecompass and cell2location deconvolution' in Lotfollahi-lab/nichecompass
+2026-11-17 17:38:41 | 🚀 flying-sheep pushed to theislab/anndata2ri
+    - [af22372] (expanded) chore(deps): bump https://github.com/biomejs/pre-commit (#317)
+2026-11-17 17:36:16 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-17 17:35:33 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-17 16:56:52 | ⭐️ 6berry starred bowang-lab/MedSAMSlicer
+2026-11-17 16:38:37 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-17 14:34:26 | 🚀 github-actions pushed to Genentech/jmpost
+    - [a72bcc1] (expanded) Add/Update JUnit report: 396be9f8df0debbefd81326109ea16d68a9ceab0
+2026-11-17 13:54:17 | 🚀 danielinteractive pushed to Genentech/jmpost
+    - [4684047] (expanded) add word
+2026-11-17 13:49:03 | ⭐️ YirenWangSdutcm starred bowang-lab/MedSAM2
+2026-11-17 13:42:38 | 🚀 danielinteractive pushed to Genentech/jmpost
+    - [db0b298] (expanded) document restriction for control flow with priors in custom models
+2026-11-17 06:14:34 | ⭐️ dianyo starred bowang-lab/scGPT
+2026-11-17 04:14:15 | 🚀 pre-commit-ci pushed to theislab/multigrate
+    - [d60122a] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-17 04:12:34 | ⭐️ Soli-code starred bowang-lab/MedSAM
+2026-11-17 04:08:12 | 🆕 pre-commit-ci created branch 'pre-commit-ci-update-config' at theislab/ehrapy
+2026-11-17 04:08:03 | 🚀 pre-commit-ci pushed to theislab/interscale
+    - [e62a9ee] (expanded)  pre-commit autoupdate
+2026-11-17 03:48:02 | ⭐️ fhhjhhg starred bowang-lab/BioReason
+2026-11-17 03:47:02 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [db15ce2] (expanded) merge script files
+2026-11-17 03:15:20 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [432aec3] (expanded) remove old slurm_scripts_detection folder, ignore .DS_Store
+2026-11-17 02:05:30 | ⭐️ dineshmdh starred Lotfollahi-lab/squint
+2026-11-17 02:04:26 | 🚀 timtreis pushed to theislab/spatialdata-db-client
+    - [9f493f9] (expanded) Merge remote-tracking branch 'origin/main' into primers-smoke-fix
