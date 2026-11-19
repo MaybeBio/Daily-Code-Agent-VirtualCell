@@ -1,0 +1,26 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-19 07:02:53 | 🔹 joshua-gould performed DeleteEvent on Genentech/scallops
+2026-11-19 07:02:51 | 🔀 joshua-gould merged PR in Genentech/scallops
+2026-11-19 06:12:13 | 🔀 joshua-gould opened PR in Genentech/scallops
+2026-11-19 05:44:08 | ⭐️ dianyo starred bowang-lab/Orthrus
+2026-11-19 05:12:48 | ⭐️ TomasKliner starred bowang-lab/ecg-fm
+2026-11-19 00:10:45 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow
+2026-11-19 00:10:34 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow-reproducibility
+2026-11-18 21:03:41 | 🐛 timini opened issue in biomap-research/PFMBench: 'Which ESM3 input produced the ProteinGym zero-shot score in Table 4?'
+2026-11-18 07:41:22 | 🚀 aboyounp-gne pushed to Genentech/BiocDuckDB
+    - [25c8c6a] (expanded) Store images and labels as references that readParquet can follow
+2026-11-18 07:25:47 | 🚀 aboyounp-gne pushed to Genentech/DuckDBSpatial
+    - [44c8f92] (expanded) Fix named-key row order, st_join, and several silent wrong results
+2026-11-18 07:01:04 | 🚀 aboyounp-gne pushed to Genentech/MultiAssaySpatialExperiment
+    - [26b173c] (expanded) Give imported SpatialData points x and y, and keep transforms in c() and renames
+2026-11-18 06:58:30 | 🚀 Adibvafa pushed to bowang-lab/BioReason-Pro
+    - [7622d47] (expanded) Train with both stages by default, as the released checkpoint was
+2026-11-18 06:30:43 | 🚀 cnedwards pushed to Genentech/AssayLoop
+    - [0883baf] (expanded) Use supported macOS 15 CI runner
+2026-11-18 03:59:17 | 🚀 eroell pushed to theislab/ehrapy
+    - [2253610] (expanded) docs: use scverse-doc theme
+2026-11-18 03:20:08 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [9b7faba] (expanded) envir read once
+2026-11-18 00:19:23 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [f29083d] (expanded) remove unused code

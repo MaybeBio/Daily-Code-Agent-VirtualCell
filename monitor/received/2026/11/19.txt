@@ -1,0 +1,161 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-19 10:07:59 | ⭐️ Ricardoskarline starred alibaba/open-code-review
+2026-11-19 10:07:36 | 🔹 ralf0131 performed PullRequestReviewEvent on alibaba/loongsuite-pilot
+2026-11-19 10:07:18 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'feat: support multi-identity CLI hosts with one system-scope installation'
+2026-11-19 10:07:18 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'feat: support multi-identity CLI hosts with one system-scope installation'
+2026-11-19 10:07:17 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'feat: support multi-identity CLI hosts with one system-scope installation'
+2026-11-19 10:07:11 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:07:11 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'Qoder IDE Stop retry can drop user input when prompt progress follows user row'
+2026-11-19 10:07:10 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'Qoder IDE Stop retry can drop user input when prompt progress follows user row'
+2026-11-19 10:07:08 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:07:05 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:07:03 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'fix(qoder): detect growing partial-record rewrites with equal timestamps'
+2026-11-19 10:07:03 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'fix(qoder): detect growing partial-record rewrites with equal timestamps'
+2026-11-19 10:07:03 | 🐛 ralf0131 labeled issue in alibaba/loongsuite-pilot: 'fix(qoder): detect growing partial-record rewrites with equal timestamps'
+2026-11-19 10:07:02 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:59 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:56 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:54 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:51 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:49 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:45 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:42 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:39 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:35 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:33 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:30 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:26 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:23 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:21 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 10:06:20 | 🔀 xiongyunn merged PR in alibaba/loongsuite-pilot
+2026-11-19 10:06:18 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-19 09:35:57 | ⭐️ duanmuseventeen starred scverse/SnapATAC2
+2026-11-19 09:23:29 | 💬 codecov-commenter created issue 'docs: larger spatial maps in the Atera and Xenium tutorials' in scverse/infercnvpy
+2026-11-19 09:19:22 | 🔀 timtreis opened PR in scverse/infercnvpy
+2026-11-19 08:26:01 | 🔹 Mic92 performed PullRequestReviewEvent on repkgs-org/repkgs
+2026-11-19 08:23:44 | 🔹 Mic92 performed CommitCommentEvent on repkgs-org/repkgs
+2026-11-19 08:21:23 | 💬 Mic92 created issue 'launch: find the record from AT_EXECFN when argv[0] is a bare name' in repkgs-org/repkgs
+2026-11-19 08:20:04 | 🔹 Mic92 performed CommitCommentEvent on repkgs-org/repkgs
+2026-11-19 08:19:08 | 🔹 Mic92 performed CommitCommentEvent on repkgs-org/repkgs
+2026-11-19 08:13:42 | ⭐️ lucidrains starred google-deepmind/robotics-antigravity-plugin
+2026-11-19 08:12:05 | 💬 Mic92 created issue 'openssl: read the package's own openssl.cnf by default' in repkgs-org/repkgs
+2026-11-19 08:05:29 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-19 07:45:40 | 💬 codecov created issue 'chore(deps): bump the pre-commit group with 2 updates' in scverse/anndata
+2026-11-19 07:45:16 | 💬 codecov created issue 'chore(deps): bump amannn/action-semantic-pull-request from 6.1.1 to 6.1.2 in the actions-deps group' in scverse/anndata
+2026-11-19 07:44:21 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-19 07:44:21 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-19 07:44:21 | 🔀 dependabot opened PR in scverse/anndata
+2026-11-19 07:43:52 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-19 07:43:52 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-19 07:43:52 | 🔀 dependabot opened PR in scverse/anndata
+2026-11-19 07:42:59 | 🔀 mweinelt merged PR in NixOS/nixpkgs
+2026-11-19 07:39:23 | 🔀 mweinelt merged PR in NixOS/infra
+2026-11-19 07:32:53 | 🔹 mweinelt performed PullRequestReviewEvent on NixOS/nixpkgs
+2026-11-19 07:31:23 | 🔀 mweinelt labeled PR in NixOS/nixpkgs
+2026-11-19 07:31:23 | 🔀 mweinelt opened PR in NixOS/nixpkgs
+2026-11-19 07:08:33 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-19 07:08:33 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-19 06:58:58 | 🔹 claude performed GollumEvent on asymmetric-effort/go-notebook
+2026-11-19 06:58:58 | 🔹 claude performed GollumEvent on asymmetric-effort/go-notebook
+2026-11-19 06:53:41 | 💬 srikarjy created issue 'perf: avoid dense BasePlot aggregation' in scverse/scanpy
+2026-11-19 06:51:23 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-19 06:51:23 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-19 06:20:17 | 🔹 mweinelt performed PullRequestReviewCommentEvent on NixOS/nixpkgs
+2026-11-19 06:01:10 | 🔹 claude performed GollumEvent on asymmetric-effort/go-notebook
+2026-11-19 06:01:10 | 🔹 claude performed GollumEvent on asymmetric-effort/go-notebook
+2026-11-19 05:51:17 | 🔹 srikarjy performed PullRequestReviewEvent on scverse/scanpy
+2026-11-19 05:44:26 | 🔀 ssnn-airr opened PR in immcantation/immcantation
+2026-11-19 05:03:29 | 🔀 timtreis merged PR in scverse/infercnvpy
+2026-11-19 04:58:01 | ⭐️ keller-mark starred scverse/gatac
+2026-11-19 04:54:24 | 💬 codecov-commenter created issue 'fix(io): genomic_position_from_gtf no longer raises KeyError when var already has positions' in scverse/infercnvpy
+2026-11-19 04:48:34 | 🔀 timtreis opened PR in scverse/infercnvpy
+2026-11-19 04:38:02 | 🔀 timtreis merged PR in scverse/infercnvpy
+2026-11-19 04:07:32 | 🔀 colejensen labeled PR in immcantation/scoper
+2026-11-19 04:07:31 | 🔀 colejensen opened PR in immcantation/scoper
+2026-11-19 04:05:20 | 🔀 colejensen labeled PR in immcantation/alakazam
+2026-11-19 04:05:18 | 🔀 colejensen opened PR in immcantation/alakazam
+2026-11-19 03:35:52 | 💬 SID-6921 created issue 'test(backed): add regression for filename=None after read_h5ad' in scverse/anndata
+2026-11-19 03:33:14 | 💬 SID-6921 created issue 'fix: Ingest with an explicit PCA use_rep/use falls back to raw X' in scverse/scanpy
+2026-11-19 03:20:02 | 🐛 ggabernet labeled issue in immcantation/enchantr: '[FEATURE] Clonal overlap calculation function move to alakazam'
+2026-11-19 03:20:01 | 🐛 ggabernet opened issue in immcantation/enchantr: '[FEATURE] Clonal overlap calculation function move to alakazam'
+2026-11-19 03:20:01 | 🐛 ggabernet assigned issue in immcantation/enchantr: '[FEATURE] Clonal overlap calculation function move to alakazam'
+2026-11-19 03:13:28 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-19 03:13:10 | 🔀 JasonJiangs merged PR in OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-19 03:10:26 | 🔀 JasonJiangs opened PR in OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-19 02:54:05 | 💬 codecov-commenter created issue 'Re-execute the jump_cells page against the re-pinned h5ad' in scverse/mantispy
+2026-11-19 02:51:07 | 💬 codecov-commenter created issue 'fix: clear errors for lazy and backed input in the scanpy wrappers, and read_lazy support in the spatial tools' in scverse/infercnvpy
+2026-11-19 02:48:40 | 💬 read-the-docs-community created issue 'Re-execute the jump_cells page against the re-pinned h5ad' in scverse/mantispy
+2026-11-19 02:46:01 | 💬 review-notebook-app created issue 'Re-execute the jump_cells page against the re-pinned h5ad' in scverse/mantispy
+2026-11-19 02:13:56 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-19 01:14:12 | 🔀 ssnn-airr opened PR in immcantation/presto
+2026-11-19 01:05:44 | 🍴 nebulia37 forked theislab/single-cell-best-practices
+2026-11-19 00:41:39 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-19 00:10:45 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow
+2026-11-19 00:10:45 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow
+2026-11-19 00:10:34 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow-reproducibility
+2026-11-19 00:10:34 | ⭐️ inoue0426 starred Lotfollahi-lab/mintflow-reproducibility
+2026-11-18 22:48:31 | ⭐️ MaybeBio starred Lotfollahi-lab/terra
+2026-11-18 22:48:31 | ⭐️ MaybeBio starred Lotfollahi-lab/terra
+2026-11-18 22:37:41 | ⭐️ MaybeBio starred Genentech/scimilarity
+2026-11-18 22:37:41 | ⭐️ MaybeBio starred Genentech/scimilarity
+2026-11-18 22:29:28 | 🔀 Zethson merged PR in scverse/pertpy
+2026-11-18 22:26:42 | ⭐️ vitkl starred bendlang/bend
+2026-11-18 21:31:36 | 🔀 Vivian0105 merged PR in immcantation/enchantr
+2026-11-18 21:08:44 | ⭐️ PoudNoOt starred Lotfollahi-lab/nichecompass
+2026-11-18 21:08:44 | ⭐️ PoudNoOt starred Lotfollahi-lab/nichecompass
+2026-11-18 20:58:31 | 🔹 Zethson performed PullRequestReviewEvent on scverse/cookiecutter-scverse
+2026-11-18 20:26:11 | 💬 Zethson created issue 'fix: derive PCA defaults from the selected representation' in scverse/scanpy
+2026-11-18 20:25:36 | 💬 Zethson created issue 'fix: keep legacy graph metrics usable without anndata.acc' in scverse/scanpy
+2026-11-18 20:21:33 | 💬 Zethson created issue 'Find gene symbols exist only in .raw attribute' in scverse/scanpy
+2026-11-18 19:17:28 | 🐛 ssnn-airr assigned issue in immcantation/presto: 'Upload example FASTQs to Zenodo, with real quality scores'
+2026-11-18 19:17:25 | 🐛 ssnn-airr labeled issue in immcantation/presto: 'Upload example FASTQs to Zenodo, with real quality scores'
+2026-11-18 19:17:24 | 🐛 ssnn-airr opened issue in immcantation/presto: 'Upload example FASTQs to Zenodo, with real quality scores'
+2026-11-18 19:02:37 | 🆕 Mic92 created branch 'k3s-test-dns' at Mic92/niks3
+2026-11-18 18:32:55 | 🐛 ssnn-airr closed issue in immcantation/presto: 'No sequences pass the V-segment primer step in Illumina MiSeq 2x250 BCR mRNA'
+2026-11-18 18:32:53 | 🔀 ssnn-airr merged PR in immcantation/presto
+2026-11-18 18:25:22 | 🔀 ssnn-airr opened PR in immcantation/presto
+2026-11-18 18:25:10 | 💬 ssnn-airr created issue 'No sequences pass the V-segment primer step in Illumina MiSeq 2x250 BCR mRNA' in immcantation/presto
+2026-11-18 18:00:44 | 🐛 ssnn-airr opened issue in immcantation/presto: 'No sequences pass the V-segment primer step in Illumina MiSeq 2x250 BCR mRNA'
+2026-11-18 17:50:47 | 🐛 ssnn-airr assigned issue in immcantation/presto: 'No sequences pass the V-segment primer step in Illumina MiSeq 2x250 BCR mRNA'
+2026-11-18 17:50:46 | 🐛 ssnn-airr labeled issue in immcantation/presto: 'No sequences pass the V-segment primer step in Illumina MiSeq 2x250 BCR mRNA'
+2026-11-18 13:25:13 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-18 13:11:25 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-18 12:20:30 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-18 11:29:52 | 🔹 claude performed GollumEvent on open-guji/luatex-cn
+2026-11-18 10:22:45 | ⭐️ akiyamanman starred bowang-lab/scGPT
+2026-11-18 10:22:45 | ⭐️ akiyamanman starred bowang-lab/scGPT
+2026-11-18 10:12:00 | 🚀 lucidrains pushed to lucidrains/x-transformers
+    - [7c5cc4e] (expanded) add the proposal from Latent Lattice Transformer - Duggal et al., throw in a dsconv kernel size 4 option
+2026-11-18 08:16:10 | 🔹 claude performed GollumEvent on ClassicMiniDIY/UltraLog
+2026-11-18 07:46:35 | 🔹 Mic92 performed DeleteEvent on nix-community/harmonia
+2026-11-18 07:44:27 | 🚀 Mic92 pushed to nix-community/harmonia
+    - [d2d5a26] (expanded) chore(deps): bump toml from 1.1.8+spec-1.1.0 to 1.2.1+spec-1.1.0
+2026-11-18 07:44:12 | 🔹 Mic92 performed DeleteEvent on nix-community/harmonia
+2026-11-18 07:34:25 | 🚀 Mic92 pushed to nix-community/harmonia
+    - [88bc3ad] (expanded) chore(deps): bump actix-web from 4.17.0 to 4.19.0
+2026-11-18 06:20:53 | 🔹 sokrypton performed DeleteEvent on sokrypton/localfold
+2026-11-18 06:20:53 | 🔹 sokrypton performed DeleteEvent on sokrypton/localfold
+2026-11-18 06:15:22 | 🆕 sokrypton created branch 'webgl-af2' at sokrypton/localfold
+2026-11-18 06:05:43 | 🔹 Mic92 performed DeleteEvent on TUM-DSE/doctor-cluster-config
+2026-11-18 05:54:18 | 🆕 Mic92 created branch 'claim-until-commit' at Mic92/niks3
+2026-11-18 05:41:32 | 🚀 ggabernet pushed to immcantation/enchantr
+    - [8c76f14] (expanded) Merge branch 'master' into polish_reports
+2026-11-18 05:40:08 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/enchantr
+2026-11-18 05:35:46 | 🔹 jluethi performed PullRequestReviewCommentEvent on normanrz/ngff
+2026-11-18 05:22:12 | 🔹 jluethi performed PullRequestReviewCommentEvent on normanrz/ngff
+2026-11-18 04:50:04 | 🚀 Mic92 pushed to numtide/llm-agents.nix
+    - [cf4f8d6] (expanded) plannotator-tui: add git for tests
+2026-11-18 04:36:03 | 🚀 Mic92 pushed to numtide/llm-agents.nix
+    - [111b73b] (expanded) opencode-desktop: drop musl fff-bin from node_modules
+2026-11-18 03:40:18 | 🔹 Mic92 performed DeleteEvent on Mic92/tincr
+2026-11-18 03:40:03 | 🚀 Mic92 pushed to Mic92/tincr
+    - [a99fc10] (expanded) build(deps): bump log from 0.4.34 to 0.4.35
+2026-11-18 03:13:41 | 🔹 Vivian0105 performed DeleteEvent on immcantation/enchantr
+2026-11-18 02:59:45 | 🚀 ssnn-airr pushed to immcantation/alakazam
+    - [75ba3e7] (expanded) Merge pull request #143 from immcantation/collapse_sparse_followup
+2026-11-18 02:36:45 | 🆕 ssnn-airr created branch 'collapse_sparse_followup' at immcantation/alakazam
+2026-11-18 02:05:13 | 🚀 github-actions pushed to immcantation/alakazam
+    - [967a6db] (expanded)  Auto-render docs.
+2026-11-18 01:53:57 | 🚀 ssnn-airr pushed to immcantation/alakazam
+    - [348cc6c] (expanded) Merge pull request #141 from robertbjornson/collapse_sparse
