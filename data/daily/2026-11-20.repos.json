@@ -1,0 +1,340 @@
+[
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "Linseven",
+      "QT-learn-lib",
+      "chaojixinren",
+      "j2lab-csm",
+      "patadejaguar",
+      "privatez"
+    ],
+    "event": "mixed",
+    "stars": 54404,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "alibaba/nacos",
+    "who": [
+      "KomachiSion"
+    ],
+    "event": "issue",
+    "stars": 33532,
+    "language": "Java",
+    "description": "an easy-to-use dynamic service discovery, configuration and service management platform for building AI cloud native applications.",
+    "url": "https://github.com/alibaba/nacos"
+  },
+  {
+    "full_name": "alibaba/spring-ai-alibaba",
+    "who": [
+      "HowellYan"
+    ],
+    "event": "mixed",
+    "stars": 11165,
+    "language": "Java",
+    "description": "Agentic AI Framework for Java Developers",
+    "url": "https://github.com/alibaba/spring-ai-alibaba"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "LouYuanbo1",
+      "Mohamed-Abdalla1"
+    ],
+    "event": "star",
+    "stars": 4452,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "scverse/scanpy",
+    "who": [
+      "maltekuehl"
+    ],
+    "event": "other",
+    "stars": 2618,
+    "language": "Python",
+    "description": "Single-cell analysis in Python. Scales to >100M cells.",
+    "url": "https://github.com/scverse/scanpy"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "Larry-Fang-xin",
+      "javeedsm",
+      "pububaji",
+      "yqzhu-123"
+    ],
+    "event": "mixed",
+    "stars": 1671,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "rtp-llm-review-bot"
+    ],
+    "event": "pr",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "bowang-lab/MedRAX",
+    "who": [
+      "STkonomi"
+    ],
+    "event": "star",
+    "stars": 1257,
+    "language": "Python",
+    "description": "MedRAX: Medical Reasoning Agent for Chest X-ray - ICML 2025",
+    "url": "https://github.com/bowang-lab/MedRAX"
+  },
+  {
+    "full_name": "bowang-lab/U-Mamba",
+    "who": [
+      "Snowyrunner"
+    ],
+    "event": "star",
+    "stars": 1034,
+    "language": "Python",
+    "description": "U-Mamba: Enhancing Long-range Dependency for Biomedical Image Segmentation",
+    "url": "https://github.com/bowang-lab/U-Mamba"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "xiaohaizi90"
+    ],
+    "event": "star",
+    "stars": 741,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "who": [
+      "JasonJiangs",
+      "MaybeBio",
+      "VictorCurean"
+    ],
+    "event": "mixed",
+    "stars": 607,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/OmicsML/awesome-foundation-model-single-cell-papers"
+  },
+  {
+    "full_name": "davidliwei/awesome-CRISPR",
+    "who": [
+      "yzhao80"
+    ],
+    "event": "mixed",
+    "stars": 586,
+    "language": "",
+    "description": "List of software/websites/databases/other stuff for genome engineering",
+    "url": "https://github.com/davidliwei/awesome-CRISPR"
+  },
+  {
+    "full_name": "scverse/spatialdata",
+    "who": [
+      "MeyerBender"
+    ],
+    "event": "issue",
+    "stars": 408,
+    "language": "Python",
+    "description": "An open and interoperable data framework for spatial omics data",
+    "url": "https://github.com/scverse/spatialdata"
+  },
+  {
+    "full_name": "alibaba/loongsuite-pilot",
+    "who": [
+      "linrunqi08",
+      "messixukejia",
+      "ralf0131"
+    ],
+    "event": "mixed",
+    "stars": 263,
+    "language": "TypeScript",
+    "description": "Local-first telemetry collector for AI coding agents — unified OpenTelemetry events for Claude Code, Codex, Cursor and more. Token usage, cost, traces and security audit, exported anywhere.",
+    "url": "https://github.com/alibaba/loongsuite-pilot"
+  },
+  {
+    "full_name": "scverse/infercnvpy",
+    "who": [
+      "codecov-commenter",
+      "review-notebook-app",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 203,
+    "language": "Python",
+    "description": "Infer copy number variation (CNV) from scRNA-seq data.",
+    "url": "https://github.com/scverse/infercnvpy"
+  },
+  {
+    "full_name": "bowang-lab/scGPT-spatial",
+    "who": [
+      "yqzhu-123"
+    ],
+    "event": "star",
+    "stars": 145,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT-spatial"
+  },
+  {
+    "full_name": "bowang-lab/Orthrus",
+    "who": [
+      "dianyo"
+    ],
+    "event": "star",
+    "stars": 134,
+    "language": "Python",
+    "description": "  Orthrus is a mature RNA model for RNA property prediction. It uses a mamba encoder backbone, a variant of state-space models specifically designed for long-sequence data, such as RNA.",
+    "url": "https://github.com/bowang-lab/Orthrus"
+  },
+  {
+    "full_name": "pachterlab/Manimble",
+    "who": [
+      "moritzschaefer"
+    ],
+    "event": "issue",
+    "stars": 120,
+    "language": "Swift",
+    "description": "Edit manim slides",
+    "url": "https://github.com/pachterlab/Manimble"
+  },
+  {
+    "full_name": "alibaba/open-guardrail",
+    "who": [
+      "liuhuijuanAnne"
+    ],
+    "event": "pr",
+    "stars": 81,
+    "language": "Go",
+    "description": "Evidence-based guardrails for AI agents and automated workflows. Versioned policies, structured evidence, and auditable allow/deny decisions.",
+    "url": "https://github.com/alibaba/open-guardrail"
+  },
+  {
+    "full_name": "Lotfollahi-lab/mintflow",
+    "who": [
+      "inoue0426"
+    ],
+    "event": "star",
+    "stars": 30,
+    "language": "Python",
+    "description": "Generation of disentangled microenvironment-induced and intrinsic gene expression vectors from spatial transcriptomics data",
+    "url": "https://github.com/Lotfollahi-lab/mintflow"
+  },
+  {
+    "full_name": "anti43/openyabs",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 27,
+    "language": "Java",
+    "description": "Yet another business software on github",
+    "url": "https://github.com/anti43/openyabs"
+  },
+  {
+    "full_name": "scverse/mantispy",
+    "who": [
+      "codecov-commenter",
+      "read-the-docs-community",
+      "review-notebook-app",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 18,
+    "language": "Python",
+    "description": "Analysis framework for morphological profiling data",
+    "url": "https://github.com/scverse/mantispy"
+  },
+  {
+    "full_name": "Genentech/scallops",
+    "who": [
+      "joshua-gould"
+    ],
+    "event": "mixed",
+    "stars": 16,
+    "language": "Python",
+    "description": "SCALLOPS (Scalable Library for Optical Pooled Screens) is a comprehensive Python package designed to streamline and scale the analysis of Optical Pooled Screens (OPS) for biological data. ",
+    "url": "https://github.com/Genentech/scallops"
+  },
+  {
+    "full_name": "scverse/fast-array-utils",
+    "who": [
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 15,
+    "language": "Python",
+    "description": "Fast array utilities",
+    "url": "https://github.com/scverse/fast-array-utils"
+  },
+  {
+    "full_name": "Genentech/MoCAVI",
+    "who": [
+      "qimiankkk"
+    ],
+    "event": "pr",
+    "stars": 14,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Genentech/MoCAVI"
+  },
+  {
+    "full_name": "acidgenomics/koopa",
+    "who": [
+      "mjsteinbaugh"
+    ],
+    "event": "push",
+    "stars": 11,
+    "language": "Python",
+    "description": "Shell bootloader for data science.",
+    "url": "https://github.com/acidgenomics/koopa"
+  },
+  {
+    "full_name": "Lotfollahi-lab/mintflow-reproducibility",
+    "who": [
+      "inoue0426"
+    ],
+    "event": "star",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the MintFlow manuscript",
+    "url": "https://github.com/Lotfollahi-lab/mintflow-reproducibility"
+  },
+  {
+    "full_name": "MiniMyself/kometa-textfiles",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 3,
+    "language": "",
+    "description": "Textfiles for Kometa to build collections",
+    "url": "https://github.com/MiniMyself/kometa-textfiles"
+  },
+  {
+    "full_name": "Lotfollahi-lab/LocoGen",
+    "who": [
+      "DabinJeong",
+      "vesselux"
+    ],
+    "event": "star",
+    "stars": 2,
+    "language": "Python",
+    "description": "[NeurIPS 2026] Generative model for de novo design of regulatory DNA sequences, using property-guided generation to reach out-of-distribution objectives within a lab-in-the-loop design cycle",
+    "url": "https://github.com/Lotfollahi-lab/LocoGen"
+  }
+]
