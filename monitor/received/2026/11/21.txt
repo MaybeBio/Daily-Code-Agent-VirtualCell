@@ -1,0 +1,92 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-21 09:53:11 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-21 09:53:03 | 💬 HypForge created issue 'Part of #3051: bound the PR decision context at the session's other-branch pushes' in hyparam/hypaware
+2026-11-21 09:52:28 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-21 09:52:26 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-21 09:51:58 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-21 09:51:15 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-21 09:51:02 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-21 09:51:00 | ⭐️ georgeyboy28 starred alibaba/open-code-review
+2026-11-21 09:50:37 | 💬 wu21-web created issue 'feat(llm): add LLMTR to list of providers' in alibaba/open-code-review
+2026-11-21 09:50:37 | 🔹 rtp-llm-review-bot performed PullRequestReviewEvent on alibaba/rtp-llm
+2026-11-21 09:50:34 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-21 09:49:10 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-21 09:48:55 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-21 09:47:38 | ⭐️ wakuwaku-33 starred alibaba/page-agent
+2026-11-21 09:45:25 | 🔹 NameHaibinZhang performed PullRequestReviewEvent on alibaba/loongsuite-go
+2026-11-21 09:45:22 | 🔹 NameHaibinZhang performed PullRequestReviewCommentEvent on alibaba/loongsuite-go
+2026-11-21 09:45:22 | 🔹 NameHaibinZhang performed PullRequestReviewCommentEvent on alibaba/loongsuite-go
+2026-11-21 09:45:22 | 🔹 NameHaibinZhang performed PullRequestReviewCommentEvent on alibaba/loongsuite-go
+2026-11-21 09:43:25 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-21 09:38:27 | 🔹 Copilot performed PullRequestReviewEvent on alibaba/loongsuite-pilot
+2026-11-21 09:38:16 | 🔀 ralf0131 opened PR in alibaba/loongsuite-pilot
+2026-11-21 09:37:08 | 🔀 github-actions unlabeled PR in scverse/rapids-singlecell
+2026-11-21 09:37:07 | 🔀 Intron7 labeled PR in scverse/rapids-singlecell
+2026-11-21 09:37:07 | 🔀 Intron7 opened PR in scverse/rapids-singlecell
+2026-11-21 09:34:53 | ⭐️ denvercyber22 starred alibaba/open-code-review
+2026-11-21 09:34:10 | ⭐️ SANilave starred alibaba/page-agent
+2026-11-21 09:34:00 | 🔀 github-actions unlabeled PR in scverse/rapids-singlecell
+2026-11-21 09:31:48 | 💬 gitbenlewis created issue 'Add tximport-style transcript-length normalization   and pytximport support' in scverse/PyDESeq2
+2026-11-21 09:31:16 | 🔀 Intron7 labeled PR in scverse/rapids-singlecell
+2026-11-21 09:31:16 | 🔀 Intron7 opened PR in scverse/rapids-singlecell
+2026-11-21 09:29:37 | 🍴 JasonOA888 forked alibaba/open-code-review
+2026-11-21 08:24:16 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-21 08:20:58 | 🔹 claude performed GollumEvent on daqifi/daqifi-nyquist-firmware
+2026-11-21 08:20:58 | 🔹 claude performed GollumEvent on daqifi/daqifi-nyquist-firmware
+2026-11-21 08:12:49 | 🚀 yifanzhang-pro pushed to math-ai-org/riemann-hypothesis-proof
+    - [c6c4f0f] (expanded) Give the 3D field a tilted resting pose
+2026-11-21 07:47:38 | 🍴 tzhang-nmdp forked scverse/scvi-tutorials
+2026-11-21 07:46:13 | 🍴 tzhang-nmdp forked scverse/scvi-tools
+2026-11-21 07:44:26 | 🔀 ckmah opened PR in scverse/ecosystem-packages
+2026-11-21 07:43:46 | 🔹 ilan-gold performed PullRequestReviewEvent on scverse/anndata
+2026-11-21 07:43:38 | 🍴 ckmah forked scverse/ecosystem-packages
+2026-11-21 07:42:19 | 🔹 ilan-gold performed PullRequestReviewCommentEvent on scverse/anndata
+2026-11-21 07:19:35 | 💬 codecov-commenter created issue 'Add pp.guide_qc: flag inactive, outlying and thin guides, and let gene tests exclude guides' in scverse/mantispy
+2026-11-21 07:14:22 | 💬 read-the-docs-community created issue 'Add pp.guide_qc: flag inactive, outlying and thin guides, and let gene tests exclude guides' in scverse/mantispy
+2026-11-21 07:11:44 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-21 06:12:45 | 💬 github-actions created issue 'Fix the issues from the review of #582' in scverse/anndataR
+2026-11-21 05:53:57 | 🔀 rcannood opened PR in scverse/anndataR
+2026-11-21 04:45:06 | 🔀 leelieber2025 opened PR in scverse/ecosystem-packages
+2026-11-21 03:57:59 | 💬 read-the-docs-community created issue 'feat: exact, deterministic numba k-means (fast_array_utils.cluster)' in scverse/fast-array-utils
+2026-11-21 03:57:58 | 💬 codecov-commenter created issue 'xenium: read planar RGB aligned images (OME axes SYX)' in scverse/spatialdata-io
+2026-11-21 03:57:55 | 💬 codecov-commenter created issue 'xenium: place an H&E image without an alignment CSV by an affine fit to its keypoints' in scverse/spatialdata-io
+2026-11-21 02:56:07 | ⭐️ lyuxiaotian starred theislab/single-cell-best-practices
+2026-11-20 23:34:54 | 🔀 Zethson opened PR in scverse/PyDESeq2
+2026-11-20 23:33:01 | 💬 ilan-gold created issue 'Investigate `networkit` (for `leiden` implementation)' in scverse/scanpy
+2026-11-20 23:06:38 | 💬 Zethson created issue 'Add tximport-style transcript-length normalization   and pytximport support' in scverse/PyDESeq2
+2026-11-20 23:02:46 | 💬 Zethson created issue 'Add Relative Log Expression (RLE) Plots' in scverse/PyDESeq2
+2026-11-20 23:02:44 | 💬 Zethson created issue '[BUG] stuck on dds.deseq2()' in scverse/PyDESeq2
+2026-11-20 23:02:44 | 💬 Zethson created issue '[BUG] stuck on dds.deseq2()' in scverse/PyDESeq2
+2026-11-20 19:16:44 | 🚀 Zethson pushed to scverse/PyDESeq2
+    - [3773402] (expanded) feat: shrink the coefficient of the contrast when lfc_shrink has no coeff (#543)
+2026-11-20 17:03:01 | 💬 EperLuo created issue '[TASK: Biology] Predict hematopoietic descendant compositions from RNA snapshots' in harbor-framework/terminal-bench-science
+2026-11-20 17:02:44 | 🚀 EperLuo pushed to EperLuo/terminal-bench-science
+    - [7d8c9b0] (expanded) Clarify source RNA-state annotation guidance and record fresh Astra pilot
+2026-11-20 16:57:17 | 🔀 xiaomin-D opened PR in yuangpeng/atrium
+2026-11-20 16:51:19 | 🔀 xiaomin-D opened PR in yuangpeng/atrium
+2026-11-20 16:44:03 | 🍴 xiaomin-D forked yuangpeng/atrium
+2026-11-20 14:05:54 | 🔹 jianglan89 performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 14:04:41 | 🔹 jianglan89 performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 13:51:34 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 13:51:30 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 13:51:20 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 13:51:16 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-20 09:10:13 | 🔹 timtreis performed PullRequestReviewCommentEvent on scverse/fast-array-utils
+2026-11-20 09:09:21 | 🔹 timtreis performed PullRequestReviewCommentEvent on scverse/fast-array-utils
+2026-11-20 09:00:58 | 🔹 maltekuehl performed PullRequestReviewCommentEvent on scverse/scanpy
+2026-11-20 08:54:58 | 🔹 maltekuehl performed PullRequestReviewCommentEvent on scverse/scanpy
+2026-11-20 08:49:09 | 🔀 VictorCurean merged PR in OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-20 06:51:30 | 🔹 Zethson performed PullRequestReviewCommentEvent on scverse/spatialdata
+2026-11-20 05:23:24 | 🔀 yzhao80 opened PR in davidliwei/awesome-CRISPR
+2026-11-20 05:12:58 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 04:55:48 | 🍴 yzhao80 forked davidliwei/awesome-CRISPR
+2026-11-20 04:08:22 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 04:07:57 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 04:05:27 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 04:00:52 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 03:53:53 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 03:52:35 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 03:38:55 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-20 00:57:51 | ⭐️ yqzhu-123 starred bowang-lab/scGPT
+2026-11-20 00:57:46 | ⭐️ yqzhu-123 starred bowang-lab/scGPT-spatial
