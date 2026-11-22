@@ -1,0 +1,2787 @@
+# Page: Overview
+
+# Overview
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+
+</details>
+
+
+
+## Purpose and Scope
+
+BulkRNABert is a transformer-based encoder-only language model pre-trained on bulk RNA-seq data through self-supervision using masked language modeling. This system achieves state-of-the-art performance in cancer type classification and survival time prediction on TCGA dataset. This wiki provides comprehensive documentation for using the pretrained BulkRNABert models, preprocessing RNA-seq data, and applying the models to downstream tasks.
+
+For detailed information about the model architecture, see [BulkRNABert Model](#3). For data preprocessing details, see [Data Preprocessing](#4). For information about downstream applications, see [Downstream Applications](#5).
+
+Sources: [README.md:5-7]()
+
+## System Architecture
+
+BulkRNABert implements an end-to-end pipeline for analyzing bulk RNA sequencing data using transformer-based models, with a modular design that separates preprocessing, tokenization, model definition, and downstream applications.
+
+```mermaid
+graph TD
+    A["Raw RNA-seq Data"] --> B["preprocess_tcga_rna_seq.py"]
+    B --> C["Processed RNA-seq Data"]
+    C --> D["preprocess_rna_seq_for_bulkrnabert"]
+    D --> E["BinnedExpressionTokenizer"]
+    E --> F["BulkRNABert Model"]
+    
+    G["Pretrained Model Checkpoints"] --> F
+    
+    F --> H["Gene Embeddings"]
+    H --> I["Downstream Tasks"]
+    I --> J1["Cancer Type Classification"]
+    I --> J2["Survival Analysis"]
+    
+    subgraph "Pretrained Models"
+        G1["bulk_rna_bert_tcga"]
+        G2["bulk_rna_bert_gtex_encode"]
+        G3["bulk_rna_bert_gtex_encode_tcga"]
+    end
+    
+    G1 -.-> G
+    G2 -.-> G
+    G3 -.-> G
+    
+    K["common_gene_id.txt"] --> B
+```
+
+Sources: [README.md:5-7](), [README.md:49-52]()
+
+## Key Components
+
+BulkRNABert consists of several key components that work together to process RNA-seq data and generate embeddings for downstream tasks.
+
+| Component | Purpose | Implementation |
+|-----------|---------|----------------|
+| Data Preprocessing | Transform raw RNA-seq data into a format suitable for modeling | `preprocess_tcga_rna_seq.py`, `preprocess_rna_seq_for_bulkrnabert` |
+| Tokenization | Convert numerical gene expression values into tokens | `BinnedExpressionTokenizer` |
+| Core Model | Generate contextual gene embeddings using transformer architecture | `BulkRNABert` |
+| Model Loading | Load pretrained models and configurations | `get_pretrained_model` |
+| Downstream Applications | Use gene embeddings for specific tasks like classification | Classification and survival prediction models |
+
+Sources: [README.md:25-47]()
+
+## Code Organization
+
+The codebase is organized to provide a clean separation of concerns between different components of the system.
+
+```mermaid
+graph TD
+    subgraph "Code Structure"
+        A["multiomics_open_research"]
+        A --> B["bulk_rna_bert"]
+        B --> C1["model.py"]
+        B --> C2["pretrained.py"]
+        B --> C3["preprocess.py"]
+        B --> C4["tokenizer.py"]
+        B --> C5["downstream"]
+        C5 --> D1["cancer_classification.py"]
+        C5 --> D2["survival.py"]
+    end
+
+    subgraph "Data"
+        E["data/"]
+        E --> E1["common_gene_id.txt"]
+        E --> E2["tcga_sample.csv"]
+        E --> E3["raw_tcga_sample/"]
+    end
+
+    subgraph "Checkpoints"
+        F["checkpoints/"]
+        F --> F1["bulk_rna_bert_tcga/"]
+        F --> F2["bulk_rna_bert_gtex_encode/"]
+        F --> F3["bulk_rna_bert_gtex_encode_tcga/"]
+    end
+```
+
+Sources: [README.md]()
+
+## Pretrained Models
+
+BulkRNABert provides three different pretrained models, each trained on different datasets or combinations of datasets.
+
+| Model Name | Training Data | Description |
+|------------|---------------|-------------|
+| `bulk_rna_bert_tcga` | TCGA | BulkRNABert pre-trained on TCGA data |
+| `bulk_rna_bert_gtex_encode` | GTEx and ENCODE | BulkRNABert pre-trained on GTEx and ENCODE data |
+| `bulk_rna_bert_gtex_encode_tcga` | GTEx, ENCODE, and TCGA | BulkRNABert pre-trained on a mix of GTEx, ENCODE and TCGA data |
+
+For more details about these pretrained models, see [Pretrained Models](#3.1).
+
+Sources: [README.md:49-52]()
+
+## Data Processing Pipeline
+
+The data processing pipeline transforms raw RNA-seq data into a format suitable for input to the BulkRNABert model. The pipeline includes preprocessing, normalization, and tokenization steps.
+
+```mermaid
+flowchart LR
+    A["TCGA RNA-seq Data"] --> B["preprocess_tcga_rna_seq.py"]
+    K["common_gene_id.txt"] --> B
+    B --> C["Processed RNA-seq CSV"]
+    
+    C --> D["preprocess_rna_seq_for_bulkrnabert"]
+    D --> E["RNA-seq Array"]
+    
+    E --> F["BinnedExpressionTokenizer"]
+    F --> G["Token IDs"]
+    
+    G --> H["BulkRNABert"]
+    H --> I["Gene Embeddings"]
+    
+    I --> J["Downstream Applications"]
+```
+
+Sources: [README.md:55-69]()
+
+## Typical Usage
+
+Using BulkRNABert typically involves:
+
+1. Loading a pretrained model using `get_pretrained_model`
+2. Preprocessing RNA-seq data with `preprocess_rna_seq_for_bulkrnabert`
+3. Tokenizing the preprocessed data
+4. Running the model to generate embeddings
+5. Using the embeddings for downstream tasks
+
+The system is designed to make this process as seamless as possible, with comprehensive utilities for each step.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Preprocessing as "Preprocessing Utilities"
+    participant Model as "BulkRNABert Model"
+    participant Downstream as "Downstream Applications"
+    
+    User->>Preprocessing: Load RNA-seq data
+    Preprocessing->>Preprocessing: Normalize and format data
+    Preprocessing->>Model: Tokenize data
+    User->>Model: Load pretrained model
+    Model->>Model: Generate gene embeddings
+    Model->>Downstream: Provide embeddings
+    Downstream->>User: Return predictions
+```
+
+Sources: [README.md:19-48]()
+
+## Downstream Applications
+
+BulkRNABert embeddings can be used for various downstream tasks related to cancer genomics:
+
+1. **Cancer Type Classification**: Predicting cancer types from RNA-seq data across multiple cohorts (BRCA, BLCA, GBMLGG, LUAD, UCEC)
+2. **Survival Analysis**: Predicting patient survival time
+
+For details about cancer classification, see [Cancer Classification](#5.1). For details about survival analysis, see [Survival Analysis](#5.2).
+
+Sources: [README.md:71-73]()
+
+## System Requirements and Installation
+
+To use BulkRNABert:
+
+1. Clone the repository
+2. Install the package using `pip install -e .`
+3. Download the pretrained model checkpoints
+
+The system is built using JAX and Haiku, providing efficient and scalable model inference.
+
+Sources: [README.md:11-17]()
+
+## Citing BulkRNABert
+
+The BulkRNABert research is published in a bioRxiv paper: "BulkRNABert: Cancer prognosis from bulk RNA-seq based language models" by Gelard et al., 2024.
+
+Sources: [README.md:75-90]()
+
+---
+
+# Page: System Architecture
+
+# System Architecture
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [multiomics_open_research/bulk_rna_bert/pretrained.py](multiomics_open_research/bulk_rna_bert/pretrained.py)
+
+</details>
+
+
+
+## Purpose and Scope
+
+This document describes the high-level architecture of BulkRNABert, detailing its main components and how they interact to process RNA-sequencing data through transformer-based models. It covers the data flow from raw RNA-seq data to gene embeddings and explains how these embeddings enable downstream applications. For specific details about the BulkRNABert model itself, see [BulkRNABert Model](#3), and for preprocessing specifics, see [Data Preprocessing](#4).
+
+## System Overview
+
+BulkRNABert is a transformer-based system for analyzing bulk RNA sequencing data. The system processes gene expression data to generate contextualized gene embeddings that can be used for various downstream tasks like cancer classification and survival prediction.
+
+```mermaid
+flowchart TD
+    A["Raw RNA-seq Data"] --> B["Preprocessing Pipeline"]
+    B --> C["Processed RNA-seq Data"]
+    C --> D["BinnedExpressionTokenizer"]
+    D --> E["Tokenized RNA-seq Data"]
+    E --> F["BulkRNABert Model"]
+    
+    G["Pretrained Model Checkpoints"] --> F
+    
+    F --> H["Gene Embeddings"]
+    H --> I["Downstream Tasks"]
+    I --> J1["Cancer Type Classification"]
+    I --> J2["Survival Analysis"]
+    
+    subgraph "Pretrained Models"
+        G1["bulk_rna_bert_tcga"]
+        G2["bulk_rna_bert_gtex_encode"]
+        G3["bulk_rna_bert_gtex_encode_tcga"]
+    end
+    
+    G1 -.-> G
+    G2 -.-> G
+    G3 -.-> G
+    
+    K["Common Gene IDs"] --> B
+```
+
+Sources: [README.md:5-7](), [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86]()
+
+## Core Components
+
+The BulkRNABert system consists of the following core components:
+
+1. **Data Preprocessing** - Transforms raw RNA-seq data into a standardized format
+2. **Tokenization** - Converts numerical gene expression values into token IDs
+3. **BulkRNABert Model** - Processes tokenized data to generate gene embeddings
+4. **Model Loading** - Facilitates loading of pretrained models
+5. **Downstream Applications** - Utilizes embeddings for specific tasks like cancer classification
+
+### Data Preprocessing Pipeline
+
+The preprocessing pipeline converts raw RNA-seq data (such as from TCGA, GTEx, or ENCODE) into a format suitable for the BulkRNABert model.
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Data Files"] --> B["preprocess_tcga_rna_seq.py"]
+    K["common_gene_id.txt"] --> B
+    B --> C["Processed RNA-seq CSV"]
+    
+    C --> D["preprocess_rna_seq_for_bulkrnabert()"]
+    D --> E["RNA-seq Array"]
+    
+    subgraph "Normalization Options"
+        N1["Log Normalization"]
+        N2["Max Normalization"]
+    end
+    
+    N1 -.-> D
+    N2 -.-> D
+    
+    F["BulkRNABertConfig"] --> D
+```
+
+Sources: [README.md:55-69]()
+
+Key features of the preprocessing pipeline:
+- Uses a standardized set of gene IDs specified in `common_gene_id.txt`
+- Supports different normalization strategies (log, max)
+- Transforms raw data (like TPM values) into a format ready for tokenization
+
+### Tokenization System
+
+The tokenization system converts normalized gene expression values into token IDs for input to the transformer model.
+
+```mermaid
+flowchart TD
+    A["RNA-seq Array"] --> B["BinnedExpressionTokenizer"]
+    B --> C["Token IDs"]
+    
+    D["Configuration Parameters"] --> B
+    D1["n_expressions_bins"] --> D
+    D2["use_max_normalization"] --> D
+    D3["normalization_factor"] --> D
+    D4["prepend_cls_token"] --> D
+    
+    C --> E["BulkRNABert Model Input"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:67-72](), [README.md:38-40]()
+
+The `BinnedExpressionTokenizer` discretizes continuous gene expression values into bins, turning them into integer token IDs that can be processed by the transformer model.
+
+### Model Architecture
+
+```mermaid
+flowchart TD
+    A["Token IDs"] --> B["BulkRNABert Model"]
+    
+    subgraph "BulkRNABert Internal Structure"
+        C["Gene Embeddings Layer"] --> D["Transformer Encoder Layers"]
+        D --> E["Contextual Gene Embeddings"]
+    end
+    
+    B --> C
+    E --> F["Embeddings Output"]
+    
+    G["Model Config"] --> B
+    H["Pretrained Parameters"] --> B
+    
+    F --> I["Downstream Applications"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:76-82](), [README.md:41-47]()
+
+BulkRNABert uses a BERT-style transformer architecture that processes token IDs to generate contextual gene embeddings. These embeddings capture complex relationships between genes in the expression profile.
+
+## Model Loading System
+
+The model loading system provides a straightforward way to load pretrained BulkRNABert models.
+
+```mermaid
+flowchart TD
+    A["get_pretrained_model()"] --> B["Load Configuration"]
+    B --> C["Initialize Tokenizer"]
+    C --> D["Build Forward Function"]
+    D --> E["Load Parameters"]
+    
+    F["Checkpoint Directory"] --> G["Model-specific Checkpoint Path"] 
+    G --> B
+    G --> E
+    
+    A --> H["Return Components"]
+    H --> I1["parameters"]
+    H --> I2["forward_fn"]
+    H --> I3["tokenizer"]
+    H --> I4["config"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86](), [README.md:28-33]()
+
+The `get_pretrained_model` function serves as the primary entry point for using pretrained BulkRNABert models. It:
+1. Loads the model configuration from the checkpoint directory
+2. Initializes the tokenizer with the correct parameters
+3. Builds a forward function for the model
+4. Loads the pretrained parameters
+5. Returns all components needed for inference
+
+## Complete Inference Flow
+
+The following diagram illustrates the complete flow from raw RNA-seq data to embeddings that can be used for downstream tasks:
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data CSV"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["RNA-seq Array"]
+    C --> D["tokenizer.batch_tokenize()"]
+    D --> E["Token IDs"]
+    E --> F["forward_fn.apply()"]
+    F --> G["Embeddings"]
+    
+    H["get_pretrained_model()"] --> I["parameters, forward_fn, tokenizer, config"]
+    I --> D
+    I --> F
+    
+    G --> J["Mean Embedding"]
+    J --> K["Downstream Tasks"]
+```
+
+Sources: [README.md:19-48]()
+
+## Pretrained Model Variants
+
+BulkRNABert offers three pretrained model variants, each trained on different datasets:
+
+| Model Name | Training Data | Use Case |
+|------------|---------------|----------|
+| `bulk_rna_bert_tcga` | TCGA | Cancer research focused |
+| `bulk_rna_bert_gtex_encode` | GTEx and ENCODE | Normal tissue expression patterns |
+| `bulk_rna_bert_gtex_encode_tcga` | GTEx, ENCODE, and TCGA | Comprehensive gene expression understanding |
+
+Sources: [README.md:49-52]()
+
+## Downstream Applications System
+
+BulkRNABert embeddings can be used for various downstream tasks, particularly in cancer research:
+
+```mermaid
+flowchart LR
+    A["BulkRNABert Embeddings"] --> B["Downstream Applications"]
+    
+    B --> C["Cancer Classification"]
+    B --> D["Survival Analysis"]
+    
+    C --> E["MLP Classifier"]
+    E --> F1["BRCA"]
+    E --> F2["BLCA"]
+    E --> F3["GBMLGG"]
+    E --> F4["LUAD"]
+    E --> F5["UCEC"]
+    
+    D --> G["Survival Predictor"]
+    G --> H["Patient Outcome Prediction"]
+```
+
+Sources: [README.md:71-73]()
+
+The system provides pretrained downstream models for specific cancer classification tasks and survival analysis, leveraging the gene embeddings generated by BulkRNABert.
+
+## Technical Implementation Details
+
+BulkRNABert is implemented using JAX and Haiku, providing efficient computation and transformation-based building blocks:
+
+```mermaid
+flowchart TD
+    A["JAX Backend"] --> B["BulkRNABert Implementation"]
+    C["Haiku Neural Network Library"] --> B
+    
+    B --> D["Forward Transformation"]
+    D --> E["Embedding Generation"]
+    
+    F["Model Parameters"] --> D
+    G["Input Tokens"] --> D
+    
+    E --> H["Downstream Applications"]
+```
+
+Sources: [README.md:19-48](), [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86]()
+
+The technical implementation uses:
+- JAX for high-performance numerical computing
+- Haiku for neural network component definitions
+- Functional transformations for model application
+- Checkpointing for model parameter storage and loading
+
+The model parameters are stored as joblib files in the checkpoint directory, and configuration is stored in JSON format.
+
+## Data Flow Throughout System
+
+The following diagram illustrates how data flows through the entire BulkRNABert system:
+
+```mermaid
+flowchart TD
+    A["Raw RNA-seq Data"] --> B["Preprocessing"]
+    B --> C["Gene Expression Table"]
+    C --> D["Normalization"]
+    D --> E["Tokenization"]
+    E --> F["Token IDs"]
+    F --> G["BulkRNABert Model"]
+    G --> H["Gene Embeddings"]
+    H --> I["Mean Pooling"]
+    I --> J["Sample Embedding Vector"]
+    J --> K1["Cancer Classification"]
+    J --> K2["Survival Analysis"]
+    
+    L["common_gene_id.txt"] --> B
+    M["BulkRNABertConfig"] --> D
+    M --> E
+    M --> G
+    N["Pretrained Parameters"] --> G
+```
+
+Sources: [README.md:19-48](), [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86]()
+
+This diagram shows the complete data transformation process from raw RNA-seq data to actionable insights via the downstream applications, illustrating the role of each component in the system.
+
+---
+
+# Page: BulkRNABert Model
+
+# BulkRNABert Model
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [checkpoints/bulk_rna_bert_gtex_encode/config.json](checkpoints/bulk_rna_bert_gtex_encode/config.json)
+- [checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json](checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json)
+- [checkpoints/bulk_rna_bert_tcga/config.json](checkpoints/bulk_rna_bert_tcga/config.json)
+
+</details>
+
+
+
+BulkRNABert is a transformer-based encoder-only language model pre-trained on bulk RNA sequencing data through self-supervised learning with masked language modeling. This page details the model's architecture, parameters, and configuration options.
+
+For information on using pretrained models, see [Model Loading and Inference](#3.2). For details on preprocessing data for the model, see [Data Preprocessing](#4).
+
+## Model Overview
+
+BulkRNABert applies transformer architecture principles to RNA-seq data, treating gene expression levels as tokens in a sequence. The model learns contextualized representations of gene expressions that capture biological relationships between genes.
+
+### BulkRNABert in the System Pipeline
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data"] --> B["BinnedExpressionTokenizer"]
+    B --> C["Token IDs"]
+    C --> D["BulkRNABert Model"]
+    D --> E["Gene Embeddings"]
+    
+    F["get_pretrained_model()"] --> G["parameters"]
+    F --> H["forward_fn"]
+    F --> I["tokenizer"]
+    F --> J["config"]
+    
+    G --> D
+    H --> D
+    I --> B
+    J --> D
+```
+
+Sources: [README.md:19-48]()
+
+## Model Architecture
+
+BulkRNABert follows a transformer encoder architecture with gene-specific adaptations.
+
+### Architecture Diagram
+
+```mermaid
+graph TD
+    A["Input: Token IDs (batch_size × n_genes)"] --> B["Gene Embedding Layer<br>(embed_dim=256)"]
+    B --> C["Transformer Encoder<br>(num_layers=4)"]
+    
+    subgraph "Transformer Encoder"
+        D1["Layer 1"] --> D2["Layer 2"]
+        D2 --> D3["Layer 3"]
+        D3 --> D4["Layer 4"]
+        
+        subgraph "Each Layer"
+            E1["Multi-Head Attention<br>(num_attention_heads=8, key_size=32)"] --> E2["Feed-Forward Network<br>(ffn_embed_dim=512)"]
+            E2 --> E3["Layer Normalization"]
+        end
+    end
+    
+    C --> F["Output Embeddings<br>(batch_size × n_genes × embed_dim)"]
+    
+    G["Gene2Vec Weights<br>(gene2vec_weights_path)"] -.-> B
+```
+
+Sources: [checkpoints/bulk_rna_bert_tcga/config.json:1](), [README.md:5-7]()
+
+The model consists of:
+
+1. **Gene Embedding Layer**:
+   - Processes 19,062 genes (`n_genes` parameter)
+   - Expression values binned into 64 categories (`n_expressions_bins` parameter)
+   - Initial embedding dimension of 200 (`init_gene_embed_dim`)
+   - Optionally projected to 256 dimensions (`embed_dim`)
+   - Initialized using Gene2Vec weights when `use_gene_embedding=true`
+
+2. **Transformer Encoder**:
+   - 4 identical layers (`num_layers` parameter)
+   - Each layer contains:
+     - Multi-head self-attention with 8 heads (`num_attention_heads`)
+     - Keys/queries of dimension 32 (`key_size`)
+     - Feed-forward network with hidden dimension 512 (`ffn_embed_dim`)
+     - Layer normalization and residual connections
+
+3. **Output Layer**:
+   - Produces contextualized embeddings for each gene
+   - Output dimension: batch_size × n_genes × embed_dim
+
+## Configuration Parameters
+
+BulkRNABert is configured through the following parameters, as defined in the configuration files:
+
+| Parameter | Description | Default Value |
+|-----------|-------------|---------------|
+| n_genes | Number of genes in the common gene set | 19,062 |
+| n_expressions_bins | Number of bins for tokenizing gene expression | 64 |
+| embed_dim | Dimension of transformer embeddings | 256 |
+| init_gene_embed_dim | Initial gene embedding dimension | 200 |
+| project_gene_embedding | Whether to project gene embeddings | true |
+| use_gene_embedding | Whether to use gene embeddings initialization | true |
+| num_attention_heads | Number of attention heads in transformer | 8 |
+| key_size | Size of key vectors in attention | 32 |
+| ffn_embed_dim | Feed-forward network hidden dimension | 512 |
+| num_layers | Number of transformer encoder layers | 4 |
+| use_memory_efficient_attention | Whether to use memory-efficient attention | false |
+| use_gradient_checkpointing | Whether to use gradient checkpointing | true |
+| gene2vec_weights_path | Path to Gene2Vec weights | "data/gene2vec_weights_common_gene_ids.npy" |
+| embeddings_layers_to_save | Layers from which to save embeddings | [] (configurable) |
+| attention_layers_to_save | Layers from which to save attention | [] |
+| use_log_normalization | Whether to apply log normalization | true |
+| use_max_normalization | Whether to apply max normalization | true |
+| normalization_factor | Scaling factor for normalization | ~5.55-5.87 (varies by model) |
+
+Sources: [checkpoints/bulk_rna_bert_tcga/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json:1]()
+
+## Inference Process
+
+During inference, BulkRNABert processes tokenized gene expressions to generate embeddings:
+
+```mermaid
+flowchart LR
+    A["preprocess_rna_seq_for_bulkrnabert()"] --> B["RNA-seq Array"]
+    B --> C["tokenizer.batch_tokenize()"]
+    C --> D["Token IDs"]
+    D --> E["forward_fn.apply()"]
+    E --> F["Output Dictionary"]
+    F --> G["embeddings_4<br>(Final Layer Embeddings)"]
+    G --> H["Mean Pooling<br>(.mean(axis=1))"]
+    H --> I["Sample Embeddings<br>(batch_size × embed_dim)"]
+    
+    J["parameters"] --> E
+    K["forward_fn"] --> E
+    L["random_key"] --> E
+```
+
+Sources: [README.md:36-47]()
+
+The inference process includes:
+1. Preprocessing RNA-seq data with normalization
+2. Tokenizing expression values into discrete bins
+3. Applying the forward function with loaded parameters
+4. Extracting embeddings from specified layers (typically layer 4)
+5. Optionally applying mean pooling to get sample-level embeddings
+
+## Model Variants
+
+BulkRNABert is available in three pretrained variants:
+
+1. **bulk_rna_bert_tcga**
+   - Trained on The Cancer Genome Atlas (TCGA) data
+   - Specialized for cancer genomics applications
+   - Normalization factor: 5.547176906585117
+
+2. **bulk_rna_bert_gtex_encode**
+   - Trained on Genotype-Tissue Expression (GTEx) and ENCODE data
+   - Better for normal tissue expression patterns
+   - Normalization factor: 5.873553674586928
+
+3. **bulk_rna_bert_gtex_encode_tcga**
+   - Trained on a combination of GTEx, ENCODE, and TCGA data
+   - Most comprehensive model with exposure to both normal and cancer tissues
+   - Normalization factor: 5.873553674586928
+
+Sources: [README.md:49-52](), [checkpoints/bulk_rna_bert_tcga/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json:1]()
+
+## Implementation and Usage
+
+BulkRNABert is implemented using JAX and Haiku for efficient computation and automatic differentiation.
+
+### Model Loading Process
+
+```mermaid
+flowchart TD
+    A["get_pretrained_model()"] --> B["Load Configuration<br>(config.json)"]
+    B --> C["Initialize BinnedExpressionTokenizer<br>(n_expressions_bins=64)"]
+    C --> D["Build Forward Function"]
+    D --> E["Load Model Parameters<br>(checkpoint files)"]
+    E --> F["Return Components"]
+    
+    F --> G1["parameters"]
+    F --> G2["forward_fn"]
+    F --> G3["tokenizer"]
+    F --> G4["config"]
+    
+    H["Checkpoint Directory"] --> B
+    H --> E
+```
+
+Sources: [README.md:28-34]()
+
+The basic usage pattern for BulkRNABert is:
+1. Load the pretrained model using `get_pretrained_model`
+2. Preprocess RNA-seq data with `preprocess_rna_seq_for_bulkrnabert`
+3. Tokenize the preprocessed data with `tokenizer.batch_tokenize`
+4. Apply the model using `forward_fn.apply`
+5. Extract and use the resulting embeddings
+
+BulkRNABert's outputs can be used for downstream applications such as cancer classification and survival analysis, as detailed in [Downstream Applications](#5).
+
+---
+
+# Page: Pretrained Models
+
+# Pretrained Models
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [checkpoints/bulk_rna_bert_gtex_encode/config.json](checkpoints/bulk_rna_bert_gtex_encode/config.json)
+- [checkpoints/bulk_rna_bert_gtex_encode/params.joblib](checkpoints/bulk_rna_bert_gtex_encode/params.joblib)
+- [checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json](checkpoints/bulk_rna_bert_gtex_encode_tcga/config.json)
+- [checkpoints/bulk_rna_bert_gtex_encode_tcga/params.joblib](checkpoints/bulk_rna_bert_gtex_encode_tcga/params.joblib)
+- [checkpoints/bulk_rna_bert_tcga/config.json](checkpoints/bulk_rna_bert_tcga/config.json)
+- [checkpoints/bulk_rna_bert_tcga/params.joblib](checkpoints/bulk_rna_bert_tcga/params.joblib)
+
+</details>
+
+
+
+This document provides detailed information about the available pretrained BulkRNABert models in the repository, their configurations, and how to use them. For information about model loading and inference, see [Model Loading and Inference](#3.2), and for details about the base model architecture, see [BulkRNABert Model](#3).
+
+## Overview
+
+The repository provides three pretrained BulkRNABert models, each trained on different datasets to support various research needs. These models enable researchers to generate meaningful embeddings from bulk RNA-sequencing data without needing to train a transformer model from scratch.
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Data"] --> B["Preprocessing"]
+    B --> C["Tokenized RNA-seq"]
+    C --> D["Pretrained BulkRNABert"]
+    
+    subgraph "Available Pretrained Models"
+        D1["bulk_rna_bert_tcga"]
+        D2["bulk_rna_bert_gtex_encode"]
+        D3["bulk_rna_bert_gtex_encode_tcga"]
+    end
+    
+    D --> D1
+    D --> D2
+    D --> D3
+    
+    D1 --> E["Gene Embeddings"]
+    D2 --> E
+    D3 --> E
+    
+    E --> F["Downstream Tasks"]
+    F --> G1["Cancer Classification"]
+    F --> G2["Survival Analysis"]
+```
+
+Sources: [README.md:49-52]()
+
+## Model Characteristics
+
+Each pretrained model has been trained on different datasets, making them suitable for various research applications:
+
+| Model Name | Training Dataset | Specialized For | Normalization Factor |
+|------------|------------------|-----------------|----------------------|
+| bulk_rna_bert_tcga | TCGA (The Cancer Genome Atlas) | Cancer research | 5.547176906585117 |
+| bulk_rna_bert_gtex_encode | GTEx (Genotype-Tissue Expression) and ENCODE | Normal tissue expression | 5.873553674586928 |
+| bulk_rna_bert_gtex_encode_tcga | GTEx, ENCODE, and TCGA | Both normal and cancer tissue | 5.873553674586928 |
+
+All models support 19,062 genes and have identical architecture parameters, differing only in their trained weights and normalization factors. The complete gene list is available in the `data/common_gene_id.txt` file.
+
+Sources: [checkpoints/bulk_rna_bert_tcga/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode/config.json:1](), [README.md:9]()
+
+## Model Architecture and Configuration
+
+The pretrained BulkRNABert models follow a BERT-style transformer encoder architecture, with parameters optimized for RNA-seq data analysis.
+
+```mermaid
+flowchart TD
+    A["Input Gene Expression"] --> B["Expression Binning/Tokenization"]
+    B --> C["Gene Embeddings Layer"]
+    C --> D["Transformer Encoder"]
+    
+    subgraph "get_pretrained_model Function"
+        M["model_name parameter"]
+        CP["checkpoint_directory"]
+        ES["embeddings_layers_to_save"]
+        
+        M --> CFG["Load Configuration"]
+        CP --> CFG
+        CFG --> TK["Initialize Tokenizer"]
+        TK --> FF["Build Forward Function"]
+        FF --> LP["Load Parameters"]
+        CP --> LP
+        ES --> FF
+    end
+    
+    D --> E["Output Gene Embeddings"]
+    
+    style A fill:#f9f9f9
+    style B fill:#f9f9f9
+    style C fill:#f9f9f9
+    style D fill:#f9f9f9
+    style E fill:#f9f9f9
+```
+
+### Configuration Parameters
+
+All pretrained models share the following configuration parameters:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| n_genes | 19,062 | Number of genes in the model |
+| n_expressions_bins | 64 | Number of bins for expression tokenization |
+| embed_dim | 256 | Embedding dimension size |
+| init_gene_embed_dim | 200 | Initial gene embedding dimension size |
+| project_gene_embedding | true | Whether to project gene embeddings |
+| use_gene_embedding | true | Whether to use gene embeddings |
+| num_attention_heads | 8 | Number of attention heads in transformer |
+| key_size | 32 | Size of key vectors in attention mechanism |
+| ffn_embed_dim | 512 | Feed-forward network embedding dimension |
+| num_layers | 4 | Number of transformer layers |
+| use_gradient_checkpointing | true | Memory optimization technique |
+| use_log_normalization | true | Apply log normalization to data |
+| use_max_normalization | true | Apply max normalization to data |
+
+Sources: [checkpoints/bulk_rna_bert_tcga/config.json:1](), [checkpoints/bulk_rna_bert_gtex_encode/config.json:1]()
+
+## Model Loading and Usage
+
+The pretrained models can be loaded using the `get_pretrained_model` function from the BulkRNABert package.
+
+```mermaid
+sequenceDiagram
+    participant User as "User Code"
+    participant Get as "get_pretrained_model()"
+    participant Cfg as "Configuration"
+    participant Tok as "BinnedExpressionTokenizer"
+    participant Fwd as "Forward Function"
+    participant Chk as "Checkpoint Files"
+    
+    User->>Get: Call with model_name
+    Get->>Cfg: Load config.json
+    Get->>Tok: Initialize tokenizer
+    Get->>Fwd: Build forward function
+    Get->>Chk: Load model parameters
+    Get-->>User: Return parameters, forward_fn, tokenizer, config
+    
+    User->>User: Transform forward_fn
+    User->>User: Preprocess RNA-seq data
+    User->>User: Tokenize data
+    User->>User: Apply model
+    User->>User: Extract embeddings
+```
+
+### Basic Usage Example
+
+The following steps demonstrate how to load a pretrained model and use it for inference:
+
+1. Import necessary modules
+2. Load the pretrained model
+3. Preprocess and tokenize RNA-seq data
+4. Run inference to get embeddings
+
+Here's how to select which model to use:
+
+```python
+# For cancer research:
+model_name = "bulk_rna_bert_tcga"
+
+# For normal tissue expression:
+model_name = "bulk_rna_bert_gtex_encode"
+
+# For mixed normal and cancer data:
+model_name = "bulk_rna_bert_gtex_encode_tcga"
+```
+
+The model checkpoint files are expected to be found in the `checkpoints/` directory, containing both the configuration file (`config.json`) and parameters file (`params.joblib`).
+
+Sources: [README.md:19-47]()
+
+## Output Embeddings
+
+The models generate gene embeddings that capture the contextual relationships between genes in the RNA-seq sample. By default, you can extract the embeddings from any layer of the transformer.
+
+When specifying `embeddings_layers_to_save=(4,)`, as shown in the example, the model will save the embeddings from the 4th (final) layer. These embeddings can be accessed from the model output:
+
+```python
+# Get mean embeddings from layer 4
+mean_embedding = outs["embeddings_4"].mean(axis=1)
+```
+
+You can specify multiple layers to save embeddings from, such as `embeddings_layers_to_save=(1, 2, 3, 4)`, to analyze representations at different depths of the model.
+
+Sources: [README.md:46-47]()
+
+## Dataset Compatibility
+
+The pretrained models require RNA-seq data to be structured with the same genes and in the same order as specified in the `common_gene_id.txt` file. This ensures consistency in the model inputs.
+
+For TCGA data, a preprocessing script is provided to format the data correctly:
+
+```
+python scripts/preprocess_tcga_rna_seq.py \
+--dataset-path data/tcga_sample_gdc/ \
+--output-folder data/ \
+--common-gene-ids-path data/common_gene_id.txt \
+--rna-seq-column tpm_unstranded
+```
+
+The preprocessing pipeline ensures that the input data has the appropriate format and normalization for the pretrained models.
+
+Sources: [README.md:56-69]()
+
+## Applications in Downstream Tasks
+
+The embeddings generated by the pretrained models can be used for downstream tasks such as cancer classification and survival analysis. The example notebook `examples/downstream_task_example.ipynb` demonstrates how to use the pretrained models for cancer type classification across five TCGA cohorts (BRCA, BLCA, GBMLGG, LUAD, UCEC).
+
+For more detailed information on downstream applications, refer to [Downstream Applications](#5) and the specific task sections [Cancer Classification](#5.1) and [Survival Analysis](#5.2).
+
+Sources: [README.md:73-73]()
+
+---
+
+# Page: Model Loading and Inference
+
+# Model Loading and Inference
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [multiomics_open_research/bulk_rna_bert/pretrained.py](multiomics_open_research/bulk_rna_bert/pretrained.py)
+
+</details>
+
+
+
+This document explains how to load pretrained BulkRNABert models and perform inference with them. It covers the key components of the model loading process, the inference pipeline, and provides examples of how to use the loaded models for generating gene embeddings. For information about the available pretrained models and their characteristics, see [Pretrained Models](#3.1).
+
+## 1. Model Loading Process
+
+The central function for loading pretrained models is `get_pretrained_model()`, which handles loading the model configuration, initializing the tokenizer, building the forward function, and loading the model parameters.
+
+```mermaid
+flowchart TD
+    A["get_pretrained_model()"] --> B["Load Configuration"]
+    B --> C["Initialize Tokenizer"]
+    C --> D["Build Forward Function"]
+    D --> E["Load Parameters"]
+    
+    A --> F["Return Model Components"]
+    F --> G1["parameters"]
+    F --> G2["forward_fn"]
+    F --> G3["tokenizer"]
+    F --> G4["config"]
+    
+    H["Checkpoint Directory"] --> B
+    H --> E
+    
+    subgraph "Configuration Settings"
+        I1["n_genes"]
+        I2["n_expressions_bins"]
+        I3["embed_dim"]
+        I4["num_layers"]
+        I5["num_attention_heads"]
+    end
+    
+    I1 -.-> B
+    I2 -.-> B
+    I3 -.-> B
+    I4 -.-> B
+    I5 -.-> B
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86]()
+
+### 1.1 Function Parameters
+
+The `get_pretrained_model()` function accepts several parameters that control the loading process:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `model_name` | str | Name of the pretrained model to load (e.g., "bulk_rna_bert_tcga") |
+| `compute_dtype` | jnp.dtype | Data type used for computations (default: jnp.float32) |
+| `param_dtype` | jnp.dtype | Data type for model parameters (default: jnp.float32) |
+| `output_dtype` | jnp.dtype | Data type for model outputs (default: jnp.float32) |
+| `embeddings_layers_to_save` | tuple[int, ...] | Indices of transformer layers from which to return embeddings |
+| `checkpoint_directory` | str | Directory where checkpoints are stored (default: "checkpoints/") |
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:29-36]()
+
+### 1.2 Available Pretrained Models
+
+BulkRNABert provides three pretrained models:
+
+| Model Name | Description |
+|------------|-------------|
+| `bulk_rna_bert_tcga` | BulkRNABert pretrained on TCGA data |
+| `bulk_rna_bert_gtex_encode` | BulkRNABert pretrained on GTEx and ENCODE data |
+| `bulk_rna_bert_gtex_encode_tcga` | BulkRNABert pretrained on a mix of GTEx, ENCODE, and TCGA data |
+
+Sources: [README.md:49-52]()
+
+## 2. Inference Pipeline
+
+The inference process with BulkRNABert involves several steps: loading the model, preprocessing RNA-seq data, tokenizing, running inference, and extracting embeddings.
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data (CSV)"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["RNA-seq Array"]
+    
+    C --> D["tokenizer.batch_tokenize()"]
+    D --> E["Token IDs"]
+    
+    E --> F["forward_fn.apply()"]
+    F --> G["Model Outputs"]
+    
+    G --> H["Gene Embeddings"]
+    
+    I["get_pretrained_model()"] --> J["parameters"]
+    I --> K["forward_fn"]
+    I --> L["tokenizer"]
+    I --> M["config"]
+    
+    J --> F
+    K --> F
+    M --> B
+    L --> D
+```
+
+Sources: [README.md:19-48]()
+
+### 2.1 Preprocessing Data
+
+Before inference, RNA-seq data must be preprocessed using the `preprocess_rna_seq_for_bulkrnabert()` function. This function:
+
+1. Takes a pandas DataFrame containing RNA-seq data
+2. Applies normalization (log or max normalization based on config)
+3. Returns a numpy array ready for tokenization
+
+Sources: [README.md:37-38]()
+
+### 2.2 Tokenization
+
+The tokenizer converts normalized RNA-seq values into token IDs that the model can process:
+
+1. The `BinnedExpressionTokenizer` discretizes continuous expression values into bins
+2. The `batch_tokenize()` method processes multiple samples at once
+3. The output is a 2D array of token IDs (samples × genes)
+
+Sources: [README.md:39-40](), [multiomics_open_research/bulk_rna_bert/pretrained.py:67-72]()
+
+### 2.3 Model Inference
+
+Inference involves:
+
+1. Transforming the model's forward function using `hk.transform()`
+2. Converting tokens to JAX arrays
+3. Calling the transformed forward function with model parameters
+4. Extracting embeddings from the output
+
+Sources: [README.md:43-47]()
+
+## 3. End-to-End Example
+
+The complete process of loading a model and performing inference follows this sequence:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant get_pretrained_model
+    participant preprocess_rna_seq_for_bulkrnabert
+    participant BinnedExpressionTokenizer
+    participant hk.transform
+    participant forward_fn.apply
+    
+    User->>get_pretrained_model: model_name, embeddings_layers_to_save
+    get_pretrained_model-->>User: parameters, forward_fn, tokenizer, config
+    
+    User->>hk.transform: forward_fn
+    hk.transform-->>User: transformed_forward_fn
+    
+    User->>preprocess_rna_seq_for_bulkrnabert: rna_seq_df, config
+    preprocess_rna_seq_for_bulkrnabert-->>User: rna_seq_array
+    
+    User->>BinnedExpressionTokenizer: batch_tokenize(rna_seq_array)
+    BinnedExpressionTokenizer-->>User: tokens_ids
+    
+    User->>forward_fn.apply: parameters, random_key, tokens
+    forward_fn.apply-->>User: model_outputs
+    
+    User->>User: Extract embeddings
+```
+
+Sources: [README.md:19-48]()
+
+### 3.1 Code Implementation
+
+Here's a reference to the essential code flow for loading a model and performing inference:
+
+1. Import required packages and functions
+2. Load the pretrained model using `get_pretrained_model()`
+3. Transform the forward function using `hk.transform()`
+4. Load and preprocess RNA-seq data
+5. Tokenize the preprocessed data
+6. Run inference using `forward_fn.apply()`
+7. Extract the desired embeddings from the output
+
+Sources: [README.md:20-47]()
+
+### 3.2 Extracting Embeddings
+
+After inference, you can extract embeddings from different transformer layers based on your `embeddings_layers_to_save` setting:
+
+- The output dictionary contains keys like `embeddings_4` for the embeddings from layer 4
+- You can compute mean embeddings across genes to get a sample-level representation
+- These embeddings can be used for downstream tasks like classification or survival analysis
+
+Sources: [README.md:47-48]()
+
+## 4. Advanced Usage
+
+### 4.1 Working with Different Data Types
+
+BulkRNABert supports different precision levels for computations, parameters, and outputs:
+
+- Use `compute_dtype=jnp.float16` for faster inference when precision is less critical
+- Use `param_dtype=jnp.float32` for training for better numerical stability
+- Match `output_dtype` to your downstream application requirements
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:31-33]()
+
+### 4.2 Accessing Multiple Layer Embeddings
+
+To get embeddings from multiple layers, specify them in `embeddings_layers_to_save`:
+
+```
+# Get embeddings from layers 1, 2, and 4
+parameters, forward_fn, tokenizer, config = get_pretrained_model(
+    model_name="bulk_rna_bert_tcga",
+    embeddings_layers_to_save=(1, 2, 4),
+)
+```
+
+This will result in output keys `embeddings_1`, `embeddings_2`, and `embeddings_4` in the model output.
+
+Sources: [multiomics_open_research/bulk_rna_bert/pretrained.py:34](), [multiomics_open_research/bulk_rna_bert/pretrained.py:74]()
+
+## 5. Model Loading and Inference in the BulkRNABert Architecture
+
+The model loading and inference components fit into the overall BulkRNABert architecture as follows:
+
+```mermaid
+flowchart TD
+    A["get_pretrained_model()"] --> |"Returns"| B["Model Components"]
+    B --> B1["parameters"]
+    B --> B2["forward_fn"]
+    B --> B3["tokenizer"]
+    B --> B4["config"]
+    
+    C["RNA-seq Data"] --> D["preprocess_rna_seq_for_bulkrnabert()"]
+    D --> E["Processed Data"]
+    E --> F["tokenizer.batch_tokenize()"]
+    F --> G["Token IDs"]
+    
+    B1 --> H["forward_fn.apply()"]
+    B2 --> |"Transformed by hk.transform()"| H
+    G --> H
+    H --> I["Model Outputs"]
+    I --> J["Embedding Extraction"]
+    J --> K["Downstream Applications"]
+    
+    K --> K1["Cancer Classification"]
+    K --> K2["Survival Analysis"]
+    K --> K3["Custom Analysis"]
+```
+
+Sources: [README.md:19-48](), [multiomics_open_research/bulk_rna_bert/pretrained.py:29-86]()
+
+This page covers how to load pretrained BulkRNABert models and perform inference to generate embeddings. For information on how to use these embeddings for downstream tasks, see [Cancer Classification](#5.1) and [Survival Analysis](#5.2).
+
+---
+
+# Page: Data Preprocessing
+
+# Data Preprocessing
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [data/common_gene_id.txt](data/common_gene_id.txt)
+- [data/tcga_sample.csv](data/tcga_sample.csv)
+- [multiomics_open_research/bulk_rna_bert/preprocess.py](multiomics_open_research/bulk_rna_bert/preprocess.py)
+
+</details>
+
+
+
+This document details the preprocessing pipeline used to prepare bulk RNA sequencing data for input to the BulkRNABert model. The preprocessing steps transform raw RNA-seq data into a standardized format that can be effectively tokenized and processed by the transformer-based model. For information about the tokenization process that follows preprocessing, see [Tokenization](#4.1).
+
+## Overview of the Preprocessing Pipeline
+
+The BulkRNABert system requires RNA-seq data to be preprocessed into a specific format before it can be used for model training or inference. The preprocessing pipeline handles gene ID filtering, normalization, and restructuring of the data.
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Files (.tsv)"] --> B["preprocess_tcga_rna_seq_dataset()"]
+    C["common_gene_id.txt"] --> B
+    B --> D["Processed RNA-seq CSV"]
+    D --> E["preprocess_rna_seq_for_bulkrnabert()"]
+    F["BulkRNABertConfig"] --> E
+    E --> G["Normalized RNA-seq Array"]
+    G --> H["BinnedExpressionTokenizer"]
+    
+    subgraph "Preprocessing Operations"
+        I["Gene Filtering"]
+        J["Missing Gene Handling"]
+        K["Normalization"]
+    end
+    
+    B --- I
+    B --- J
+    E --- K
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py](), [README.md:55-69]()
+
+## TCGA Data Preprocessing
+
+The BulkRNABert system primarily works with RNA-seq data from The Cancer Genome Atlas (TCGA). A dedicated preprocessing function handles the transformation of raw TCGA data files into a standardized format.
+
+### Common Gene ID Standardization
+
+A fundamental aspect of the preprocessing is the standardization of gene IDs across different RNA-seq datasets. The system uses a predefined list of gene IDs (stored in `common_gene_id.txt`) as a reference for filtering and alignment.
+
+```mermaid
+graph TD
+    A["Raw TCGA Data (.tsv)"] --> B["read_tcga_dataframe()"]
+    B --> C["DataFrame with gene_id & gene_name"]
+    D["common_gene_id.txt"] --> E["get_gene_id_from_common_gene_ids()"]
+    C --> E
+    E --> F["Filtered Gene IDs"]
+    F --> G["Check for Minimum Common Genes"]
+    G -->|"≥ 18,000 genes"| H["Keep Sample"]
+    G -->|"< 18,000 genes"| I["Skip Sample"]
+    H --> J["Add Missing Genes with Zero Values"]
+    J --> K["Reorder According to Reference"]
+    K --> L["Processed RNA-seq CSV"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:28-139](), [data/common_gene_id.txt]()
+
+### Key Preprocessing Functions
+
+The preprocessing pipeline includes several specialized functions for handling TCGA RNA-seq data:
+
+| Function | Purpose |
+|----------|---------|
+| `get_all_tcga_dataset_files` | Locates all TCGA dataset files in a given directory |
+| `read_tcga_dataframe` | Reads a TCGA dataframe from a TSV file and filters out rows with missing gene IDs |
+| `split_gene_id_version` | Separates a gene ID into base ID and version (e.g., "ENSG00000000003.14" → "ENSG00000000003", "14") |
+| `get_gene_id_from_common_gene_ids` | Filters gene IDs to include only those in the reference list |
+| `preprocess_tcga_rna_seq_dataset` | Main function that processes an entire directory of TCGA files into a single CSV |
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:28-139]()
+
+## RNA-seq Preparation for BulkRNABert
+
+After the initial TCGA preprocessing, the data undergoes additional preparation specifically for the BulkRNABert model:
+
+```mermaid
+flowchart LR
+    A["Processed RNA-seq CSV"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    C["BulkRNABertConfig"] --> B
+    B --> D["Remove 'identifier' Column"]
+    D --> E["Convert to Numpy Array"]
+    
+    subgraph "Conditional Normalization"
+        F["config.use_log_normalization=True"] --> G["Log10 Normalization (log10(x+1))"]
+    end
+    
+    E --> H["Normalized RNA-seq Array"]
+    G -.- H
+    H --> I["To Tokenizer"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:141-149](), [README.md:36-40]()
+
+### Using the Preprocessing Functions
+
+To preprocess TCGA RNA-seq data and prepare it for BulkRNABert, two main functions are used:
+
+1. First, raw TCGA data is processed into a standardized CSV:
+
+```python
+# Example from README
+python scripts/preprocess_tcga_rna_seq.py \
+--dataset-path data/tcga_sample_gdc/ \
+--output-folder data/ \
+--common-gene-ids-path data/common_gene_id.txt \
+--rna-seq-column tpm_unstranded
+```
+
+2. Then, for BulkRNABert-specific processing:
+
+```python
+# From the example in README
+rna_seq_df = pd.read_csv("data/tcga_sample.csv")
+rna_seq_array = preprocess_rna_seq_for_bulkrnabert(rna_seq_df, config)
+```
+
+Sources: [README.md:55-69](), [README.md:24-41]()
+
+## Handling Missing Genes and Minimum Threshold
+
+The preprocessing pipeline includes mechanisms to handle missing genes and ensure data quality:
+
+1. If a sample has fewer than 18,000 common genes with the reference list (defined by `MIN_COMMON_GENES = 18_000`), it is skipped
+2. For retained samples, any missing genes from the reference list are added with zero expression values
+3. Gene expressions are reordered to match the exact order of the reference gene list
+
+This ensures that all processed samples have consistent gene sets and ordering, which is crucial for the BulkRNABert model.
+
+```mermaid
+graph TD
+    A["Sample DataFrame"] --> B["Filter to Common Genes"]
+    B --> C["Check Minimum Threshold"]
+    C -->|"≥ 18,000 genes"| D["Process Sample"]
+    C -->|"< 18,000 genes"| E["Skip Sample (Log Warning)"]
+    D --> F["Identify Missing Genes"]
+    F --> G["Create Zero-Valued Entries"]
+    G --> H["Concatenate with Original"]
+    H --> I["Reindex to Match Reference Order"]
+    I --> J["Add Sample to Output"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:88-138]()
+
+## Normalization Options
+
+The BulkRNABert preprocessing supports log normalization (log10(x+1)) based on the configuration:
+
+| Normalization Type | Configuration Flag | Transformation |
+|-------------------|-------------------|---------------|
+| Log Normalization | `config.use_log_normalization=True` | log10(expression + 1) |
+| No Normalization | `config.use_log_normalization=False` | raw expression values |
+
+The normalization is applied in the final preprocessing step before the data is passed to the tokenizer.
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:147-148]()
+
+## Gene ID Format Handling
+
+The preprocessing pipeline handles gene IDs with and without version numbers. For example, gene ID "ENSG00000000003.14" would be broken down into:
+- Base ID: "ENSG00000000003"
+- Version: "14"
+
+The system can accept and process gene IDs in either format (with or without versions) and can output them as needed.
+
+Sources: [multiomics_open_research/bulk_rna_bert/preprocess.py:43-48](), [multiomics_open_research/bulk_rna_bert/preprocess.py:51-85]()
+
+## Integration with the BulkRNABert Pipeline
+
+The preprocessing component fits into the larger BulkRNABert workflow as follows:
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Data"] --> B["preprocess_tcga_rna_seq_dataset()"]
+    B --> C["Processed CSV"]
+    C --> D["preprocess_rna_seq_for_bulkrnabert()"]
+    D --> E["Normalized Array"]
+    E --> F["tokenizer.batch_tokenize()"]
+    F --> G["Token IDs"]
+    G --> H["BulkRNABert Model"]
+    H --> I["Gene Embeddings"]
+    
+    J["BulkRNABertConfig"] --> D
+    K["common_gene_id.txt"] --> B
+```
+
+Sources: [README.md:24-47](), [multiomics_open_research/bulk_rna_bert/preprocess.py]()
+
+## Command-Line Preprocessing
+
+The repository provides a script for preprocessing TCGA RNA-seq data from the command line:
+
+```bash
+python scripts/preprocess_tcga_rna_seq.py \
+--dataset-path data/tcga_sample_gdc/ \
+--output-folder data/ \
+--common-gene-ids-path data/common_gene_id.txt \
+--rna-seq-column tpm_unstranded
+```
+
+This script takes raw data files and creates a processed CSV file ready for the next steps in the pipeline.
+
+Sources: [README.md:55-69]()
+
+---
+
+# Page: Tokenization
+
+# Tokenization
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [multiomics_open_research/bulk_rna_bert/tokenizer.py](multiomics_open_research/bulk_rna_bert/tokenizer.py)
+
+</details>
+
+
+
+## Purpose and Scope
+
+This document explains the tokenization process in the BulkRNABert system, which is responsible for converting continuous gene expression values into discrete tokens that the transformer-based model can process. Tokenization serves as the critical bridge between numerical RNA-seq data and the BulkRNABert model's input format. For information about the overall data preprocessing pipeline, see [Data Preprocessing](#4), and for details about the model itself, see [BulkRNABert Model](#3).
+
+## Overview of Tokenization in BulkRNABert
+
+In natural language processing, tokenization typically involves splitting text into words or subwords. For genomic data, BulkRNABert uses a different approach: binning continuous gene expression values into discrete categories. This discretization process creates a vocabulary of expression levels that the model can learn to interpret.
+
+```mermaid
+flowchart LR
+    A["RNA-seq Expression Values 
+    (Continuous)"] --> B["BinnedExpressionTokenizer"] --> C["Discretized Token IDs
+    (Integer Values)"]
+    
+    subgraph "Tokenization Process"
+        B1["1. Optional Normalization"] --> B2["2. Bin Assignment"] --> B3["3. Special Token Handling"]
+    end
+    
+    B --- B1
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:20-160]()
+
+## BinnedExpressionTokenizer
+
+The tokenization functionality is implemented in the `BinnedExpressionTokenizer` class. This class handles the conversion of continuous gene expression values into discrete token IDs, which can then be processed by the transformer model.
+
+### Key Configuration Parameters
+
+The tokenizer can be configured with several parameters that affect how gene expressions are binned and processed:
+
+| Parameter | Description | Default Value | Effect |
+|-----------|-------------|---------------|--------|
+| `n_expressions_bins` | Number of bins to divide expression values into | N/A (Required) | Controls the granularity of expression value discretization |
+| `use_max_normalization` | Whether to normalize expressions to [0,1] range | `True` | Affects how expression values are scaled |
+| `normalization_factor` | Factor to divide expression values by | 1.0 | Sets the scale for normalization |
+| `prepend_cls_token` | Whether to add a CLS token at the beginning | `False` | Adds a classification token similar to BERT |
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:25-35]()
+
+### Vocabulary and Special Tokens
+
+The tokenizer creates a vocabulary consisting of:
+
+1. **Standard tokens**: String representations of integers from 0 to `n_expressions_bins-1`, representing different expression level bins
+2. **Special tokens**: Additional tokens for specific purposes
+
+The special tokens include:
+
+| Token | Name | Purpose |
+|-------|------|---------|
+| `<pad>` | Padding token | Used to pad sequences to equal length |
+| `<mask>` | Mask token | Used during masked language modeling training |
+| `<cls>` | Classification token | Can be added at the beginning of sequences |
+| `<unk>` | Unknown token | Represents unknown or out-of-vocabulary values |
+| `<eos>` | End of sequence token | Marks the end of a sequence |
+| `<bos>` | Beginning of sequence token | Marks the beginning of a sequence |
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:44-66]()
+
+## Tokenization Process
+
+The tokenization process converts continuous gene expression values into discrete token IDs through the following steps:
+
+```mermaid
+flowchart TD
+    A["Gene Expression Array"] --> B{"use_max_normalization?"}
+    B -->|"Yes"| C["Normalize by dividing 
+    by normalization_factor"]
+    B -->|"No"| D["Use raw values"]
+    C --> E["Apply np.digitize with bins"]
+    D --> E
+    E --> F["Set zero expressions to bin 0"]
+    F --> G{"prepend_cls_token?"}
+    G -->|"Yes"| H["Prepend CLS token ID"]
+    G -->|"No"| I["Return token IDs as is"]
+    H --> J["Final Token IDs"]
+    I --> J
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:132-148]()
+
+### Bin Creation
+
+The tokenizer creates bins for expression values in one of two ways, depending on the configuration:
+
+1. If `use_max_normalization=True`: Bins are created in the range [0.0, 1.0]
+2. If `use_max_normalization=False`: Bins are created in the range [0.0, normalization_factor]
+
+The bins are created using `np.linspace()` to divide the range into `n_expressions_bins` equal-width intervals.
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:36-42]()
+
+### Digitization
+
+The actual conversion of expression values to bin indices is performed using `np.digitize()`, which assigns each value to a bin based on which range it falls into. Special handling is applied to ensure that expressions with value 0.0 are consistently assigned to bin 0.
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:144-145]()
+
+## Integration with BulkRNABert Pipeline
+
+The tokenizer is a key component in the BulkRNABert workflow, sitting between the data preprocessing step and the model input:
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Data"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["RNA-seq Array"]
+    C --> D["tokenizer.batch_tokenize()"]
+    D --> E["Token IDs"]
+    E --> F["BulkRNABert Model"]
+    
+    G["get_pretrained_model()"] --> H["parameters, forward_fn, tokenizer, config"]
+    H --> D
+    H --> F
+```
+
+Sources: [README.md:25-47]()
+
+### Batch Processing
+
+For efficiency when processing multiple RNA-seq samples, the tokenizer provides a `batch_tokenize()` method that applies the tokenization process to a batch of gene expression arrays, returning a batch of token ID arrays.
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:150-160]()
+
+## Usage Example
+
+The tokenizer is typically obtained as part of loading a pretrained model and used as shown in this example from the repository documentation:
+
+```python
+# Get pretrained model
+parameters, forward_fn, tokenizer, config = get_pretrained_model(
+    model_name="bulk_rna_bert_tcga",
+    embeddings_layers_to_save=(4,),
+    checkpoint_directory="checkpoints/",
+)
+forward_fn = hk.transform(forward_fn)
+
+# Get bulk RNASeq data and tokenize it
+rna_seq_df = pd.read_csv("data/tcga_sample.csv")
+rna_seq_array = preprocess_rna_seq_for_bulkrnabert(rna_seq_df, config)
+tokens_ids = tokenizer.batch_tokenize(rna_seq_array)
+tokens = jnp.asarray(tokens_ids, dtype=jnp.int32)
+```
+
+Sources: [README.md:19-40]()
+
+## Relation to Machine Learning Model
+
+The tokenization scheme directly impacts how the BulkRNABert model perceives gene expression patterns. By discretizing continuous expression values into bins, the model can learn relationships between expression levels of different genes in a manner similar to how language models learn relationships between words.
+
+```mermaid
+flowchart LR
+    subgraph "Tokenization Pipeline"
+        A["Gene Expression
+        Values"] --> B["BinnedExpressionTokenizer"]
+        B --> C["Token IDs"]
+    end
+    
+    subgraph "Model Processing"
+        C --> D["Gene Embeddings Layer"]
+        D --> E["BERT Transformer
+        Layers"]
+        E --> F["Contextualized
+        Gene Embeddings"]
+    end
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/tokenizer.py:20-160](), [README.md:5-6]()
+
+## Summary
+
+The tokenization process in BulkRNABert serves as a crucial step that transforms continuous gene expression data into a format suitable for a transformer model. The `BinnedExpressionTokenizer` class provides a flexible approach to this conversion by offering various configuration options for normalization and binning. This discretization enables the transformer model to process genomic data in a manner analogous to how language models process text, allowing it to capture complex relationships between gene expression patterns.
+
+---
+
+# Page: Downstream Applications
+
+# Downstream Applications
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py](multiomics_open_research/bulk_rna_bert/downstream/pretrained.py)
+
+</details>
+
+
+
+This page documents the downstream applications that leverage BulkRNABert gene embeddings for specific predictive tasks. For information about the BulkRNABert model itself, see [BulkRNABert Model](#3). For details on tokenization and preprocessing, see [Data Preprocessing](#4).
+
+## Overview
+
+BulkRNABert generates contextual gene embeddings from RNA-seq data that capture meaningful relationships between genes and their expression patterns. These high-dimensional embeddings serve as powerful feature representations for downstream predictive tasks, currently focused on two primary applications:
+
+1. **Cancer Type Classification**: Identifying cancer types from gene expression profiles
+2. **Survival Analysis**: Predicting patient survival outcomes
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    A["BulkRNABert Embeddings"] --> B["Downstream Tasks"]
+    
+    B --> C["Cancer Classification MLP"]
+    B --> D["Survival Analysis MLP"]
+    
+    C --> E1["BRCA Classification"]
+    C --> E2["BLCA Classification"]
+    C --> E3["GBMLGG Classification"]
+    C --> E4["LUAD Classification"]
+    C --> E5["UCEC Classification"]
+    
+    D --> F["Patient Survival Prediction"]
+    
+    subgraph "Downstream Model Loading"
+        G["get_pretrained_downstream_model()"]
+        H["downstream checkpoints"]
+    end
+    
+    G --> C
+    G --> D
+    H --> G
+```
+
+This diagram illustrates how the embeddings generated by BulkRNABert are used in downstream applications and how these models are loaded.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118]()
+
+## Available Downstream Models
+
+Currently, BulkRNABert provides the following pretrained downstream models:
+
+| Model Name | Description | Head Name | Task |
+|------------|-------------|-----------|------|
+| `tcga_5_cohorts` | Classification for 5 TCGA cancer cohorts | `classification_head` | Cancer Type Classification |
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:33-35]()
+
+## Downstream Model Implementation
+
+Both cancer classification and survival analysis use the same underlying architecture, `RNASeqSurvivalMLP`, which is a multi-layer perceptron that takes gene embeddings as input and produces task-specific predictions.
+
+```mermaid
+flowchart TD
+    A["Gene Embeddings"] --> B["RNASeqSurvivalMLP"]
+    B --> C["Task-Specific Output"]
+    
+    subgraph "RNASeqSurvivalMLP Architecture"
+        D1["Input Layer (Embedding Dimension)"]
+        D2["Hidden Layer 1"]
+        D3["Hidden Layer 2"]
+        D4["Output Layer (Task-Specific)"]
+        
+        D1 --> D2
+        D2 --> D3
+        D3 --> D4
+    end
+    
+    B -.- D1
+```
+
+The model architecture uses the same underlying structure for both tasks but with different output dimensions depending on the specific application.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/model.py]()
+
+## Loading Pretrained Downstream Models
+
+The `get_pretrained_downstream_model` function provides a standardized interface for loading pretrained downstream models:
+
+```mermaid
+flowchart TD
+    A["get_pretrained_downstream_model()"] --> B["Load Configuration Files"]
+    B --> C["Parse RNASeqDownStreamConfig"]
+    C --> D["Parse BulkRNABertConfig"]
+    D --> E["Initialize Tokenizer"]
+    
+    E --> F["Create head_fn()"]
+    F --> G["Build Model with Forward Function"]
+    G --> H["Load Parameters"]
+    
+    H --> I["Return Components"]
+    I --> J1["parameters"]
+    I --> J2["forward_fn"]
+    I --> J3["tokenizer"]
+    I --> J4["config"]
+    I --> J5["mlm_config"]
+```
+
+This function loads all necessary components for performing inference with downstream models.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118]()
+
+## Cancer Classification Application
+
+The cancer classification model classifies samples into one of five cancer types from The Cancer Genome Atlas (TCGA):
+
+1. **BRCA**: Breast Invasive Carcinoma
+2. **BLCA**: Bladder Urothelial Carcinoma 
+3. **GBMLGG**: Glioblastoma Multiforme and Lower Grade Glioma
+4. **LUAD**: Lung Adenocarcinoma
+5. **UCEC**: Uterine Corpus Endometrial Carcinoma
+
+```mermaid
+flowchart LR
+    A["Gene Embeddings"] --> B["RNASeqSurvivalMLP"]
+    B --> C["Logits (5 Classes)"]
+    C --> D["Softmax"]
+    D --> E["Classification Probabilities"]
+    
+    E --> F1["P(BRCA)"]
+    E --> F2["P(BLCA)"]
+    E --> F3["P(GBMLGG)"]
+    E --> F4["P(LUAD)"]
+    E --> F5["P(UCEC)"]
+```
+
+The output of the model is a vector of probabilities for each cancer type, with the highest probability indicating the predicted class.
+
+Sources: [README.md:71-73]()
+
+## Survival Analysis Application
+
+The survival analysis model predicts patient survival time based on gene expression patterns, which is particularly valuable for prognosis and treatment planning.
+
+```mermaid
+flowchart LR
+    A["Gene Embeddings"] --> B["RNASeqSurvivalMLP"]
+    B --> C["Survival Prediction"]
+    C --> D1["Survival Time Estimate"]
+    C --> D2["Risk Score"]
+```
+
+While the current repository primarily focuses on cancer classification, the same `RNASeqSurvivalMLP` architecture can be adapted for survival analysis.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/model.py]()
+
+## End-to-End Workflow
+
+```mermaid
+flowchart TD
+    A["RNA-seq Data (CSV)"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["Preprocessed RNA-seq Array"]
+    C --> D["tokenizer.batch_tokenize()"]
+    D --> E["Token IDs"]
+    
+    E --> F["BulkRNABert Model"]
+    F --> G["Gene Embeddings"]
+    
+    G --> H["Downstream MLP Model"]
+    H --> I["Predictions"]
+    
+    J["get_pretrained_model()"] --> F
+    K["get_pretrained_downstream_model()"] --> H
+```
+
+This diagram shows the complete workflow from raw RNA-seq data to final predictions, illustrating how the different components of the system interact.
+
+Sources: [README.md:19-48]()
+
+## Example Usage
+
+Here's an example of how to use the cancer classification downstream model:
+
+```python
+import haiku as hk
+import jax
+import jax.numpy as jnp
+import pandas as pd
+
+from multiomics_open_research.bulk_rna_bert.downstream.pretrained import get_pretrained_downstream_model
+from multiomics_open_research.bulk_rna_bert.preprocess import preprocess_rna_seq_for_bulkrnabert
+
+# Load pretrained downstream model
+parameters, forward_fn, tokenizer, config, mlm_config = get_pretrained_downstream_model(
+    model_name="tcga_5_cohorts",
+    checkpoint_directory="checkpoints/"
+)
+forward_fn = hk.transform(forward_fn)
+
+# Preprocess RNA-seq data
+rna_seq_df = pd.read_csv("data/tcga_sample.csv")
+rna_seq_array = preprocess_rna_seq_for_bulkrnabert(rna_seq_df, mlm_config)
+tokens_ids = tokenizer.batch_tokenize(rna_seq_array)
+tokens = jnp.asarray(tokens_ids, dtype=jnp.int32)
+
+# Perform inference
+random_key = jax.random.PRNGKey(0)
+outputs = forward_fn.apply(parameters, random_key, tokens)
+
+# Get classification probabilities
+classification_probs = outputs["logits"]
+predicted_class = jnp.argmax(classification_probs, axis=-1)
+```
+
+For more detailed examples, refer to the notebook at `examples/downstream_task_example.ipynb` which demonstrates an inference with the classification model trained on the 5 cohorts.
+
+Sources: [README.md:71-73]()
+
+## Integration with BulkRNABert
+
+```mermaid
+flowchart TD
+    subgraph "BulkRNABert System"
+        A["RNA-seq Data"] --> B["Preprocessing Pipeline"]
+        B --> C["BinnedExpressionTokenizer"]
+        C --> D["BulkRNABert Model"]
+        D --> E["Gene Embeddings"]
+    end
+    
+    subgraph "Downstream Applications"
+        F["get_pretrained_downstream_model()"]
+        G["Cancer Classification MLP"]
+        H["Survival Analysis MLP"]
+        
+        F --> G
+        F --> H
+    end
+    
+    E --> G
+    E --> H
+    
+    G --> I["Cancer Type Prediction"]
+    H --> J["Survival Prediction"]
+```
+
+This diagram shows how the downstream applications are integrated with the core BulkRNABert system, highlighting the flow of information from raw RNA-seq data to final predictions.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118](), [README.md:19-48]()
+
+---
+
+# Page: Cancer Classification
+
+# Cancer Classification
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [checkpoints/tcga_5_cohorts/config.json](checkpoints/tcga_5_cohorts/config.json)
+- [checkpoints/tcga_5_cohorts/params.joblib](checkpoints/tcga_5_cohorts/params.joblib)
+- [data/5_cohorts_labels_mapping.pkl](data/5_cohorts_labels_mapping.pkl)
+- [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py](multiomics_open_research/bulk_rna_bert/downstream/pretrained.py)
+
+</details>
+
+
+
+## Purpose and Scope
+
+This document describes how to use BulkRNABert for cancer type classification. It explains the architecture of the cancer classification module, the available pre-trained models, and provides practical guidance on implementing cancer classification using the BulkRNABert embeddings. For information about survival prediction, see [Survival Analysis](#5.2).
+
+## System Architecture
+
+The cancer classification pipeline in BulkRNABert uses a two-stage approach:
+
+1. A pre-trained BulkRNABert model generates gene embeddings from RNA-seq data
+2. A classification head (MLP) takes these embeddings to predict cancer types
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data"] --> B["BulkRNABert\nEncoder"]
+    B --> C["Gene\nEmbeddings"]
+    C --> D["MLP\nClassifier"]
+    D --> E["Cancer Type\nPrediction"]
+    
+    subgraph "Classification Head"
+        D
+    end
+    
+    subgraph "Pre-trained Model"
+        B
+        C
+    end
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:26-29]()
+
+The pre-trained model for cancer classification supports 5 cancer cohorts:
+
+```mermaid
+flowchart TD
+    A["Cancer Classification\nMLP"] --> B["5 Output Logits"]
+    B --> C1["BLCA\n(Bladder Urothelial Carcinoma)"]
+    B --> C2["BRCA\n(Breast Invasive Carcinoma)"]
+    B --> C3["GBMLGG\n(Glioblastoma Multiforme and\nBrain Lower Grade Glioma)"]
+    B --> C4["LUAD\n(Lung Adenocarcinoma)"]
+    B --> C5["UCEC\n(Uterine Corpus Endometrial Carcinoma)"]
+```
+
+Sources: [data/5_cohorts_labels_mapping.pkl:1](), [checkpoints/tcga_5_cohorts/config.json:1]()
+
+## Model Configuration
+
+The cancer classification model uses the following configuration:
+
+| Component | Configuration |
+|-----------|---------------|
+| Base Model | BulkRNABert pre-trained on TCGA data |
+| Hidden Layer Sizes | [256, 128] |
+| Final Activation | Identity |
+| MLP Activation | SELU |
+| Dropout Rate | 0.0 |
+| Layer Normalization | Disabled |
+| Number of Output Classes | 5 (BLCA, BRCA, GBMLGG, LUAD, UCEC) |
+
+Sources: [checkpoints/tcga_5_cohorts/config.json:1]()
+
+## Implementation Details
+
+The cancer classification system utilizes the `RNASeqSurvivalMLP` module for the classification head, despite its name suggesting survival analysis. The same underlying architecture is used for both tasks with different output configurations.
+
+```mermaid
+classDiagram
+    class get_pretrained_downstream_model {
+      +loads model parameters
+      +configures tokenizer
+      +builds forward function
+      +returns parameters, forward_fn, tokenizer, config
+    }
+    
+    class RNASeqSurvivalMLP {
+      +hidden_sizes
+      +final_activation
+      +dropout_rate
+      +layer_norm
+      +mlp_activation
+      +can be used for classification or survival prediction
+    }
+    
+    class build_bulk_bert_with_head_fn {
+      +combines BulkRNABert with classification head
+      +configures compute parameters
+    }
+    
+    get_pretrained_downstream_model --> RNASeqSurvivalMLP: creates
+    get_pretrained_downstream_model --> build_bulk_bert_with_head_fn: uses
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118](), [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:103-105]()
+
+## Data Flow
+
+The cancer classification pipeline processes data through the following steps:
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data\n(CSV format)"] --> B["Preprocessing"]
+    B --> C["Tokenization"]
+    C --> D["BulkRNABert\nEncoder"]
+    D --> E["Gene Embeddings"]
+    E --> F["MLP\nClassifier"]
+    F --> G["Cancer Type\nPrediction"]
+    
+    subgraph "Inference Process"
+        B
+        C
+        D
+        E
+        F
+        G
+    end
+```
+
+Sources: [README.md:19-48]()
+
+## Usage
+
+To use the pre-trained cancer classification model:
+
+1. First, prepare your RNA-seq data according to the expected format (see [Data Preprocessing](#4))
+2. Load the pre-trained downstream model using the `get_pretrained_downstream_model` function
+3. Preprocess and tokenize your RNA-seq data
+4. Run the model to get predictions
+
+Example workflow:
+
+```mermaid
+flowchart TD
+    A["Load model with\nget_pretrained_downstream_model('tcga_5_cohorts')"] --> B["Preprocess RNA-seq data\nwith preprocess_rna_seq_for_bulkrnabert"]
+    B --> C["Tokenize data\nwith tokenizer.batch_tokenize"]
+    C --> D["Run model inference\nwith forward_fn.apply"]
+    D --> E["Get classification predictions"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118](), [README.md:19-48]()
+
+## Model Loading and Inference
+
+The system provides the `get_pretrained_downstream_model` function to load the pre-trained cancer classification model:
+
+```mermaid
+flowchart TD
+    A["get_pretrained_downstream_model"] --> B["Load Configuration"]
+    B --> C["Initialize Tokenizer"]
+    C --> D["Build Forward Function"]
+    D --> E["Load Parameters"]
+    
+    A --> F["Return Components"]
+    F --> G1["parameters"]
+    F --> G2["forward_fn"]
+    F --> G3["tokenizer"]
+    F --> G4["config"]
+    F --> G5["mlm_config"]
+    
+    H["Checkpoint Directory"] --> B
+    H --> E
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118]()
+
+The model uses "tcga_5_cohorts" as the model name, which maps to "classification_head" in the internal model configuration.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:33-35]()
+
+## Key Files and Resources
+
+| Resource | Description |
+|----------|-------------|
+| `get_pretrained_downstream_model` | Function to load pre-trained cancer classification model |
+| `tcga_5_cohorts` | Pre-trained model name for 5 cancer cohort classification |
+| `data/5_cohorts_labels_mapping.pkl` | Mapping of numerical labels to cancer cohort names |
+| `examples/downstream_task_example.ipynb` | Example notebook for cancer classification |
+
+Sources: [README.md:71-73](), [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:33-35](), [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118]()
+
+## Notes on Model Performance
+
+The BulkRNABert approach achieves state-of-the-art performance in cancer type classification on the TCGA dataset. The model was trained on the 5 cancer cohorts (BRCA, BLCA, GBMLGG, LUAD, UCEC) and demonstrates the effectiveness of transformer-based models for capturing gene expression patterns specific to different cancer types.
+
+Sources: [README.md:5-7]()
+
+For a complete example demonstrating cancer classification, refer to the notebook at `examples/downstream_task_example.ipynb`.
+
+Sources: [README.md:71-73]()
+
+---
+
+# Page: Survival Analysis
+
+# Survival Analysis
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+- [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py](multiomics_open_research/bulk_rna_bert/downstream/pretrained.py)
+
+</details>
+
+
+
+## Overview
+
+This document details the Survival Analysis system within the BulkRNABert framework. Survival analysis in this context refers to the prediction of patient survival outcomes using bulk RNA-seq data processed through BulkRNABert embeddings. The system leverages transformer-based representations of gene expression data to predict patient prognosis, which is valuable for personalized treatment planning and clinical decision-making.
+
+For information about cancer type classification using BulkRNABert, see [Cancer Classification](#5.1).
+
+## System Architecture
+
+Survival Analysis in BulkRNABert functions as a downstream application that builds upon the gene embeddings generated by the core transformer model. The system follows a two-stage approach where RNA-seq data is first processed through the primary BulkRNABert model to generate contextual gene embeddings, and then a specialized survival prediction model uses these embeddings to predict patient outcomes.
+
+```mermaid
+flowchart TD
+    A["RNA-seq Data"] --> B["BulkRNABert Preprocessing"]
+    B --> C["Tokenization"]
+    C --> D["BulkRNABert Core Model"]
+    D --> E["Contextual Gene Embeddings"]
+    E --> F["RNASeqSurvivalMLP"]
+    F --> G["Survival Prediction"]
+    
+    subgraph "Pretrained Components"
+        H["Pretrained BulkRNABert"]
+        I["Pretrained Survival MLP"]
+    end
+    
+    H -.-> D
+    I -.-> F
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:37-118]()
+
+## Survival Prediction Model
+
+The survival prediction capability is implemented through the `RNASeqSurvivalMLP` model, which takes contextualized gene embeddings from BulkRNABert and outputs survival predictions. This model is a specialized Multi-Layer Perceptron (MLP) designed specifically for survival analysis tasks.
+
+```mermaid
+flowchart LR
+    A["Gene Embeddings\n(from layer 4)"] --> B["Mean Pooling"]
+    B --> C["RNASeqSurvivalMLP"]
+    C --> D["Survival Prediction"]
+    
+    subgraph "RNASeqSurvivalMLP Architecture"
+        E["Input Layer"] --> F["Hidden Layers"]
+        F --> G["Output Layer"]
+    end
+    
+    B -.-> E
+    G -.-> D
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:103-105]()
+
+The model architecture consists of:
+- Input layer that takes the mean pooled gene embeddings
+- Configurable hidden layers with customizable dimensions
+- Output layer that provides survival prediction values
+
+## Using the Survival Analysis System
+
+To use the pretrained survival analysis model, you need to:
+
+1. Load the pretrained model using the `get_pretrained_downstream_model` function
+2. Preprocess your RNA-seq data
+3. Generate embeddings using BulkRNABert
+4. Feed the embeddings to the survival model to get predictions
+
+### Loading the Model
+
+The survival model can be loaded using the `get_pretrained_downstream_model` function, which retrieves both the BulkRNABert model and the survival prediction head.
+
+```mermaid
+flowchart TD
+    A["get_pretrained_downstream_model()"] --> B["Load Model Config"]
+    B --> C["Initialize Tokenizer"]
+    C --> D["Define RNASeqSurvivalMLP"]
+    D --> E["Build Forward Function"]
+    E --> F["Load Parameters"]
+    F --> G["Return Model Components"]
+    
+    G --> H1["parameters"]
+    G --> H2["forward_fn"]
+    G --> H3["tokenizer"]
+    G --> H4["config"]
+    G --> H5["mlm_config"]
+```
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:38-118]()
+
+### Data Processing Pipeline
+
+The survival analysis pipeline follows these steps:
+
+1. Preprocess RNA-seq data using common gene IDs
+2. Normalize and tokenize the gene expression values
+3. Run the BulkRNABert model to get gene embeddings
+4. Feed the embeddings to the survival MLP for prediction
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq\nData"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["BinnedExpressionTokenizer.batch_tokenize()"]
+    C --> D["BulkRNABert Forward Pass"]
+    D --> E["Extract and Pool Embeddings"]
+    E --> F["RNASeqSurvivalMLP Forward Pass"]
+    F --> G["Survival Prediction\nOutput"]
+```
+
+Sources: [README.md:19-48](), [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:107-114]()
+
+## Technical Implementation
+
+### Survival Model Configuration
+
+The survival prediction model's behavior is controlled by the `RNASeqDownStreamConfig` which specifies:
+
+- Which embedding layer to use from the BulkRNABert model
+- The architecture of the survival MLP (hidden layers, dimensions)
+- Other training and inference parameters
+
+| Configuration Parameter | Description |
+|-------------------------|-------------|
+| `embeddings_layer_to_use` | Which layer of BulkRNABert to extract embeddings from (defaults to layer 4) |
+| `model.hidden_dims` | Dimensions of hidden layers in the MLP |
+| `model.dropout_rate` | Dropout rate applied during training |
+| `rnaseq_representation_model.checkpoint_path` | Path to the pretrained BulkRNABert checkpoint |
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:81-90]()
+
+### Calling the Model
+
+The integrated model (BulkRNABert + survival head) is created using the `build_bulk_bert_with_head_fn` function, which:
+
+1. Builds the BulkRNABert model according to the provided configuration
+2. Extracts embeddings from the specified layer
+3. Applies mean pooling to get a single embedding vector per sample
+4. Feeds this embedding to the survival MLP to get predictions
+
+The survival prediction process is designed to work seamlessly with the BulkRNABert embeddings, making it straightforward to use once the models are loaded.
+
+Sources: [multiomics_open_research/bulk_rna_bert/downstream/pretrained.py:107-114]()
+
+## Relation to Other Components
+
+The survival analysis system is part of the broader downstream applications of BulkRNABert:
+
+```mermaid
+flowchart TD
+    A["BulkRNABert"] --> B["Gene Embeddings"]
+    
+    B --> C["Cancer Classification\n(Section 5.1)"]
+    B --> D["Survival Analysis\n(This Section)"]
+    
+    subgraph "Downstream Applications"
+        C
+        D
+    end
+    
+    E["Pretrained Models"] --> A
+    F["Tokenization\n(Section 4.1)"] --> A
+    G["Data Preprocessing\n(Section 4)"] --> F
+```
+
+The survival analysis model leverages the same gene embeddings as other downstream tasks but is specifically optimized for predicting patient survival outcomes.
+
+Sources: [README.md:6-7]()
+
+## Performance
+
+According to the repository description, BulkRNABert achieves state-of-the-art performance in survival time prediction on the TCGA dataset. This demonstrates the effectiveness of using transformer-based embeddings from RNA-seq data for this critical clinical application.
+
+Sources: [README.md:5-7]()
+
+---
+
+# Page: Usage Examples
+
+# Usage Examples
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [README.md](README.md)
+
+</details>
+
+
+
+This page provides practical examples of how to use BulkRNABert for various tasks, from basic model inference to specialized downstream applications. For information about the model architecture itself, see [BulkRNABert Model](#3), and for details on data preprocessing, see [Data Preprocessing](#4).
+
+## Getting Started
+
+Before diving into examples, ensure you have installed the package and downloaded the necessary model checkpoints.
+
+```mermaid
+graph TD
+    A["Installation Steps"] --> B["1. Clone Repository"]
+    B --> C["2. Install Package: pip install -e ."]
+    C --> D["3. Download Checkpoints"]
+    D --> E["Ready for Usage"]
+```
+
+Sources: [README.md:13-16]()
+
+## Basic Model Loading and Inference
+
+The following example demonstrates how to load a pretrained BulkRNABert model and perform basic inference to obtain gene embeddings.
+
+```mermaid
+flowchart LR
+    A["RNA-seq Data\n(CSV file)"] --> B["preprocess_rna_seq_for_bulkrnabert()"]
+    B --> C["RNA-seq Array"]
+    C --> D["tokenizer.batch_tokenize()"]
+    D --> E["Token IDs"]
+    
+    F["get_pretrained_model()\nParameters"] --> G["forward_fn.apply()"]
+    E --> G
+    G --> H["Embeddings"]
+    
+    subgraph "Model Components"
+        I1["parameters"]
+        I2["forward_fn"]
+        I3["tokenizer"]
+        I4["config"]
+    end
+    
+    J["get_pretrained_model()"] --> I1
+    J --> I2
+    J --> I3
+    J --> I4
+```
+
+### Example: Loading a Pretrained Model
+
+```python
+# Import necessary libraries
+import haiku as hk
+import jax
+import jax.numpy as jnp
+import pandas as pd
+
+from multiomics_open_research.bulk_rna_bert.pretrained import get_pretrained_model
+from multiomics_open_research.bulk_rna_bert.preprocess import preprocess_rna_seq_for_bulkrnabert
+
+# Get pretrained model
+parameters, forward_fn, tokenizer, config = get_pretrained_model(
+    model_name="bulk_rna_bert_tcga",
+    embeddings_layers_to_save=(4,),
+    checkpoint_directory="checkpoints/",
+)
+forward_fn = hk.transform(forward_fn)
+```
+
+Sources: [README.md:19-35]()
+
+### Example: Processing and Tokenizing RNA-seq Data
+
+```python
+# Load RNA-seq data from file
+rna_seq_df = pd.read_csv("data/tcga_sample.csv")
+
+# Preprocess data for BulkRNABert
+rna_seq_array = preprocess_rna_seq_for_bulkrnabert(rna_seq_df, config)
+
+# Tokenize the processed data
+tokens_ids = tokenizer.batch_tokenize(rna_seq_array)
+tokens = jnp.asarray(tokens_ids, dtype=jnp.int32)
+```
+
+Sources: [README.md:36-40]()
+
+### Example: Running Inference
+
+```python
+# Create a random key for JAX
+random_key = jax.random.PRNGKey(0)
+
+# Run the forward pass
+outs = forward_fn.apply(parameters, random_key, tokens)
+
+# Extract mean embeddings from the 4th layer
+mean_embedding = outs["embeddings_4"].mean(axis=1)
+```
+
+Sources: [README.md:42-47]()
+
+## Available Pretrained Models
+
+BulkRNABert offers three pretrained models, each trained on different datasets:
+
+| Model Name | Description | Training Data |
+|------------|-------------|---------------|
+| bulk_rna_bert_tcga | Base BulkRNABert model | TCGA data only |
+| bulk_rna_bert_gtex_encode | Alternative model | GTEx and ENCODE data |
+| bulk_rna_bert_gtex_encode_tcga | Comprehensive model | Mix of GTEx, ENCODE, and TCGA data |
+
+To specify which model to use, modify the `model_name` parameter in the `get_pretrained_model` function.
+
+Sources: [README.md:49-52]()
+
+## Data Preprocessing Examples
+
+BulkRNABert requires RNA-seq data to be in a specific format. Below is an example of preprocessing raw TCGA RNA-seq data.
+
+```mermaid
+flowchart LR
+    A["Raw RNA-seq Data"] --> B["preprocess_tcga_rna_seq.py"]
+    B --> C["Processed CSV File"]
+    D["common_gene_id.txt"] --> B
+
+    subgraph "Preprocessing Steps"
+        E1["1. Load Raw Data"]
+        E2["2. Filter by Common Genes"]
+        E3["3. Format and Transform"]
+        E4["4. Save Processed Data"]
+    end
+    
+    E1 --> E2 --> E3 --> E4
+```
+
+### Example: Preprocessing TCGA RNA-seq Data
+
+```bash
+python scripts/preprocess_tcga_rna_seq.py \
+--dataset-path data/tcga_sample_gdc/ \
+--output-folder data/ \
+--common-gene-ids-path data/common_gene_id.txt \
+--rna-seq-column tpm_unstranded
+```
+
+This script processes raw RNA-seq data from the GDC portal into a format that can be used with BulkRNABert. The script uses the common gene IDs provided in `data/common_gene_id.txt` to ensure compatibility with the model.
+
+Sources: [README.md:55-69]()
+
+## Downstream Tasks Examples
+
+BulkRNABert's gene embeddings can be used for various downstream tasks, including cancer classification and survival analysis.
+
+```mermaid
+flowchart TD
+    A["BulkRNABert Embeddings"] --> B["Downstream Applications"]
+    
+    B --> C["get_pretrained_downstream_model()"]
+    C --> D["Cancer Type Classification"]
+    C --> E["Survival Prediction"]
+    
+    D --> F1["BRCA"]
+    D --> F2["BLCA"]
+    D --> F3["GBMLGG"]
+    D --> F4["LUAD"]
+    D --> F5["UCEC"]
+```
+
+### Example: Cancer Type Classification
+
+The repository includes a notebook that demonstrates how to use BulkRNABert embeddings for cancer type classification across five cancer cohorts.
+
+```python
+# First, obtain gene embeddings as shown in previous examples
+# Then, load the pretrained downstream classification model
+from multiomics_open_research.bulk_rna_bert.pretrained import get_pretrained_downstream_model
+
+# Load the classification model
+classification_params, classification_forward_fn = get_pretrained_downstream_model(
+    downstream_task="classification",
+    checkpoint_directory="checkpoints/"
+)
+
+# Transform the forward function
+classification_forward_fn = hk.transform(classification_forward_fn)
+
+# Run inference
+random_key = jax.random.PRNGKey(1)
+classification_outputs = classification_forward_fn.apply(
+    classification_params, 
+    random_key, 
+    mean_embedding
+)
+
+# Get predicted classes
+predicted_classes = jnp.argmax(classification_outputs, axis=1)
+```
+
+Sources: [README.md:71-73]()
+
+### Example: Survival Analysis
+
+Similarly, you can use BulkRNABert embeddings for survival prediction.
+
+```python
+# Load the survival prediction model
+survival_params, survival_forward_fn = get_pretrained_downstream_model(
+    downstream_task="survival",
+    checkpoint_directory="checkpoints/"
+)
+
+# Transform the forward function
+survival_forward_fn = hk.transform(survival_forward_fn)
+
+# Run inference
+random_key = jax.random.PRNGKey(1)
+survival_outputs = survival_forward_fn.apply(
+    survival_params, 
+    random_key, 
+    mean_embedding
+)
+
+# Get survival predictions
+predicted_survival = survival_outputs
+```
+
+## End-to-End Example Workflow
+
+Below is a comprehensive diagram showing the entire workflow from data preprocessing to downstream applications.
+
+```mermaid
+flowchart TB
+    A["Raw RNA-seq Data"] --> B["Preprocessing Pipeline\n(preprocess_tcga_rna_seq.py)"]
+    B --> C["Processed RNA-seq CSV"]
+    C --> D["Data Preprocessing\n(preprocess_rna_seq_for_bulkrnabert)"]
+    D --> E["RNA-seq Array"]
+    E --> F["Tokenization\n(tokenizer.batch_tokenize)"]
+    F --> G["Token IDs"]
+    
+    H["Model Loading\n(get_pretrained_model)"] --> I["BulkRNABert Components"]
+    I --> J["parameters"]
+    I --> K["forward_fn"]
+    I --> L["tokenizer"]
+    I --> M["config"]
+    
+    G --> N["Model Inference\n(forward_fn.apply)"]
+    J --> N
+    N --> O["Gene Embeddings"]
+    
+    O --> P["Downstream Tasks"]
+    P --> Q["Cancer Classification\n(get_pretrained_downstream_model)"]
+    P --> R["Survival Analysis\n(get_pretrained_downstream_model)"]
+    
+    Q --> S["Classification Results"]
+    R --> T["Survival Predictions"]
+```
+
+This diagram illustrates the complete process of using BulkRNABert, from preprocessing raw RNA-seq data to obtaining gene embeddings and using them for downstream tasks.
+
+## Tips for Effective Usage
+
+1. **Model Selection**: Choose the appropriate pretrained model based on your data:
+   - `bulk_rna_bert_tcga`: Best for cancer-related studies using TCGA data
+   - `bulk_rna_bert_gtex_encode`: Suitable for normal tissue analysis
+   - `bulk_rna_bert_gtex_encode_tcga`: Best for mixed datasets containing both normal and cancer samples
+
+2. **Embedding Layer Selection**: The model allows you to extract embeddings from different layers:
+   - Earlier layers (1-2): Capture more basic gene expression patterns
+   - Middle layers (3-4): Balance between basic and complex features
+   - Later layers (5-6): Represent more abstract, task-specific features
+
+3. **Gene Set Compatibility**: Ensure your RNA-seq data contains the genes listed in `common_gene_id.txt` for optimal performance.
+
+4. **Preprocessing Options**: The `preprocess_rna_seq_for_bulkrnabert` function offers different normalization options (log normalization and max normalization) that can affect model performance.
+
+Sources: [README.md]()
+
+---
+
+# Page: Development and Contribution
+
+# Development and Contribution
+
+<details>
+<summary>Relevant source files</summary>
+
+The following files were used as context for generating this wiki page:
+
+- [.gitignore](.gitignore)
+- [.pre-commit-config.yaml](.pre-commit-config.yaml)
+- [LICENSE.md](LICENSE.md)
+- [README.md](README.md)
+
+</details>
+
+
+
+## Purpose and Scope
+
+This page provides essential information for developers who want to contribute to or extend the BulkRNABert codebase. It covers development setup, code quality standards, workflow, and contribution guidelines. For information on using the pretrained models, see [Overview](#1) and [Model Loading and Inference](#3.2).
+
+## Repository Setup
+
+To start developing or contributing to BulkRNABert, follow these steps:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/instadeepai/multiomics-open-research.git
+   cd multiomics-open-research
+   ```
+
+2. Install the package in development mode:
+   ```bash
+   pip install -e .
+   ```
+
+3. Install development tools and pre-commit hooks:
+   ```bash
+   pip install pre-commit
+   pre-commit install
+   ```
+
+Sources: [README.md:13-16](), [.pre-commit-config.yaml:1-45]()
+
+## Development Workflow
+
+### Code Structure
+
+The following diagram illustrates the high-level structure of the codebase and the main components developers might work with:
+
+```mermaid
+graph TD
+    subgraph "Code Organization"
+        A["multiomics_open_research/"] --> B["bulk_rna_bert/"]
+        A --> C["scripts/"]
+        A --> D["data/"]
+        A --> E["examples/"]
+        A --> F["checkpoints/"]
+        
+        B --> B1["model.py"]
+        B --> B2["tokenizer.py"]
+        B --> B3["preprocess.py"]
+        B --> B4["pretrained.py"]
+        B --> B5["downstream/"]
+        
+        C --> C1["preprocess_tcga_rna_seq.py"]
+        
+        E --> E1["downstream_task_example.ipynb"]
+    end
+```
+
+Sources: [README.md:11-53]()
+
+### Development Process
+
+The diagram below outlines the recommended development workflow for contributing to the BulkRNABert project:
+
+```mermaid
+flowchart TD
+    A["Fork Repository"] --> B["Create Feature Branch"]
+    B --> C["Implement Changes"]
+    C --> D["Run Pre-commit Hooks"]
+    D -- "Fails" --> C
+    D -- "Passes" --> E["Run Tests"]
+    E -- "Fails" --> C
+    E -- "Passes" --> F["Create Pull Request"]
+    F --> G["Code Review"]
+    G -- "Changes Requested" --> C
+    G -- "Approved" --> H["Merge to Main"]
+```
+
+Sources: [.pre-commit-config.yaml:1-45]()
+
+## Code Quality Standards
+
+The BulkRNABert project enforces strict code quality standards through automated checks. The following diagram shows the relationship between code changes and quality checks:
+
+```mermaid
+graph LR
+    subgraph "Pre-commit Hooks"
+        A["Your Code Changes"] --> B["isort"]
+        B --> C["black"]
+        C --> D["flake8"]
+        D --> E["mypy"]
+        E --> F["nbstripout"]
+        F --> G["pre-commit-hooks"]
+    end
+    
+    G -- "Passes All Checks" --> H["Commit Allowed"]
+    G -- "Fails Checks" --> I["Fix Issues"]
+    I --> A
+```
+
+### Code Formatting and Linting
+
+The project uses the following tools for code quality:
+
+| Tool | Purpose | Configuration |
+|------|---------|--------------|
+| isort | Import sorting | Profile: black |
+| black | Code formatting | Default settings |
+| flake8 | Linting | Max line length: 88, Extended ignore: E203 |
+| mypy | Type checking | Default settings |
+| nbstripout | Cleaning notebook outputs | Default settings |
+| pre-commit-hooks | General checks | merge conflict, EOF, trailing whitespace |
+
+Sources: [.pre-commit-config.yaml:1-45]()
+
+## Extending BulkRNABert
+
+BulkRNABert is designed to be extensible. Here are the main components that you might want to extend:
+
+```mermaid
+graph TB
+    subgraph "Extensible Components"
+        A["BulkRNABert Model"] --> A1["New Model Architectures"]
+        A --> A2["Different Embedding Layers"]
+        A --> A3["Additional Encoder Types"]
+        
+        B["Tokenization"] --> B1["Custom Tokenizers"]
+        B --> B2["Alternative Binning Strategies"]
+        
+        C["Preprocessing"] --> C1["Additional Data Sources"]
+        C --> C2["New Normalization Methods"]
+        
+        D["Downstream Tasks"] --> D1["New Classification Tasks"]
+        D --> D2["Other Predictive Tasks"]
+        D --> D3["Integration with Other Omics"]
+    end
+```
+
+### Using BulkRNABert in New Downstream Tasks
+
+To use BulkRNABert for a new downstream task, you typically need to:
+
+1. Load the pretrained model
+2. Extract embeddings
+3. Train a task-specific model
+
+Here's a diagram showing the typical workflow for extending with new downstream tasks:
+
+```mermaid
+flowchart LR
+    A["get_pretrained_model()"] --> B["Extract Embeddings"]
+    B --> C["Design Task-Specific Model"]
+    C --> D["Train and Evaluate"]
+    D --> E["Save New Downstream Model"]
+```
+
+Sources: [README.md:19-48]()
+
+## License and Attribution
+
+BulkRNABert is released under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0). This license allows:
+
+- Sharing and adaptation for non-commercial purposes
+- Attribution to the original authors
+- Sharing adaptations under the same license
+
+When contributing to or extending BulkRNABert, ensure that your work:
+
+1. Maintains the same license
+2. Includes appropriate attribution to the original work
+3. Is not used for commercial purposes without explicit permission
+
+Additionally, when using BulkRNABert in academic work, please cite the associated paper as mentioned in the README.
+
+Sources: [LICENSE.md:1-438](), [README.md:75-90]()
+
+## Code Entry Points
+
+The following diagram illustrates the main entry points for developers looking to contribute to or extend BulkRNABert:
+
+```mermaid
+graph TD
+    subgraph "Main Entry Points"
+        A["get_pretrained_model()"] --> A1["Model Loading"]
+        B["BinnedExpressionTokenizer"] --> B1["Tokenization"]
+        C["preprocess_rna_seq_for_bulkrnabert()"] --> C1["Preprocessing"]
+        D["get_pretrained_downstream_model()"] --> D1["Downstream Tasks"]
+    end
+    
+    subgraph "Implementation Files"
+        A1 --> A1F["pretrained.py"]
+        B1 --> B1F["tokenizer.py"]
+        C1 --> C1F["preprocess.py"]
+        D1 --> D1F["downstream/utils.py"]
+    end
+```
+
+Sources: [README.md:25-46]()
+
+## Contribution Best Practices
+
+When contributing to BulkRNABert, consider the following best practices:
+
+1. **Documentation**: Include docstrings for all functions and classes
+2. **Testing**: Add tests for new functionality
+3. **Type Hints**: Use Python type hints for better code quality
+4. **Modularity**: Keep components modular to facilitate reuse and extension
+5. **Reproducibility**: Ensure that random seeds are set for reproducible results
+6. **Dependencies**: Minimize dependencies to maintain portability
+
+Sources: [.pre-commit-config.yaml:1-45](), [README.md:13-16]()
+
+## Troubleshooting Development Issues
+
+Common development issues and their solutions:
+
+| Issue | Solution |
+|-------|----------|
+| Pre-commit hooks failing | Run `pre-commit run --all-files` to see detailed errors |
+| Import errors after adding new modules | Make sure __init__.py files are properly set up |
+| Type checking issues | Add appropriate type hints or use Any where necessary |
+| Model loading errors | Check checkpoint paths and ensure model architecture matches |
+
+Sources: [.pre-commit-config.yaml:1-45](), [README.md:29-33]()

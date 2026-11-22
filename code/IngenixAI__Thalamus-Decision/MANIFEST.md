@@ -1,7 +1,7 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/IngenixAI/Thalamus-Decision
-- 快照日期: 2026-11-19
+- 快照日期: 2026-11-22
 - 快照 commit: [`7b9e02ed404b`](https://github.com/IngenixAI/Thalamus-Decision/commit/7b9e02ed404bbd01438ce52d49dd7b74be6df7f8)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 

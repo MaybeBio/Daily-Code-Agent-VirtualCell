@@ -1,0 +1,23 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: scFoundation
+  ckpt_path: weights/scFoundation/models.ckpt
+  gene_list_path: weights/scFoundation/OS_scRNA_gene_index.19264.tsv
+  tasks: cluster
+  pretrain_prefix: 20230926_85M
+  pretrain_directory: weights/CellPLM
+  weights_dir: weights/scFoundation
+  source_dir: public_code/scFoundation
+  expression_layer: auto
+  inference_batch_size: 1
+  attention_query_chunk_size: 256

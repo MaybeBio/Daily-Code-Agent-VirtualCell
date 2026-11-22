@@ -1,0 +1,25 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  spilt_name:
+  - train
+  - vaild
+  - test
+  - all
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: CellPLM
+  tasks: clustering
+  pretrain_prefix: 20230926_85M
+  pretrain_directory: weights/CellPLM
+  weights_dir: weights/CellPLM
+  source_dir: public_code/CellPLM
+  expression_layer: auto
+  inference_batch_size: 32

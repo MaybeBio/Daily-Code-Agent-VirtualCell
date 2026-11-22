@@ -1,0 +1,29 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  task: "annotation"
+  label_fields: ["celltype"]
+  covariate_fields: 
+  ensembl_auto_conversion: True
+  hvg: 3000
+  test_dataset_name: bmmc
+
+model_cfg:
+  model: UMAP
+  tasks: "cluster"
+  pretrain_prefix: 20230926_85M
+  overwrite_config:
+    drop_node_rate: 0.3
+    dec_layers: 1
+    model_dropout: 0.5
+    mask_node_rate: 0.75
+    mask_feature_rate: 0.25
+    dec_mod: mlp
+    latent_mod: ae
+    max_batch_size: 70000
+    out_dim: 18
+    head_type: annotation # embedder
+  pretrain_directory: weights/CellPLM
+

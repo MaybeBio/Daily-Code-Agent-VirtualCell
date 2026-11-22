@@ -1,0 +1,103 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vcc"
+version = "0.1.0"
+description = "Reverse Perturbation Prediction for CRISPR Perturb-seq"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "accelerate>=1.13.0",
+    "anndata>=0.12.10",
+    "arc-state @ git+https://github.com/ArcInstitute/state.git@bf4fbc9ea35bf4d1e91afe201b663dec5d8bdd48",
+    "h5py==3.15.1",
+    "mudata>=0.3.8",
+    "numba>=0.64.0",
+    "numpy>=2.2.6",
+    "pandas>=2.2.3",
+    "pyarrow>=14.0.2",
+    "pyyaml>=6.0.2",
+    "scanpy>=1.11.2",
+    "scikit-learn==1.7.2",
+    "scvi-tools>=1.4.0.post1,<1.4.1",
+    "scipy>=1.15.0",
+    "setuptools<81",
+    "torch>=2.7.0",
+    "tqdm>=4.67.1",
+    "transformers>=4.57.0",
+    "umap-learn==0.5.9.post2",
+    "openpyxl>=3.1",
+    "httpx[socks]>=0.28.1",
+    "pyxlsb>=1.0.10",
+]
+
+[project.optional-dependencies]
+# Building the extra single-cell lines from Cell Ranger BAMs; reading the R files of
+# the pinned cell-state programs.
+data = [
+    "pysam>=0.23",
+    "rdata>=0.11",
+]
+research = [
+    "datasets>=2.10.0",
+]
+viz = [
+    "matplotlib==3.10.7",
+]
+
+[dependency-groups]
+dev = [
+    "ipython>=8.18.1",
+    "pysam>=0.23",
+    "pytest>=8.3.5",
+    "ruff>=0.11.8",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/README.md",
+    "/pyproject.toml",
+    "/src",
+    "/configs",
+    "/tests",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+src = ["src", "tests"]
+force-exclude = true
+extend-exclude = [
+    "scGPT",
+    "archive/",
+    "data/",
+    "docs/",
+    "third_party",
+    "**/*.sh",
+    "**/*.yaml",
+    "**/*.yml",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F"]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["archive", ".git", ".venv"]

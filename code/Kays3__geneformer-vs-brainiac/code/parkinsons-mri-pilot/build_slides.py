@@ -1,5 +1,7 @@
 """Rebuild the editable research update using python-pptx."""
+import csv
 import json
+from statistics import median
 from pathlib import Path
 
 from pptx import Presentation
@@ -64,4 +66,36 @@ for y, heading, words in [
     (5.36, "Test motor progression separately", "Link baseline MRI to 24-month MDS-UPDRS Part III motor scores and medication state in an approved PPMI dataset. Compare imaging against a baseline clinical forecast.")]:
     label(s,.75,y,3.8,1.3,heading,23,teal,True)
     label(s,4.8,y,7.75,1.45,words,21)
+s = page("Published PPMI cohort  /  External reference", "Motor examination scores over 24 months")
+label(s, .75, 2.05, 12, .8, "Mean MDS-UPDRS Part III score in the untreated + treated OFF group", 23)
+for x, visit, mean, count in [
+    (.75, "Baseline", "20.89", 423), (3.9, "6 months", "24.87", 400),
+    (7.05, "12 months", "25.10", 334), (10.2, "24 months", "27.13", 282)
+]:
+    label(s, x, 3.1, 2.7, .5, visit, 20)
+    label(s, x, 3.7, 2.7, .85, mean, 35, teal, True)
+    label(s, x, 4.65, 2.8, .6, f"{count} exams", 17)
+label(s, .75, 5.65, 11.85, .95, "The group mean rose by 6.24 points. Different numbers contributed at each visit. Individual change requires paired records.", 21)
+label(s, .75, 6.85, 12, .44, "Simuni et al., Movement Disorders (2018), Table 2. DOI 10.1002/mds.27361", 14)
+s = page("Proposed study  /  Before diagnosis", "How early was a change detectable?")
+label(s, .75, 2.0, 12, .78, "Illustrative smell-test timeline for one participant", 23, teal, True)
+for x, time, event in [
+    (.75, "−36 months", "Test within reference range"),
+    (4.85, "−18 months", "First abnormal test"),
+    (9.05, "Month 0", "Clinical PD diagnosis"),
+]:
+    label(s, x, 3.0, 3.7, .65, time, 28, navy, True)
+    label(s, x, 3.85, 3.7, 1.2, event, 21)
+label(s, .75, 5.15, 11.9, 1.25, "The marker crossed the threshold between the two tests. Its biological cause and the anatomical site of onset remain unknown.", 22)
+label(s, .75, 6.75, 12, .5, "Design precedent: Jennings et al., PARS cohort (2017). Example dates are hypothetical.", 15)
+s = page("Validation  /  Cognitive status at the scan visit", "AUC varied with the participant split")
+with (root / "results/auc-by-split.csv").open() as f:
+    runs = list(csv.DictReader(f))
+label(s, .75, 2.0, 12, .8, "50 stratified five-fold splits of the same 33 people", 24)
+for x, name in zip([.75, 4.85, 9.0], metrics):
+    values = [float(run[name]) for run in runs]
+    label(s, x, 3.0, 3.8, .85, name, 21, navy, True)
+    label(s, x, 3.95, 3.8, .85, f"{median(values):.2f}", 34, teal, True)
+    label(s, x, 5.0, 3.8, .7, f"Range {min(values):.2f} to {max(values):.2f}", 19)
+label(s, .75, 6.05, 11.85, 1.0, "Values show median held-out AUC and the observed range across splits. Independent validation is needed to estimate performance in new patients.", 19)
 deck.save(root / "Parkinsons-MRI-pilot.pptx")

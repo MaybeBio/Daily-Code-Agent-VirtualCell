@@ -1,0 +1,95 @@
+"""Training epochs: sharded or gene-blocked GeneEffect rows."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, DistributedSampler, Sampler
+
+from src.data.batches import DependencyBatch
+from src.data.datasets import DependencyDataset
+
+# Objectives whose batches hold every training row of a few genes.
+GENE_BLOCK_OBJECTIVES = ("pearson_blocks", "line_ranking")
+
+
+class GeneBlockSampler(Sampler[list[int]]):
+    """Batches of every training row of ``genes_per_block`` genes, for one rank.
+
+    Each epoch draws one permutation of the genes that have rows, seeded by the
+    epoch alone so every rank sees the same order, and cuts it into blocks. Blocks
+    are dealt to ranks round-robin; an incomplete block and the blocks that do not
+    fill a whole round are dropped, so every gene appears at most once per epoch
+    and every rank takes the same number of updates.
+    """
+
+    def __init__(
+        self,
+        rows_by_gene: Sequence[np.ndarray],
+        *,
+        genes_per_block: int,
+        epoch: int,
+        rank: int,
+        world: int,
+    ) -> None:
+        if genes_per_block < 1:
+            raise ValueError("genes_per_block must be positive")
+        self.rows_by_gene = rows_by_gene
+        self.genes = np.flatnonzero([len(rows) for rows in rows_by_gene])
+        self.genes_per_block = genes_per_block
+        self.epoch, self.rank, self.world = epoch, rank, world
+
+    def __len__(self) -> int:
+        return len(self.genes) // self.genes_per_block // self.world
+
+    def __iter__(self) -> Iterator[list[int]]:
+        order = np.random.default_rng(
+            np.random.SeedSequence([0, self.epoch])
+        ).permutation(self.genes)
+        blocks = order[: len(self) * self.world * self.genes_per_block].reshape(
+            -1, self.genes_per_block
+        )
+        for block in blocks[self.rank :: self.world]:
+            yield np.concatenate([self.rows_by_gene[gene] for gene in block]).tolist()
+
+
+def dependency_loader(
+    dataset: DependencyDataset,
+    config: Mapping[str, Any],
+    epoch: int,
+    accelerator: Any,
+) -> DataLoader[DependencyBatch]:
+    """One shuffled GeneEffect epoch of training batches for this rank.
+
+    ``GENE_BLOCK_OBJECTIVES`` take gene blocks (``GeneBlockSampler``); every other
+    objective takes ``dependency_batch_size`` rows from a seeded ``DistributedSampler``
+    with the incomplete tail dropped, so every rank takes the same number of updates.
+    Do not pass the loader through ``accelerator.prepare``. The dataset keeps its
+    tables on the rank's device, so the loader collates in-process, without workers.
+    """
+    train = config["train"]
+    rank, world = accelerator.process_index, accelerator.num_processes
+    if train["objective"] in GENE_BLOCK_OBJECTIVES:
+        sampler = GeneBlockSampler(
+            dataset.rows_by_gene(),
+            genes_per_block=train["genes_per_block"],
+            epoch=epoch,
+            rank=rank,
+            world=world,
+        )
+        return DataLoader(dataset, batch_sampler=sampler, collate_fn=dataset.collate)
+    sampler = DistributedSampler(
+        dataset, num_replicas=world, rank=rank, shuffle=True, seed=0, drop_last=True
+    )
+    sampler.set_epoch(epoch)
+    return DataLoader(
+        dataset,
+        batch_size=train["dependency_batch_size"],
+        sampler=sampler,
+        drop_last=True,
+        collate_fn=dataset.collate,
+        generator=torch.Generator().manual_seed(epoch * world + rank),
+    )

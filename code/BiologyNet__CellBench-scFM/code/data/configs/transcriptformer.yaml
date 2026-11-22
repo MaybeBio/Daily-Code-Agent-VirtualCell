@@ -1,0 +1,25 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: TranscriptFormer
+  tasks: embedding_extraction
+  variant: tf_sapiens
+  weights_dir: weights/TranscriptFormer
+  source_dir: public_code/TranscriptFormer
+  backend_python: runtime_envs/transcriptformer/bin/python
+  backend_device: cuda
+  inference_batch_size: 1
+  expression_layer: auto
+  max_length: 1023
+  organism: NCBITaxon:9606
+  assay: unknown
+output_dir: output

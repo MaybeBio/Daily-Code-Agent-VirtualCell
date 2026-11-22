@@ -1,0 +1,11 @@
+from pathlib import Path
+import pandas as pd
+R=Path(__file__).resolve().parents[1];p=R/'data/model_attributes_working.csv';x=pd.read_csv(p).fillna('未知')
+items={'Geneformer':('gf-12L-30M-i2048；revision 31bf641d','排序基因；中位数标准化','30M 细胞（Genecorpus-30M，来源规模）','人','2048','https://huggingface.co/ctheodoris/Geneformer'), 'LangCell':('cell_bert + cell_proj','Geneformer V1 排序 + CLS','未知','未知','未知','https://github.com/PharMolix/LangCell'), 'scFoundation':('models.ckpt','19264 基因表达补齐、normalize/log1p、t4','未知；需核对所用检查点','未知','19264 基因输入索引','https://github.com/biomap-research/scFoundation'), 'scGPT':('whole-human','基因 ID + 51 表达分箱 + CLS','未知；需核对 whole-human 检查点','未知','1200（本地协议）','https://github.com/bowang-lab/scGPT'), 'CellPLM':('20230926_85M','全基因计数、common_preprocess','未知','未知','未知','https://github.com/OmicsML/CellPLM'), 'Nicheformer':('revision 0ba4ba162f9ad3d6c8b713761954c31be2fa69ed','完整词表、技术均值、物种及技术 token','未知','未知','未知','https://huggingface.co/theislab/Nicheformer'), 'Tabula':('pancreas.pth；sha256 ed6a3ef16d042d6deacb4bc044daf6d93c57ddb3182559fb8bbd0149d06a965c','官方 check_vocab/Preprocessor','未知','未知','未知','https://github.com/aristoteleo/tabula'), 'TranscriptFormer':('TF-Sapiens','官方 tokenizer；缺失 assay 为 unknown','未知','未知','1023（本地协议）','data/model_protocols.json'), 'UCE':('weights/UCE，具体哈希待核实','官方基因/染色体采样','未知','未知','1536（配置值）','data/configs/uce.yaml'), 'GeneCompass':('weights/GeneCompass，具体哈希待核实','计数/中位数、log2 排序及基因知识先验','未知','未知','2048（配置值）','data/configs/genecompass.yaml'), 'CellFM':('weights/CellFM，具体哈希待核实','匹配基因、log 标准化、CLS','未知','未知','2048（配置值）','data/configs/cellfm.yaml'), 'scLong':('weights/scLong，具体哈希待核实','固定词表、normalize/log1p；输入基因还原后均值','未知','未知','27875（配置值）','data/configs/sclong.yaml'), 'scPRINT2':('weights/scPRINT2，具体哈希待核实','检查点物种词表及官方 Embedder','未知','未知','2000（配置值）','data/configs/scprint2.yaml')}
+for i,row in x.iterrows():
+ m=row.model
+ if m in items:
+  ck,tok,sz,sp,L,src=items[m];x.loc[i,['checkpoint','input','pretraining_size_unit','pretraining_species','context_length','source']]=[ck,tok,sz,sp,L,src]
+ else:
+  x.loc[i,['checkpoint','training_objective','pretraining_size_unit','pretraining_species','context_length','source']]=['不适用：数据集训练基线','数据集内拟合；详见代码','不适用','不适用','不适用','data/configs/']
+x.to_csv(p,index=False)

@@ -1,0 +1,25 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: scLong
+  tasks: embedding_extraction
+  variant: 1b
+  weights_dir: weights/scLong
+  source_dir: public_code/scLong
+  backend_device: cuda
+  inference_batch_size: 1
+  expression_layer: auto
+  max_length: 27875
+  organism: NCBITaxon:9606
+  pooling: benchmark_mean_official_input_gene_decodings
+  pooling_definition: user_authorized_benchmark_mean_after_official_embed_reindex
+output_dir: output

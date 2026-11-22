@@ -1,20 +1,20 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/leelieber2025/AnnoTuneAgent
-- 快照日期: 2026-11-19
-- 快照 commit: [`14db2688e77a`](https://github.com/leelieber2025/AnnoTuneAgent/commit/14db2688e77a15c4ec6c00908fb9ed95c1815e9f)
+- 快照日期: 2026-11-22
+- 快照 commit: [`b4a055cfa05b`](https://github.com/leelieber2025/AnnoTuneAgent/commit/b4a055cfa05b7960bc6f5c822cae89fa6ece7e0c)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
-## 保留 (64 个文件, 5.1 MB)
+## 保留 (66 个文件, 4.2 MB)
 
 | 类别 | 文件数 | 大小 |
 |---|---:|---:|
-| 源码 | 44 | 5.0 MB |
-| 文档 | 11 | 71.5 KB |
-| 构建/配置 | 7 | 7.8 KB |
-| README | 2 | 7.6 KB |
+| 源码 | 45 | 4.1 MB |
+| 文档 | 11 | 75.9 KB |
+| 构建/配置 | 8 | 9.4 KB |
+| README | 2 | 8.3 KB |
 
-按后缀: `.ipynb` 3 (4.4 MB)、`.py` 40 (609.6 KB)、`.md` 11 (56.8 KB)、`无后缀` 2 (22.4 KB)、`.yml` 2 (4.7 KB)、`pyproject.toml` 1 (2.6 KB)、`.css` 1 (1.2 KB)、`.yaml` 2 (436 B)、`.txt` 1 (90 B)、`setup.cfg` 1 (37 B)
+按后缀: `.ipynb` 3 (3.5 MB)、`.py` 41 (637.3 KB)、`.md` 11 (61.8 KB)、`无后缀` 2 (22.4 KB)、`.yml` 3 (6.2 KB)、`pyproject.toml` 1 (2.6 KB)、`.css` 1 (1.2 KB)、`.yaml` 2 (436 B)、`.txt` 1 (90 B)、`setup.cfg` 1 (37 B)
 
 > README / 文档中的相对图片与链接已改写为 GitHub 绝对地址。
 
@@ -32,12 +32,12 @@
 | [`src/annotuneagent/tokenizer/vocab.json`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/tokenizer/vocab.json) | 6.4 MB |
 | [`src/annotuneagent/tokenizer/merges.txt`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/tokenizer/merges.txt) | 3.2 MB |
 | [`src/annotuneagent/ontology/cl_isa.json`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/ontology/cl_isa.json) | 259.6 KB |
-| [`src/annotuneagent/markers.tsv`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/markers.tsv) | 119.8 KB |
-| [`src/annotuneagent/ontology/ontology_map.jsonl`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/ontology/ontology_map.jsonl) | 100.1 KB |
+| [`src/annotuneagent/markers.tsv`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/markers.tsv) | 135.9 KB |
+| [`src/annotuneagent/ontology/ontology_map.jsonl`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/ontology/ontology_map.jsonl) | 112.4 KB |
 | [`src/annotuneagent/tokenizer/tokenizer_config.json`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/tokenizer/tokenizer_config.json) | 16.3 KB |
 | [`MANIFEST.in`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/MANIFEST.in) | 1.1 KB |
-| [`CITATION.cff`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/CITATION.cff) | 924 B |
-| [`.gitignore`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/.gitignore) | 762 B |
+| [`CITATION.cff`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/CITATION.cff) | 818 B |
+| [`.gitignore`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/.gitignore) | 763 B |
 | [`.gitattributes`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/.gitattributes) | 304 B |
 | [`src/annotuneagent/py.typed`](https://github.com/leelieber2025/AnnoTuneAgent/raw/HEAD/src/annotuneagent/py.typed) | 0 B |
 

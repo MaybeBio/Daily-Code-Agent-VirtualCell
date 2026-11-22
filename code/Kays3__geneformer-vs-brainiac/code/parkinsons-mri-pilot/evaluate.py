@@ -50,18 +50,23 @@ assert X.shape == (len(rows), 768) and np.isfinite(X).all()
 y = (rows.group == "PD-MCI").to_numpy(dtype=int)
 clinical = np.column_stack([rows.age, rows.sex == "M"])
 names = ["Age and sex", "BrainIAC", "Age, sex and BrainIAC"]
-scores = {name: np.full(len(y), np.nan) for name in names}
-folds = np.zeros(len(y), dtype=int)
-for fold, (train, test) in enumerate(StratifiedKFold(5, shuffle=True, random_state=42).split(X, y), 1):
-    folds[test] = fold
-    # Retain three scan components, fixed before examining labels or scores.
-    pca = PCA(3, svd_solver="full").fit(X[train])
-    z = pca.transform(X)
-    for name, inputs in zip(names, [clinical, z, np.column_stack([clinical, z])]):
-        clf = make_pipeline(StandardScaler(), LogisticRegression(C=1, class_weight="balanced"))
-        clf.fit(inputs[train], y[train])
-        scores[name][test] = clf.predict_proba(inputs[test])[:, 1]
+def score_split(seed):
+    scores = {name: np.full(len(y), np.nan) for name in names}
+    folds = np.zeros(len(y), dtype=int)
+    for fold, (train, test) in enumerate(StratifiedKFold(5, shuffle=True, random_state=seed).split(X, y), 1):
+        folds[test] = fold
+        # Retain three scan components, fixed before examining labels or scores.
+        pca = PCA(3, svd_solver="full").fit(X[train])
+        z = pca.transform(X)
+        for name, inputs in zip(names, [clinical, z, np.column_stack([clinical, z])]):
+            clf = make_pipeline(StandardScaler(), LogisticRegression(C=1, class_weight="balanced"))
+            clf.fit(inputs[train], y[train])
+            scores[name][test] = clf.predict_proba(inputs[test])[:, 1]
 
+    return scores, folds
+
+
+scores, folds = score_split(42)
 pred = rows.assign(fold=folds, mci=y, **scores)
 pred.to_csv(out / "held-out-predictions.csv", index=False)
 summary = {}
@@ -77,3 +82,10 @@ fig.tight_layout()
 fig.savefig(out / "roc.png", dpi=160)
 (out / "metrics.json").write_text(json.dumps(summary, indent=2) + "\n")
 print(device, summary)
+
+# Quantify partition sensitivity with the same participants and fixed predictors.
+runs = []
+for seed in range(50):
+    predictions = scores if seed == 42 else score_split(seed)[0]
+    runs.append({"seed": seed, **{name: roc_auc_score(y, p) for name, p in predictions.items()}})
+pd.DataFrame(runs).to_csv(out / "auc-by-split.csv", index=False)

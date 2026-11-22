@@ -1,7 +1,7 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/gm-oogway/geneformer-tcga-hnsc
-- 快照日期: 2026-11-19
+- 快照日期: 2026-11-22
 - 快照 commit: [`b50267d661dc`](https://github.com/gm-oogway/geneformer-tcga-hnsc/commit/b50267d661dc0a50c2a98f06c0e41ee3dc6ef2e5)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 

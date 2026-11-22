@@ -1,7 +1,7 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/ratschlab/aestetik
-- 快照日期: 2026-11-19
+- 快照日期: 2026-11-22
 - 快照 commit: [`c9ff87c7dab0`](https://github.com/ratschlab/aestetik/commit/c9ff87c7dab0b6824cc5f9986a4ab5ee56cdc4b9)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 

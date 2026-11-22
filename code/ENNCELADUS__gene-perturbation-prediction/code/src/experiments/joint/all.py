@@ -1,0 +1,387 @@
+"""One automatic run: preparation through validation evaluation, then summary.md.
+
+Every step is skipped when its output exists, so rerunning with the same run id
+resumes; the test split is never evaluated here.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
+from pathlib import Path
+
+from src.data.io import read_json
+from src.experiments.joint.config import load_config
+from src.experiments.joint.pipeline import (
+    BASELINE_NAMES,
+    LINEAR_MODEL_CONTROLS,
+    Job,
+    check_resume_processes,
+    choose_gpus,
+    run_pool,
+    sigterm_raises,
+    start_process,
+    training_argv,
+    visible_gpus,
+)
+from src.experiments.run_dir import number
+
+LINE_NAMES = {
+    "ACH-000551": "K562",
+    "ACH-000739": "HepG2",
+    "ACH-000971": "HCT116",
+    "ACH-000995": "Jurkat",
+}
+ARM_NAMES = {
+    "no_change": "No change",
+    "global_mean_effect": "Global mean effect",
+    "released_state": "Released STATE checkpoint",
+    "state_joint": "STATE as in the joint model",
+    "mlp_hvg": "MLP on HVG",
+    "mlp_tx1": "MLP on Tx1",
+}
+VALIDATION_COLUMNS = {
+    "Selective Spearman (per selective gene)": "val_selective_spearman",
+    "Selective AUPR lift": "val_selective_aupr_lift",
+    "Huber": "val_geneeffect_loss",
+    "Absolute Pearson (per line)": "val_geneeffect_pearson_macro_per_line",
+    "Residual Pearson (per gene)": "val_residual_pearson_macro_per_gene",
+    "Residual Spearman (per gene)": "val_residual_spearman_macro_per_gene",
+    "SD ratio (per gene)": "val_residual_sd_ratio_macro_per_gene",
+}
+
+
+def _name(model_id: str) -> str:
+    return (
+        f"{LINE_NAMES[model_id]} ({model_id})" if model_id in LINE_NAMES else model_id
+    )
+
+
+def comparison_argv(config_path: Path, run: Path, *mode: str) -> tuple[str, ...]:
+    return (
+        sys.executable,
+        "-m",
+        "src.experiments.joint.response_comparison",
+        "--config",
+        str(config_path),
+        "--out-dir",
+        str(run / "comparison"),
+        "--device",
+        "cuda",
+        *mode,
+    )
+
+
+def comparison_and_training(
+    config_path: Path,
+    config: dict,
+    run: Path,
+    gpus: tuple[str, ...],
+    start: Callable = start_process,
+) -> None:
+    """Untrained comparison arms, joint training, trained comparison jobs, summary:
+    subprocesses on ``gpus``, or in this process on the CPU without any."""
+    from src.experiments.joint import response_comparison
+    from src.experiments.joint.train import run_training
+
+    comparison, train, logs = run / "comparison", run / "train", run / "logs"
+    compared = (comparison / "verdicts.json").is_file()
+    if not compared:
+        if gpus:
+            job = Job(
+                "comparison_untrained", comparison_argv(config_path, run, "--untrained")
+            )
+            run_pool([job], [gpus[:1]], logs, start)
+        else:
+            response_comparison.run_untrained(config, comparison, device="cpu")
+        if (comparison / "sanity.json").is_file():
+            print(sanity_line(comparison), flush=True)
+    if not (train / "done.json").is_file():
+        if gpus:
+            check_resume_processes(train, len(gpus))
+            job = Job("train", training_argv(config_path, run, len(gpus)))
+            run_pool([job], [gpus], logs, start)
+        else:
+            run_training(config, train)
+    if not compared:
+        pending = response_comparison.pending_trained_jobs(config, comparison)
+        if gpus:
+            jobs = [
+                Job(
+                    f"comparison_{arm}__{anchor}",
+                    comparison_argv(config_path, run, "--job", arm, anchor),
+                )
+                for arm, anchor in pending
+            ]
+            run_pool(jobs, [(gpu,) for gpu in gpus], logs, start)
+        else:
+            for arm, anchor in pending:
+                response_comparison.run_trained_job(
+                    config, comparison, arm, anchor, device="cpu"
+                )
+        response_comparison.summarise(config, comparison)
+
+
+def _validation(config: dict, run: Path, device: str) -> None:
+    from src.experiments.joint.baselines import run_baselines
+    from src.experiments.joint.evaluate import evaluate_checkpoint, export_evaluation
+    from src.experiments.joint.readout.run import run_readout
+
+    best = run / "train" / "best.pt"
+    evaluation = run / "evaluation" / "val"
+    if not (evaluation / "metrics.json").is_file():
+        print("validation evaluation of the joint model", flush=True)
+        export_evaluation(evaluate_checkpoint(best, split="val"), evaluation)
+    baselines = run / "baselines" / "val"
+    if not (baselines / "metrics.json").is_file():
+        print("validation baselines", flush=True)
+        run_baselines(config, split="val", out_dir=baselines)
+    if not (run / "readout" / "metrics.json").is_file():
+        print("readout head with the explicit gene-specific context slope", flush=True)
+        run_readout(best, run / "readout", device=device)
+
+
+def target_sum_line(manifest: dict) -> str:
+    space = manifest["expression_space"]
+    sources = " and ".join(_name(m) for m in space["target_sum_sources"])
+    return (
+        f"Target total T = {space['target_sum']:.1f}: the median whole-library UMI "
+        f"count of the non-targeting cells in {sources}. Every expression quantity "
+        f"except Tx1's input is log1p(x * T / library size), library size over all "
+        f"genes."
+    )
+
+
+def sanity_line(comparison: Path) -> str:
+    sanity = read_json(comparison / "sanity.json")
+    parts = [
+        f"{_name(anchor)} {number(row['ratio_to_no_change'], 3)} "
+        f"({row['covered_genes']} of {row['total_genes']} genes in its vocabulary)"
+        for anchor, row in sanity["anchors"].items()
+    ]
+    return (
+        "STATE sanity line, released checkpoint untrained, held-out loss / "
+        "no-change loss: " + "; ".join(parts)
+    )
+
+
+def _interval(pooled: dict) -> str:
+    low, high = pooled["interval"]
+    return f"{number(pooled['ratio'])} [{number(low)}, {number(high)}]"
+
+
+def _comparison_section(comparison: Path) -> list[str]:
+    import pandas as pd
+
+    from src.experiments.joint.response_comparison import VERDICTS
+
+    table = pd.read_csv(comparison / "comparison.csv")
+    verdicts = read_json(comparison / "verdicts.json")
+    folds = list(dict.fromkeys(table.fold))
+    by_fold = table.set_index(["arm", "fold"])
+    header = [
+        "Arm",
+        *(f"{_name(f)} held out" for f in folds),
+        "Pooled, all folds [95% interval]",
+        "Pooled, without HCT116 [95% interval]",
+        "Identity share (mean over folds)",
+    ]
+    lines = [
+        "## Response-model comparison",
+        "",
+        "Held-out loss divided by the no-change loss on the same conditions "
+        "(below 1 beats no-change); each fold trains on three anchors and scores "
+        f"the fourth. Intervals: {verdicts['bootstrap']}-resample gene bootstrap "
+        "of the pooled ratio.",
+        "",
+        "| " + " | ".join(header) + " |",
+        "|" + "---|" * len(header),
+    ]
+    for arm, name in ARM_NAMES.items():
+        identity = by_fold.loc[arm].identity_share.dropna()
+        cells = [
+            name,
+            *(number(by_fold.loc[(arm, f), "held_out_ratio"]) for f in folds),
+            _interval(verdicts["pooled"]["all_folds"][arm]),
+            _interval(verdicts["pooled"]["without_hct116"][arm]),
+            number(identity.mean() if len(identity) else None),
+        ]
+        lines.append("| " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        "Verdicts (difference = first arm's pooled ratio minus the second's; "
+        "below 0 favours the first):",
+        "",
+    ]
+    for key, first, second in VERDICTS:
+        words = []
+        for variant, label in (
+            ("all_folds", "all folds"),
+            ("without_hct116", "without HCT116"),
+        ):
+            verdict = verdicts["verdicts"][variant][key]
+            low, high = verdict["interval"]
+            difference = verdict["difference"]
+            if verdict["label"] == "separated":
+                better = ARM_NAMES[first] if difference < 0 else ARM_NAMES[second]
+                outcome = f"{better} is better, the interval excludes 0"
+            else:
+                outcome = "no separation, the interval includes 0"
+            words.append(
+                f"{label}: difference {number(difference)} "
+                f"[{number(low)}, {number(high)}], {outcome}"
+            )
+        lines.append(
+            f"- {ARM_NAMES[first]} vs {ARM_NAMES[second]}: " + "; ".join(words) + "."
+        )
+    return lines
+
+
+def validation_section(config: dict, run: Path) -> list[str]:
+    done = read_json(run / "train" / "done.json")
+    train = config["train"]
+    if done["bad_epochs"] >= train["patience"]:
+        stop = (
+            f"training stopped early after {done['bad_epochs']} epochs without a "
+            "higher validation selective-gene Spearman"
+        )
+    else:
+        stop = f"training ran to the maximum of {train['max_epochs']} epochs"
+    baselines = read_json(run / "baselines" / "val" / "metrics.json")
+    rows = {
+        "Joint model": read_json(run / "evaluation" / "val" / "metrics.json"),
+        "Readout head with the explicit gene-specific context slope": read_json(
+            run / "readout" / "metrics.json"
+        ),
+        **{
+            name: baselines.get(method)
+            for method, name in BASELINE_NAMES.items()
+            if method in baselines or method not in LINEAR_MODEL_CONTROLS
+        },
+    }
+    lines = [
+        "## Validation on the GeneEffect validation lines",
+        "",
+        f"Joint model: `train/best.pt` is epoch {done['best_epoch'] + 1} of "
+        f"{done['next_epoch']} trained (validation selective-gene Spearman "
+        f"{number(done['best_score'])}); {stop}.",
+        "",
+        "| Model | " + " | ".join(VALIDATION_COLUMNS) + " |",
+        "|" + "---|" * (len(VALIDATION_COLUMNS) + 1),
+    ]
+    for name, metrics in rows.items():
+        cells = (
+            ["not produced"] * len(VALIDATION_COLUMNS)
+            if metrics is None
+            else [number(metrics[key]) for key in VALIDATION_COLUMNS.values()]
+        )
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        "Undefined correlations come from predictors that are constant per gene "
+        "across lines (gene mean, copy-baseline); they are not zero.",
+    ]
+    return lines
+
+
+def write_summary(config: dict, run: Path, run_id: str) -> Path:
+    from src.data.prepared import PREPARED_METADATA_FILENAME
+
+    manifest = read_json(Path(config["prepared_root"]) / PREPARED_METADATA_FILENAME)
+    lines = [
+        f"# Run {run_id}",
+        "",
+        "Validation only; the test split is not evaluated by this run. Nothing "
+        "here is synthetic-lethality evidence.",
+        "",
+        "## Expression space",
+        "",
+        target_sum_line(manifest),
+        "",
+        "## STATE sanity line",
+        "",
+        sanity_line(run / "comparison"),
+        "",
+        *_comparison_section(run / "comparison"),
+        "",
+        *validation_section(config, run),
+    ]
+    path = run / "summary.md"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def run_all(
+    config_path: Path, *, run_id: str | None, gpus: Sequence[str] | None = None
+) -> Path:
+    """Run (or resume) every step into ``<output_root>/<run id>``; return that dir.
+
+    ``gpus`` (default: every visible GPU) is not bound to the run: a resumed run
+    may use other GPUs, except that unfinished training needs as many as it
+    started on.
+    """
+    from src.experiments.prepare import prepare_inputs
+
+    config_path = Path(config_path)
+    config = load_config(config_path)
+    visible = visible_gpus()
+    chosen = choose_gpus(gpus, visible)
+    if run_id is None:
+        run_id = "all_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    print(f"run id: {run_id}", flush=True)
+    print(f"GPUs: {','.join(chosen) if chosen else 'none, CPU only'}", flush=True)
+    run = Path(config["output_root"]) / run_id
+    run.mkdir(parents=True, exist_ok=True)
+    # A run directory belongs to one config: finished steps are skipped by
+    # file existence, so resuming under another config would mix experiments.
+    bound = run / "run_config.json"
+    if bound.is_file():
+        if json.loads(bound.read_text()) != config:
+            raise ValueError(
+                f"{run} was started with a different config ({bound}); "
+                "use a new --run-id for this config"
+            )
+    else:
+        bound.write_text(json.dumps(config, indent=2) + "\n")
+
+    if chosen:
+        import torch
+
+        # In-process GPU work (Tx1 encoding of missing lines, checkpoint
+        # evaluation) uses the current device; make it the first chosen GPU.
+        torch.cuda.set_device(visible.index(chosen[0]))
+    with sigterm_raises():
+        manifest = read_json(prepare_inputs(config))
+        print(target_sum_line(manifest), flush=True)
+        comparison_and_training(config_path, config, run, chosen)
+        device = f"cuda:{visible.index(chosen[0])}" if chosen else "cpu"
+        _validation(config, run, device)
+        summary = write_summary(config, run, run_id)
+    print(f"summary: {summary}", flush=True)
+    return run
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("config", type=Path)
+    parser.add_argument("--run-id")
+    parser.add_argument(
+        "--gpus",
+        type=lambda text: tuple(gpu.strip() for gpu in text.split(",")),
+        help="comma-separated GPU ids to use (default: every visible GPU)",
+    )
+    args = parser.parse_args(argv)
+    # Preparation reports its progress (T, anchors, lines) through logging.
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(name)s: %(message)s", force=True
+    )
+    run_all(args.config, run_id=args.run_id, gpus=args.gpus)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

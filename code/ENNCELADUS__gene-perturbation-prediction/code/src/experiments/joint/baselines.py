@@ -1,0 +1,128 @@
+"""Evaluate train-fitted residual baselines on the prepared common panel."""
+
+import argparse
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+
+
+@dataclass(frozen=True)
+class BaselineResult:
+    """What ``run_baselines`` writes: the ladder's predictions (one row per line,
+    gene and method) with their per-line and per-gene scores and the metrics."""
+
+    predictions: pd.DataFrame
+    per_line: pd.DataFrame
+    per_gene: pd.DataFrame
+    summary: dict[str, object]
+
+
+def run_baselines(config, *, split, out_dir, inputs=None):
+    """Fit the control ladder on train lines; score ``split``. With a linear model
+    export (``paths.linear_model``), the linear model alone and the linear model plus
+    the Tx1 ridge join the ladder. ``inputs`` replaces ``load_inputs`` (synthetic
+    tests)."""
+    import numpy as np
+
+    from src.baselines.residual import run_r1_ladder
+    from src.data.splits import FixedSplit
+    from src.eval.accuracy import aggregate_geneeffect
+
+    if inputs is None:
+        from src.data.prepared import load_inputs
+
+        inputs = load_inputs(config, include_test=(split == "test"))
+    train = inputs.split.supervised_train
+    requested = getattr(inputs.split, split)
+    labels = inputs.labels.loc[inputs.labels.model_id.isin((*train, *requested))].copy()
+    donor = (
+        labels.loc[labels.model_id == "ACH-000551"].set_index("gene_symbol").gene_effect
+    )
+    if (
+        not set(inputs.genes).issubset(donor.index)
+        or not np.isfinite(donor.loc[list(inputs.genes)]).all()
+    ):
+        raise ValueError(
+            "prepared common panel lacks finite training K562 donor coverage"
+        )
+    line_ids = (*train, *requested)
+    views = {
+        name: pd.DataFrame(
+            np.stack(
+                [
+                    np.concatenate(
+                        (
+                            getattr(inputs.lines[line], attribute).mean(0),
+                            getattr(inputs.lines[line], attribute).var(0),
+                        )
+                    )
+                    for line in line_ids
+                ]
+            ),
+            index=pd.Index(line_ids, name="model_id"),
+        )
+        for name, attribute in (("tx1", "controls_tx1"), ("hvg", "basal_hvg"))
+    }
+    fixed = FixedSplit(
+        train=train,
+        val=requested if split == "val" else (),
+        test=requested if split == "test" else (),
+    )
+    predictions = run_r1_ladder(
+        labels, views, donor.loc[list(inputs.genes)], split=fixed
+    )
+    # Scored on the model's absolute-per-line and residual-per-gene axes, adding back
+    # the same fixed training means the model uses.
+    if inputs.linear_model is not None:
+        from src.baselines.linear_model_controls import linear_model_control_rows
+
+        predictions = pd.concat(
+            [predictions, linear_model_control_rows(inputs, split)], ignore_index=True
+        )
+    means = predictions.gene_symbol.map(inputs.train_gene_means)
+    predictions["geneeffect_prediction"] = predictions.residual_prediction + means
+    metrics, per_line, per_gene = {}, [], []
+    for method, frame in predictions.groupby("method", sort=True):
+        scalar, lines, genes = aggregate_geneeffect(
+            frame,
+            model_ids=requested,
+            genes=inputs.genes,
+            variable_genes=[g for g in inputs.genes if g in inputs.variable_genes],
+            selective_genes=[g for g in inputs.genes if g in inputs.selective_genes],
+        )
+        metrics[method] = {f"{split}_{key}": value for key, value in scalar.items()}
+        per_line.append(lines.assign(method=method))
+        per_gene.append(genes.assign(method=method))
+    result = BaselineResult(
+        predictions=predictions,
+        per_line=pd.concat(per_line, ignore_index=True),
+        per_gene=pd.concat(per_gene, ignore_index=True),
+        summary=metrics,
+    )
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    result.predictions.to_parquet(out_dir / "predictions.parquet", index=False)
+    result.per_line.to_csv(out_dir / "per_line.csv", index=False)
+    result.per_gene.to_csv(out_dir / "per_gene.csv", index=False)
+    (out_dir / "metrics.json").write_text(
+        json.dumps(result.summary, indent=2, allow_nan=False) + "\n"
+    )
+    return result
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--split", choices=("val", "test"), required=True)
+    parser.add_argument("--out-dir", type=Path, required=True)
+    args = parser.parse_args(argv)
+    from src.experiments.joint.config import load_config
+
+    run_baselines(load_config(args.config), split=args.split, out_dir=args.out_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

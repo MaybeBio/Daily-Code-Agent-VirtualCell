@@ -2,11 +2,11 @@
 
 🧬 PhD student at [Institut Pasteur](https://www.pasteur.fr/en), Paris · foundation models for biology and healthcare · explainable AI
 
-🌐 [Website](https://khachdallak02.github.io/) · 📄 [Research](https://khachdallak02.github.io/research/) · 🎓 [Google Scholar](https://scholar.google.com/citations?user=ydcHjw4AAAAJ&hl=en) · 🆔 [ORCID](https://orcid.org/0009-0002-1555-6581) · 💼 [LinkedIn](https://www.linkedin.com/in/khachatur-dallakyan-461674172) · ✉️ [Email](mailto:khachatur.dallakyan@gmail.com)
+🌐 [Website](https://khachdallak02.github.io/) · 🎓 [Google Scholar](https://scholar.google.com/citations?user=ydcHjw4AAAAJ&hl=en) · 💼 [LinkedIn](https://www.linkedin.com/in/khachatur-dallakyan-461674172) · ✉️ [Email](mailto:khachatur.dallakyan@gmail.com)
 
 ### 🤝 Who I work with
 
-Since October 2026 I have been a PhD student in [Laura Cantini's lab](https://research.pasteur.fr/en/member/laura-cantini/), Machine Learning for Integrative Genomics, at [Institut Pasteur](https://www.pasteur.fr/en). Before that I did research at The Chinese University of Hong Kong, in the [Centre for Perceptual and Interactive Intelligence (CPII)](https://cpii.hk/) and the [Department of Computer Science and Engineering](https://www.cse.cuhk.edu.hk/), working closely with [Yu Li](https://liyu95.com/) and [Yimin Fan](https://fanyimin-cuhk.github.io/). During my Master's I joined the [Marklund Lab](https://www.marklundlab.org/) at Karolinska Institutet, where I worked with [Ulrika Marklund](https://ki.se/personer/ulrika-marklund) and [Ziwei Liu](https://ki.se/en/people/ziwei-liu).
+Since October 2026 I have been a PhD student in [Laura Cantini's lab](https://research.pasteur.fr/en/member/laura-cantini/), Machine Learning for Integrative Genomics, at [Institut Pasteur](https://www.pasteur.fr/en). Before that I did research in the [Centre for Perceptual and Interactive Intelligence (CPII)](https://cpii.hk/) and the [Department of Computer Science and Engineering](https://www.cse.cuhk.edu.hk/), working closely with [Yu Li](https://liyu95.com/) and [Yimin Fan](https://fanyimin-cuhk.github.io/). During my Master's I joined the [Marklund Lab](https://www.marklundlab.org/) at Karolinska Institutet, where I worked with [Ulrika Marklund](https://ki.se/personer/ulrika-marklund) and [Ziwei Liu](https://ki.se/en/people/ziwei-liu).
 
 ### 🔬 What I did before
 

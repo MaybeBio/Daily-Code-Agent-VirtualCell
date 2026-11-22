@@ -1,0 +1,52 @@
+# Single-cell correction, wave one, objective screen: the nested head on what the
+# default linear model leaves (paths.linear_model), STATE absent, objective line_ranking.
+seeds: {train: 0, collator: 0, projection: 0}
+train:
+  max_epochs: 30
+  patience: 5
+  dependency_batch_size: 1024
+  state_learning_rate: 0.00001
+  adapter_learning_rate: 0.0001
+  head_learning_rate: 0.001
+  weight_decay: 0.05
+  objective: line_ranking
+  state_mode: frozen   # unused: STATE is absent (use_delta_proj and use_s false)
+  warmup_epochs: 1
+  genes_per_block: 6
+comparison:
+  epochs: 50
+  hidden: 512
+  learning_rate: 0.0001
+  state_learning_rate: 0.00001
+  batch_size: 64
+  shuffles: 10
+  bootstrap: 1000
+output_root: outputs/geneeffect_correction
+prepared_root: data/geneeffect_joint/v2
+features: {cells_per_context: 128, variable_gene_min_observations: 5, variable_gene_percentile: 75, selective_min_lines: 5, selective_max_fraction: 0.9, residual_sd_floor_percentile: 10}
+model:
+  cell_sentence_len: 64
+  esm2_adapter_hidden: 512
+  head_blocks: {use_delta_proj: false, use_s: false}
+  factor_rank: 64
+  context_components: 128
+  dropout: 0.1
+preparation:
+  response_max_cells_per_gene: 128
+  response_sampling_seed: 42
+  tx1_batch_size: 32
+  tx1_max_length: 2048
+  var_ensembl_col: ensembl_id
+paths:
+  split: configs/benchmarks/cell_line_geneeffect_split.json
+  gene_effect: data/sl_dependency_v0/raw/depmap/CRISPRGeneEffect.csv
+  basal_raw_umi: data/sl_dependency_v0/processed/basal_raw_umi
+  tx1_model_dir: data/models/tahoe_x1_3b/3b-model
+  tx1_cache: data/tx1_basal_embeddings/v1
+  esm2_embeddings: data/esm2/exp13_gene_universe_esm2_650M.npz
+  state_checkpoint: model/checkpoints/state/ST-HVG-Replogle/fewshot/k562/checkpoints/final.ckpt
+  state_model_dir: model/checkpoints/state/ST-HVG-Replogle/fewshot/k562
+  perturbseq_sources: configs/experiments/13_geneeffect_226/perturbseq_sources.json
+  # The default linear model's export on the final split, out of fold for every training line
+  # (hpc/run.sh linear-model-export configs/linear_model/default_linear_model.yaml --run-id default_linear_model_final_split_20261012).
+  linear_model: outputs/linear_model/default_linear_model_final_split_20261012/export

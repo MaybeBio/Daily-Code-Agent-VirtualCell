@@ -1,0 +1,51 @@
+[project]
+name = "open-x-cell"
+version = "0.2.0"
+description = "Clean-room runnable reproduction of X-Cell as Open-X-Cell."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "torch>=2.3",
+  "anndata",
+  "pandas",
+  "scipy",
+  "safetensors>=0.4",
+  "huggingface_hub>=1.0",
+]
+
+[project.optional-dependencies]
+data = [
+  "anndata",
+  "pandas",
+  "scipy",
+]
+metrics = [
+  "scikit-learn",
+  "scipy",
+]
+dev = [
+  "pytest",
+]
+
+[project.scripts]
+open-x-cell = "open_x_cell.cli:main"
+open-x-cell-infer = "open_x_cell.api:main"
+open-x-cell-download = "open_x_cell.download:main"
+open-x-cell-export = "open_x_cell.bundle:main"
+
+[project.urls]
+Repository = "https://github.com/zongtingwei/Open-X-cell"
+Checkpoint = "https://huggingface.co/zongting/Open-X-cell"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["open_x_cell*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]

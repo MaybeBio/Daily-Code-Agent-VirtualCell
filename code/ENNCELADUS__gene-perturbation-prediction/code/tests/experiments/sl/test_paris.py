@@ -1,0 +1,118 @@
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.experiments.sl import paris as paris_module
+from src.experiments.sl.paris import COLUMNS, janitza_selected, paris
+
+MODES = ("raw", "Ginicorrected")
+
+
+def world(seed: int = 0, n: int = 150, p: int = 40):
+    """Dependency of `dep` = +2 f0 - 1.5 f1 + noise; the other features are noise."""
+    rng = np.random.default_rng(seed)
+    lines = [f"ACH-{i:04d}" for i in range(n)]
+    expression = pd.DataFrame(
+        rng.normal(size=(n, p)), index=lines, columns=[f"f{j}" for j in range(p)]
+    )
+    y = 2 * expression["f0"] - 1.5 * expression["f1"] + 0.3 * rng.normal(size=n)
+    return pd.DataFrame({"dep": y}), expression
+
+
+@pytest.fixture(autouse=True)
+def few_trees(monkeypatch):
+    monkeypatch.setattr(paris_module, "TREES", 100)
+
+
+def test_boruta_confirms_the_planted_drivers_and_no_noise_with_the_right_signs():
+    dependency, expression = world()
+    pairs = paris(dependency, expression, "raw", seed=43, n_jobs=1)
+    assert list(pairs.columns) == COLUMNS
+    assert set(pairs["feature_gene"]) == {"f0", "f1"}
+    by = pairs.set_index("feature_gene")
+    assert by.loc["f0", "r"] > 0.5 and by.loc["f1", "r"] < -0.4
+    assert (by["r_pvalue"] < 1e-6).all() and (by["importance"] > 0).all()
+    assert (pairs["dependency_gene"] == "dep").all() and (pairs["mode"] == "raw").all()
+
+
+def test_corrected_impurity_selects_the_drivers_and_most_noise_stays_out():
+    # Janitza's null is the mirrored negative importances, so it needs many features;
+    # chance associations in the sample still let a few percent of noise through.
+    dependency, expression = world(p=300)
+    pairs = paris(dependency, expression, "Ginicorrected", seed=43, n_jobs=1)
+    by = pairs.set_index("feature_gene")
+    assert {"f0", "f1"} <= set(by.index) and len(by) < 30
+    assert by.loc["f0", "r"] > 0.5 and by.loc["f1", "r"] < -0.4
+    assert (pairs["mode"] == "Ginicorrected").all()
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_gene_never_predicts_itself_and_nan_lines_are_dropped(mode):
+    dependency, expression = world(p=300 if mode == "Ginicorrected" else 40)
+    expression["dep"] = dependency["dep"]  # a perfect predictor under its own name
+    dependency.iloc[:5, 0] = np.nan
+    pairs = paris(dependency, expression, mode, seed=43, n_jobs=1)
+    assert "dep" not in set(pairs["feature_gene"])
+    assert {"f0", "f1"} <= set(pairs["feature_gene"])
+
+
+def test_janitza_keeps_importances_above_the_mirrored_negatives():
+    selected = janitza_selected(np.array([-0.2, -0.1, 0.0, 0.1, 0.3]))
+    assert selected.tolist() == [False, False, False, False, True]
+    assert janitza_selected(np.array([0.0, 0.1])) is None
+
+
+def test_genes_run_in_parallel_workers():
+    dependency, expression = world(p=300)
+    dependency["dep2"] = -expression["f5"] + 0.2 * np.random.default_rng(1).normal(
+        size=len(expression)
+    )
+    pairs = paris(dependency, expression, "Ginicorrected", seed=43, n_jobs=2)
+    chosen = pairs.groupby("dependency_gene")["feature_gene"].agg(set)
+    assert {"f0", "f1"} <= chosen["dep"] and "f5" in chosen["dep2"]
+
+
+def test_benchmark_scores_read_either_orientation_with_a_positive_r():
+    selected = pd.DataFrame(
+        {"dependency_gene": ["B", "C", "D"], "feature_gene": ["A", "A", "E"],
+         "importance": [0.3, 0.9, 0.5], "r": [0.4, -0.6, 0.2]}
+    )  # fmt: skip
+    pairs = pd.DataFrame(
+        {"gene_a": ["A", "A", "E", "A", "X"], "gene_b": ["B", "C", "D", "D", "A"]}
+    )
+    scores = paris_module.benchmark_scores(selected, pairs, {"B", "C", "D"}, {"A", "E"})
+    # A-B selected (dependency B), A-C selected with r < 0 (no SL direction), E-D
+    # selected (dependency D, the reverse order), A-D tested but not selected, X-A
+    # never tested (X is neither a dependency nor a feature gene)
+    assert scores["score"].tolist() == [0.3, 0.0, 0.5, 0.0, 0.0]
+    assert scores["covered"].tolist() == [True, True, True, True, False]
+
+
+def test_shards_merge_into_the_full_run(tmp_path, monkeypatch):
+    dependency, expression = world(p=300)
+    dependency["dep2"] = -expression["f5"]
+    monkeypatch.setattr(paris_module, "inputs", lambda config: (dependency, expression))
+    pd.DataFrame(
+        {"model_id": "V0", "gene_a": ["f0", "f5", "f9"], "gene_b": ["dep", "dep2", "x"],
+         "label": 1}
+    ).to_parquet(tmp_path / "labels.parquet")  # fmt: skip
+    (tmp_path / "split.json").write_text(
+        '{"train": [], "bulk_labelled": [], "val": ["V0"], "test": []}'
+    )
+    config = {
+        "benchmark": str(tmp_path / "labels.parquet"),
+        "sl_split": str(tmp_path / "split.json"),
+        "gene_effect": "-", "expression": "-", "output_root": str(tmp_path),
+        "task": "paris", "mode": "Ginicorrected", "seed": 43, "n_jobs": 1,
+    }  # fmt: skip
+    for i in range(2):
+        paris_module.run(config, f"s{i}", shard=(i, 2))
+    with pytest.raises(ValueError, match="every shard"):
+        paris_module.merge(config, "bad", ["s0"])
+    out = paris_module.merge(config, "all", ["s1", "s0"])
+    pairs = pd.read_parquet(out / "pairs.parquet")
+    assert set(pairs["dependency_gene"]) == {"dep", "dep2"}
+    scores = pd.read_parquet(out / "scores.parquet")
+    # f0 drives dep with r > 0; f5 drives dep2 with r < 0; x is no gene of the run
+    assert scores["score"].gt(0).tolist() == [True, False, False]
+    assert scores["covered"].tolist() == [True, True, False]

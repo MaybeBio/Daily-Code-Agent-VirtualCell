@@ -1,0 +1,60 @@
+# Conda/mamba environment for HEBI.
+#
+#   mamba env create -f environment.yml
+#   mamba activate hebi
+#   pip install -e .
+#
+# Versions are those the model was developed and benchmarked with.
+#
+# PyTorch is installed through pip (see the pip section at the bottom):
+# the pytorch conda channel stopped at 2.5.1. For another CUDA version or
+# CPU only, change "cu124" in both URLs there (e.g. cu118, cu126, cpu).
+name: hebi
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - python=3.11
+
+  # --- scientific stack ---
+  - numpy>=1.26
+  - pandas>=2.0
+  - scipy>=1.11
+  - scikit-learn>=1.4
+  - matplotlib>=3.8
+  - seaborn>=0.13
+  - networkx>=3.0
+  - h5py>=3.10
+  - openpyxl>=3.1
+  - pyyaml>=6.0
+  - tqdm>=4.66
+  - requests>=2.31
+
+  # --- single-cell / spatial ---
+  - scanpy>=1.10
+  - anndata>=0.10
+
+  # --- optional: leiden clustering (--cluster_method leiden) ---
+  - leidenalg>=0.10
+  - python-igraph>=0.11
+
+  # --- optional: mclust clustering (--cluster_method mclust) ---
+  # Needs R as well as rpy2. Uncomment to install both.
+  # - r-base>=4.3
+  # - r-mclust
+  # - rpy2>=3.5
+
+  - pip
+  - pip:
+      # --- PyTorch 2.6.0 (CUDA 12.4) + torch_sparse ---
+      - --extra-index-url https://download.pytorch.org/whl/cu124
+      - --find-links https://data.pyg.org/whl/torch-2.6.0+cu124.html
+      - torch==2.6.0
+      - torch-sparse
+
+      # Not on conda-forge, or newer there via pip:
+      - torch-geometric>=2.6
+      - pymetis>=2023.1
+      - mygene>=3.2

@@ -1,18 +1,18 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/CHENyiru3/Awesome-single-cell-JEPA-model
-- 快照日期: 2026-11-19
-- 快照 commit: [`95a263c1b2d9`](https://github.com/CHENyiru3/Awesome-single-cell-JEPA-model/commit/95a263c1b2d9d7922379b4b4427f09d157adad0b)
+- 快照日期: 2026-11-22
+- 快照 commit: [`611db89c7fea`](https://github.com/CHENyiru3/Awesome-single-cell-JEPA-model/commit/611db89c7feac8eeabe7bc2f9a1795acb800d408)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
-## 保留 (4 个文件, 30.2 KB)
+## 保留 (4 个文件, 30.4 KB)
 
 | 类别 | 文件数 | 大小 |
 |---|---:|---:|
 | 文档 | 3 | 20.1 KB |
-| README | 1 | 10.1 KB |
+| README | 1 | 10.2 KB |
 
-按后缀: `无后缀` 1 (18.2 KB)、`.md` 3 (12.0 KB)
+按后缀: `无后缀` 1 (18.2 KB)、`.md` 3 (12.1 KB)
 
 > README / 文档中的相对图片与链接已改写为 GitHub 绝对地址。
 

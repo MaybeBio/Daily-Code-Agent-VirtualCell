@@ -1,0 +1,24 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: CellFM
+  tasks: embedding_extraction
+  variant: base
+  weights_dir: weights/CellFM
+  source_dir: public_code/CellFM
+  backend_python: runtime_envs/cellfm/bin/python
+  backend_device: GPU
+  inference_batch_size: 1
+  expression_layer: auto
+  max_length: 2048
+  organism: NCBITaxon:9606
+output_dir: output

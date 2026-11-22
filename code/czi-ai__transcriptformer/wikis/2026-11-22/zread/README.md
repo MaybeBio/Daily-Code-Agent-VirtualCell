@@ -1,0 +1,18 @@
+# czi-ai/transcriptformer
+
+- [Overview](1-overview.md)
+- [Quick Start](2-quick-start.md)
+- [Model Variants and Species Coverage](3-model-variants-and-species-coverage.md)
+- [Architecture Overview](4-architecture-overview.md)
+- [Pretrained Protein Embeddings](5-pretrained-protein-embeddings.md)
+- [Flex Attention Transformer Encoder](6-flex-attention-transformer-encoder.md)
+- [Count Decoder and Expression Prediction](7-count-decoder-and-expression-prediction.md)
+- [Zero-Truncated Poisson Loss](8-zero-truncated-poisson-loss.md)
+- [Multi-Species Training Strategy](9-multi-species-training-strategy.md)
+- [Embedding Surgery for New Species](10-embedding-surgery-for-new-species.md)
+- [Gene Tokenizer and Vocabulary](11-gene-tokenizer-and-vocabulary.md)
+- [Data Loading and Preprocessing](12-data-loading-and-preprocessing.md)
+- [CLI Inference Commands](13-cli-inference-commands.md)
+- [Cell and Contextual Gene Embeddings](14-cell-and-contextual-gene-embeddings.md)
+- [Multi-GPU and OOM-Safe Inference](15-multi-gpu-and-oom-safe-inference.md)
+- [Configuration Reference](16-configuration-reference.md)

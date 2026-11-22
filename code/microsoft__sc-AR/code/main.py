@@ -1,0 +1,368 @@
+"""Main file."""
+import psutil
+import torch
+
+# Check if GPUs are available
+if torch.cuda.is_available():
+    # Limit GPU memory growth (PyTorch automatically handles memory allocation)
+    print(f"GPUs available: {torch.cuda.device_count()}")
+    for i in range(torch.cuda.device_count()):
+        device = torch.device(f"cuda:{i}")
+        # PyTorch doesn't have a direct equivalent for TensorFlow's memory growth setting,
+        # but we can limit the memory usage manually using environment variables or control the memory growth indirectly.
+        # Here's an example to set the GPU memory fraction (for example, limit to 50% memory usage per GPU)
+        torch.cuda.set_device(device)
+        print(f"Using GPU: {torch.cuda.get_device_name(device)}")
+else:
+    print("No GPUs available.")
+
+
+# CPU usage monitoring
+cpu_percent = psutil.cpu_percent(interval=1)  # Measure CPU usage over 1 second
+cpu_count = psutil.cpu_count(logical=True)  # Total number of logical CPUs
+virtual_memory = psutil.virtual_memory()  # Virtual memory stats
+
+print(f"CPU Usage: {cpu_percent}%")
+print(f"Total CPUs: {cpu_count}")
+print(f"Total Memory: {virtual_memory.total / (1024**3):.2f} GB")
+print(f"Available Memory: {virtual_memory.available / (1024**3):.2f} GB")
+print(f"Used Memory: {virtual_memory.used / (1024**3):.2f} GB")
+
+from scripts.utils import str2bool, create_id, create_directory, quality_control_adata, \
+    run_dir, write_run_config, update_run_config, arm_name
+from scripts.dataloader import load_and_preprocess_data
+from scripts.train import train
+from eval_scripts.eval import test_scgen, test_scvi
+from scripts.predict import predict
+from datetime import datetime
+import argparse
+import wandb
+import time
+import os
+
+
+# List available GPUs in PyTorch
+if torch.cuda.is_available():
+    print(f"Available GPUs: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
+else:
+    print("No GPUs available.")
+
+
+def sanitize(s):
+    return s.encode("ascii", "ignore").decode()
+
+
+def main(args):
+    """Preprocess/load data, and train or test data based on input.
+    
+    Args:
+        args (argparse): input arguments"""
+    wandb.login()
+    start_time = time.time()
+    
+    ## create id and directory
+    create_id(args)
+    create_directory(args)
+    
+    print("Input arguments:")
+    for key, val in vars(args).items():
+        print("{:16} {}".format(key, val))
+    print('_____________________________________________________________')
+    print()
+
+    ## load and prepare data
+    if args.model_name == 'scgen':
+        adata = load_and_preprocess_data(args)
+            
+    if args.model_name == 'scvi':
+        train_adata, valid_adata, test_adata = load_and_preprocess_data(args)
+        adata = train_adata.copy()
+  
+    
+    print('Data loaded and preprocessed')
+    
+    ## quality control
+    if args.qq:
+        assert args.model_name == 'scgen', 'Quality control is only implemented for scgen'
+        quality_control_adata(adata, args)
+        return
+
+    ## train
+    if args.train:
+        # set up wandb
+        today = datetime.now().strftime("%Y%m%d")
+        wandb_id = sanitize(today+'-'+args.id)
+        # wandb project names are limited to 128 characters: shorten the test group name if needed
+        excess = len(wandb_id) - 128
+        if excess > 0:
+            test_group = 'test'+'-'.join(args.test_data)
+            wandb_id = wandb_id.replace(test_group, test_group[:-excess], 1)
+        wandb.init(project=wandb_id,
+                   config=args,
+                   dir=args.root+'/',)
+
+        # Save the run settings to config.json in the run directory
+        write_run_config(args)
+        print('Run directory: '+run_dir(args))
+
+        # CUDA timing calls only when a GPU is available
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()  # ensure accurate start
+            torch.cuda.reset_peak_memory_stats()
+        start_time = time.time()
+        
+        if args.model_name == 'scgen':
+            train(args, adata)
+
+        elif args.model_name == 'scvi':
+            train(args, train_adata, valid_adata)
+        
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()  # ensure all kernels finished
+            peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+        else:
+            peak_mem_gb = 0
+        training_time = time.time() - start_time
+
+        # add the training time and peak memory usage to the resource documentation file
+        with open(args.resource_documentation_file, 'a') as f:
+            f.write(
+                today+','+
+                str(args.id)+','+
+                str(args.model_name)+','+
+                args.data+','+
+                str(args.AR)+','+
+                str(args.ood)+','+
+                str(args.variable_con)+','+
+                str(args.con_percent)+','+
+                str(args.lr)+','+
+                str(args.weight_decay)+','+
+                str(args.batch_size)+','+
+                str(args.latent_dim)+','+
+                str(args.alpha)+','+
+                str(args.num_epoch)+','+
+                str(args.seed)+','+
+                str(args.atlas_count)+','+
+                str(training_time)+','+
+                str(peak_mem_gb)+'\n')
+
+        print(f"Total wall-clock training time: {training_time:.2f} seconds "
+            f"({training_time/3600:.2f} hours)")
+        print(f"Peak GPU memory usage: {peak_mem_gb:.2f} GB")
+
+        update_run_config(args,
+                          training_time_s=round(training_time, 2),
+                          peak_gpu_memory_gb=round(peak_mem_gb, 3),
+                          finished=True)
+
+    ## predict
+    elif args.predict:
+        if args.model_name == 'scgen':
+            predict(args, adata)
+        elif args.model_name == 'scvi':
+            raise ValueError("--predict is only available for scGen")
+
+    ## test
+    elif args.test:
+        if args.model_name == 'scvi':
+            test_scvi(args, train_adata)
+
+        elif args.model_name == 'scgen':
+            model_dic={}
+            test_scgen(args, adata, model_dic)
+        
+    print("--- Task completed in %s seconds ---" % (time.time() - start_time))
+
+    return
+
+
+if __name__ == '__main__':
+    print('Started main.py')
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--root', default=".",
+                        help="path to the sc-AR directory")
+
+    # task related arguments
+    parser.add_argument("--train", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Train model. True or False")
+    parser.add_argument("--predict", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Make prediction. True or False")
+    parser.add_argument("--test", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Run test evaluations. True or False")
+    parser.add_argument("--qq", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Perform quality control. True or False")
+    parser.add_argument("--count_atlas_cells", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="Count atlas cells in training data")
+    parser.add_argument("--plot_umap_annotated_with_w",
+                        type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="True or False")
+    parser.add_argument("--store_resampling_weights",
+                        type=str2bool, nargs='?', 
+                        const=True, default=False,
+                        help="True or False")
+    parser.add_argument("--resampling_weight_path",
+                        type=str, default=None,
+                        help="Path to store resampling weights")
+    parser.add_argument("--store_weight_diagnostics",
+                        type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="True or False")
+    parser.add_argument("--weight_diagnostics_path",
+                        type=str, default=None,
+                        help="Path to store weight diagnostics (normalized entropy and ESS)")
+    parser.add_argument("--balanced_data", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="True or False")
+    parser.add_argument("--balancing_method", default=None,
+                        help="balancing method from class_balancing or geometric_sketching")
+
+    # model related arguments
+    parser.add_argument('--id', default="",
+                        help="a name for identifying the model")
+    parser.add_argument('--test_id', default="",
+                        help="a name for saving test results")
+    parser.add_argument('--model', default='AR',
+                        help="AR or Naive")
+    parser.add_argument('--model_name', default='scgen',
+                        help="scgen,scvi")
+    parser.add_argument("--AR", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="True or False")
+    parser.add_argument('--latent_dim', default=64,
+                        help="latent dimension")
+    parser.add_argument('--num_epoch', default=300,
+                        help="number of epochs for training")
+    parser.add_argument('--optimizer', default='adam',
+                        help="optimizer for training")
+    parser.add_argument('--batch_size', default=4096, type=int, # scGen experiments use 2048
+                        help="minibatch size for training")
+    parser.add_argument('--lr', default=0.00005, type=float,
+                        help="learning rate")
+    parser.add_argument('--weight_decay', default=0.00005, type=float,
+                        help="weight_decay")
+    parser.add_argument('--hvg_count', default=2000,
+                        help="Number of highly variable genes to subsample")
+
+    # AR model related arguments
+    parser.add_argument('--bins', default=100, type=int,
+                        help="number of histogram bins per latent dimension")
+    parser.add_argument('--alpha', default=0.0001, type=float,
+                        help="alpha")
+    parser.add_argument('--w_update', default='max_w',
+                        choices=['max_w', 'uniform', 'mean_w', 'geomean_w', 'knn_w'],
+                        help="scGen AR weights: 'max_w' = density weights aggregated "
+                             "with the max over latent dimensions (sc-AR default); "
+                             "'uniform' = w=1/N (resampling-only control arm); "
+                             "mean_w, geomean_w, knn_w = the aggregation rules in "
+                             "scripts/ar_aggregation_variants.py. AR weights are "
+                             "computed from the posterior mean. scVI: max_w only")
+
+    # data related argument
+    parser.add_argument('--data', type=str, default="sctab",
+                        help='name or id of the input data')
+    parser.add_argument('--h5ad_adata_file', type=str, default=None,
+                        help='if not None, the path to input adata file')
+    parser.add_argument('--designed_data', type=str2bool, nargs='?', const=True, default=False,
+                        help='scGen: --h5ad_adata_file is a designed data file (scripts/make_designed_data.py); '
+                             'train, valid and test cells come from its obs["split"]')
+    parser.add_argument('--train_adata_path', type=str, default=None,
+                        help='if not None, the path to scvi train adata')
+    parser.add_argument('--valid_adata_path', type=str, default=None,
+                        help='if not None, the path to scvi valid adata')
+    parser.add_argument('--test_adata_path', type=str, default=None,
+                        help='if not None, the path to scvi test adata')
+    parser.add_argument('--train_data', nargs="+", default='', 
+                        help="train cell types, concatenated with ','")
+    parser.add_argument('--test_data', nargs="+", default='',
+                        help="test cell type")
+    parser.add_argument("--ood", type=str2bool, nargs='?',
+                        const=True, default=True,
+                        help="True or False")
+    parser.add_argument("--variable_con", type=str2bool, nargs='?',
+                        const=True, default=False,
+                        help="if variable control cells from the test cell group are included in the training set")
+    parser.add_argument('--con_percent', default=1.0, type=float,
+                        help='percent of test group contorl cell included in training, 0, 0.2, 0.4, 0.6, 1.0')
+    parser.add_argument('--in_dist_group', default='',
+                        help="in distirbution test cell group")
+    parser.add_argument('--out_path', default=None,
+                        help="path to save the models (default: <root>/saved_models/); "
+                             "one directory per run, <out_path>/<model_name>/<data>/<hash>/, "
+                             "with checkpoints, config.json, loss curves and predictions")
+    parser.add_argument('--atlas_count', default=0, type=int,
+                        help='number of atlas cells included in training, combined with blood cells')
+
+    # misc arguments
+    parser.add_argument('--seed', default=0, type=int, help='manual seed')
+    parser.add_argument('--adata_label_cell', default=None, 
+                        help='label for cell types in adata')
+    parser.add_argument('--adata_label_per', default=None,
+                        help='value of  adata_label_cell for perturbed cells in adata')
+    parser.add_argument('--adata_label_unper', default=None,
+                        help='value of adata_label_cell for unperturbed cells in adata')
+    parser.add_argument('--checkpoint', default=20, type=int,
+                        help="checkpoint for saving model")
+    parser.add_argument("--gpu", type=str2bool, nargs='?',
+                        const=True, default=True,
+                        help="True or False")
+    parser.add_argument('--tracked_epoch', default='best')
+    parser.add_argument('--resource_documentation_file', default='',
+                        help="path to resource documentation file")
+    
+
+    # parse and preprocess args
+    args = parser.parse_args()
+    args.num_epoch = int(args.num_epoch)
+    args.latent_dim = int(args.latent_dim)
+    if args.resource_documentation_file == '':
+        args.resource_documentation_file = os.path.join(args.root, 'result', 'train', 'resources.csv')
+
+    # check if parent directory of resource documentation file exists
+    if not os.path.exists(os.path.dirname(args.resource_documentation_file)):
+        os.makedirs(os.path.dirname(args.resource_documentation_file))
+    # check if the resource documentation file exists
+    if not os.path.exists(args.resource_documentation_file):
+        with open(args.resource_documentation_file, 'w') as f:
+            f.write('date,id,model_name,data,AR,ood,variable_con,con_percent,lr,weight_decay,batch_size,latent_dim,alpha,num_epoch,seed,atlas_count,training_time,peak_mem_gb\n')
+
+    if args.train_data != '':
+        args.train_data = args.train_data[0].split(',')
+    if args.test_data != '':
+        args.test_data = args.test_data[0].split(',')
+    if args.hvg_count != None:
+        args.hvg_count = int(args.hvg_count)
+    if args.atlas_count != None:
+        args.atlas_count = int(args.atlas_count)
+    if args.con_percent != None:
+        args.con_percent = float(args.con_percent)
+    if args.seed != None:
+        args.seed = int(args.seed)
+    if args.designed_data and args.model_name != 'scgen':
+        raise ValueError('--designed_data is only implemented for scgen')
+    if args.model_name == 'scvi':
+        if args.AR and args.w_update != 'max_w':
+            raise ValueError('scVI AR is only implemented with --w_update max_w')
+        # scvi_train.py does not pass the weight decay to scvi-tools, so the
+        # models train with the scvi-tools default; record that value
+        if args.weight_decay != 1e-6:
+            print('scVI: --weight_decay '+str(args.weight_decay)+' is not used; '
+                  'scvi-tools default 1e-6 is recorded')
+        args.weight_decay = 1e-6
+
+    args.gpu = torch.cuda.is_available()
+    
+    if (not args.test) & (not args.predict):
+        args.model = arm_name(args)
+
+    if args.out_path is None:
+        args.out_path = os.path.join(args.root, 'saved_models', '')
+
+    main(args)
+    print('Finished main.py')

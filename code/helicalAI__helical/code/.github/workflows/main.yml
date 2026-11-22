@@ -1,0 +1,263 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+
+# A new push to a PR cancels the run still going on its previous commit, to free
+# the self-hosted runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+
+      - name: setup python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12.13"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      - name: Install dependencies
+        run: |
+            uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
+            echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+            echo "VIRTUAL_ENV=$RUNNER_TEMP/venv" >> "$GITHUB_ENV"
+            source "$RUNNER_TEMP/venv/bin/activate"
+            uv pip install .[dev]
+            uv pip install -r requirements_cuda.txt
+
+      # First download before tests as they make use of the downloaded files 
+      - name: Download all files
+        run: |
+          python ci/download_all.py
+
+      - name: Execute unittests
+        run: |
+          pytest --cov-report=html:html_cov --cov-branch --cov-report term --cov=helical ci/
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: coverage-report
+          path: html_cov/
+          
+  integration-tests:
+    needs: tests
+    runs-on: self-hosted
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+
+      - name: setup python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12.13"
+
+      # because jobs may not be run in the same order, we need to install the dependencies again
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      - name: Install helical
+        run: |
+            uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
+            echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+            echo "VIRTUAL_ENV=$RUNNER_TEMP/venv" >> "$GITHUB_ENV"
+            source "$RUNNER_TEMP/venv/bin/activate"
+            uv pip install .
+            uv pip install -r requirements_cuda.txt
+        
+      # Required to get the data
+      - name: Download all files
+        run: |
+          python ci/download_all.py
+
+      - name: Execute Geneformer v1
+        run: |
+          python examples/run_models/run_geneformer.py ++model_name="gf-12L-40M-i2048" ++device="cuda"
+
+      - name: Fine-tune Geneformer v1
+        run: |
+          python examples/fine_tune_models/fine_tune_geneformer.py ++model_name="gf-12L-40M-i2048" ++device="cuda"
+
+      - name: Execute Geneformer v2
+        run: |
+          python examples/run_models/run_geneformer.py ++model_name="gf-12L-38M-i4096" ++device="cuda"
+
+      - name: Fine-tune Geneformer v2
+        run: |
+          python examples/fine_tune_models/fine_tune_geneformer.py ++model_name="gf-12L-40M-i2048" ++device="cuda"
+
+      - name: Execute scGPT
+        run: |
+          python examples/run_models/run_scgpt.py ++device="cuda"
+
+      - name: Fine-tune scGPT
+        run: |
+          python examples/fine_tune_models/fine_tune_scgpt.py ++device="cuda"
+
+      - name: Execute UCE
+        run: |
+          python examples/run_models/run_uce.py ++device="cuda"
+
+      - name: Fine-tune UCE
+        run: |
+          python examples/fine_tune_models/fine_tune_UCE.py ++device="cuda"
+
+      - name: Execute Transcriptformer
+        run: |
+          python examples/run_models/run_transcriptformer.py
+
+      - name: Execute Transcriptformer Metazoa
+        run: |
+          python examples/run_models/run_transcriptformer_metazoa.py
+
+      - name: Execute Hyena
+        run: |
+          python examples/run_models/run_hyena_dna.py ++device="cuda"
+
+      - name: Execute Hyena
+        run: |
+          python examples/fine_tune_models/fine_tune_hyena_dna.py ++device="cuda"
+
+      - name: Execute Helix-mRNA
+        run: |
+          python examples/run_models/run_helix_mrna.py ++device="cuda"
+
+      - name: Fine-tune Helix-mRNA
+        run: |
+          python examples/fine_tune_models/fine_tune_helix_mrna.py ++device="cuda"
+
+      - name: Execute Mamba2-mRNA
+        run: |
+          python examples/run_models/run_mamba2_mrna.py ++device="cuda"
+
+      - name: Fine-tune Mamba2-mRNA
+        run: |
+          python examples/fine_tune_models/fine_tune_mamba2_mrna.py ++device="cuda"
+
+      - name: Execute Caduceus
+        run: |
+          python examples/run_models/run_caduceus.py
+    
+      - name: Fine-tune Caduceus
+        run: |
+          python examples/fine_tune_models/fine_tune_caduceus.py
+      
+      - name: Execute Cell2Sen
+        run: |
+          python examples/run_models/run_c2s.py
+
+      - name: Execute Tahoe
+        run: |
+          python examples/run_models/run_tahoe.py ++device="cuda"
+
+      - name: Execute Nicheformer
+        run: |
+          python examples/run_models/run_nicheformer.py ++device="cuda"
+
+  flash-attn-integration:
+    # Smoke-tests the flash_attn code paths that the main integration-tests job cannot
+    # exercise: flash_attn is not a declared helical dependency, so the FA2 branch in
+    # select_attn_backend is dormant there. This job installs flash_attn and verifies:
+    # (1) Geneformer (BertForMaskedLM, no FA2 via HF dispatch) still loads — regression
+    #     guard against routing BERT through attn_implementation='flash_attention_2'.
+    # (2) HelixmRNA actually loads and runs on the FA2 path.
+    needs: tests
+    runs-on: self-hosted
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+
+      - name: setup python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12.13"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      - name: Install helical with flash_attn
+        run: |
+            uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
+            echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+            echo "VIRTUAL_ENV=$RUNNER_TEMP/venv" >> "$GITHUB_ENV"
+            source "$RUNNER_TEMP/venv/bin/activate"
+            uv pip install .
+            uv pip install -r requirements_cuda.txt
+
+      - name: Smoke-test Geneformer (FA2 regression guard)
+        run: |
+          python -c "
+          from helical.models.geneformer import Geneformer, GeneformerConfig
+          Geneformer(GeneformerConfig(model_name='gf-6L-10M-i2048', device='cuda'))
+          "
+
+      - name: Smoke-test HelixmRNA on FA2 path
+        run: |
+          python examples/run_models/run_helix_mrna.py ++device="cuda"
+
+  notebooks:
+    needs: tests
+    runs-on: self-hosted
+    env:
+      CUDA_VISIBLE_DEVICES: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+
+      - name: setup python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12.13"
+
+      # because jobs may not be run in the same order, we need to install the dependencies again
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+
+      - name: Install helical
+        run: |
+            uv venv --python "$(command -v python)" "$RUNNER_TEMP/venv"
+            echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+            echo "VIRTUAL_ENV=$RUNNER_TEMP/venv" >> "$GITHUB_ENV"
+            source "$RUNNER_TEMP/venv/bin/activate"
+            uv pip install .[dev]
+            uv pip install -r requirements_cuda.txt
+        
+      - name: Reduce datasets to speedup checks
+        run: |
+          sed -i 's/train\[:65%\]/train\[:5%\]/g' ./examples/notebooks/Cell-Type-Annotation.ipynb
+          sed -i 's/train\[70%:\]/train\[5%:7%\]/g' ./examples/notebooks/Cell-Type-Annotation.ipynb
+          sed -i 's/get_anndata_from_hf_dataset(ds\[\\"train\\"\])/get_anndata_from_hf_dataset(ds\[\\"train\\"\])[:100]/g' ./examples/notebooks/Cell-Type-Classification-Fine-Tuning.ipynb
+          sed -i 's/get_anndata_from_hf_dataset(ds\[\\"test\\"\])/get_anndata_from_hf_dataset(ds\[\\"test\\"\])[:10]/g' ./examples/notebooks/Cell-Type-Classification-Fine-Tuning.ipynb
+          sed -i 's/list(np.array(train_dataset.obs\[\\"LVL1\\"].tolist()))/list(np.array(train_dataset.obs\[\\"LVL1\\"].tolist()))[:100]/g' ./examples/notebooks/Cell-Type-Classification-Fine-Tuning.ipynb
+          sed -i 's/list(np.array(test_dataset.obs\[\\"LVL1\\"].tolist()))/list(np.array(test_dataset.obs\[\\"LVL1\\"].tolist()))[:10]/g' ./examples/notebooks/Cell-Type-Classification-Fine-Tuning.ipynb
+          rm ./examples/notebooks/Evo-2.ipynb
+          rm ./examples/notebooks/Geneformer-Series-Comparison.ipynb
+
+      - name: Run Notebooks
+        run: |
+          pytest --durations=0 --nbmake ./examples/notebooks/*.ipynb
+
+  ci:
+    needs: [tests, integration-tests, flash-attn-integration, notebooks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

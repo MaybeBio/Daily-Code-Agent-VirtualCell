@@ -1,0 +1,13 @@
+output_dir: output/smoke
+
+data_cfg:
+  max_cells: 96
+  subset_seed: 41
+
+model_cfg:
+  head_epochs: 2
+  max_epochs: 2
+
+evaluation_cfg:
+  compute_kbet: false
+  perturbation_split: unseen_condition

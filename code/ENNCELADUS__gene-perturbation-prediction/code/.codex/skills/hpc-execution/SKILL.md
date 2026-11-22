@@ -1,0 +1,1 @@
+../../../.claude/skills/hpc-execution/SKILL.md

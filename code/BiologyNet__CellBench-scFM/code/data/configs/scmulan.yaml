@@ -1,0 +1,22 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: scMulan
+  ckpt_path: weights/scMulan/ckpt_scMulan.pt
+  meta_info_path: weights/scMulan/meta_info.pt
+  tasks: cluster
+  pretrain_prefix: 20230926_85M
+  pretrain_directory: weights/CellPLM
+  weights_dir: weights/scMulan
+  source_dir: public_code/scMulan
+  expression_layer: auto
+  inference_batch_size: 8

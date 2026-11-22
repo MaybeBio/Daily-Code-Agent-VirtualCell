@@ -1,0 +1,27 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: Nicheformer
+  tasks: clustering
+  hf_dir: weights/Nicheformer
+  technology_mean_path: weights/Nicheformer/dissociated_mean_script.npy
+  assay_token: 15
+  modality_token: 3
+  weights_dir: weights/Nicheformer
+  source_dir: public_code/Nicheformer
+  expression_layer: auto
+  inference_batch_size: 8
+  mouse_official_mapping: resources/orthologs/nicheformer_mouse_human_official_partial.tsv
+  mouse_official_mapping_sha256: e6d60dfda5c616fde349e22ec9d8790cf5cd6c8228f46a9bcd9af31d0463befe
+  mouse_mapping_policy: official_priority_with_fixed_ensembl_completion
+  smartseq2_token: 18
+  smartseq2_approximation: user_authorized_smart_seq_family_token

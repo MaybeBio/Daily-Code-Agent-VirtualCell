@@ -1,0 +1,47 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+# Project-local Codex configuration for multiagent workflows.
+# Keep this focused on agents that help with experiment design, scoped edits,
+# review, and documentation consistency for this repository.
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "live"
+approvals_reviewer = "auto_review"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+startup_timeout_sec = 30
+
+[agents]
+max_threads = 3
+max_depth = 1
+
+[agents.domain_mapper]
+description = "Read-only mapper for code, data, config, and documentation paths in the virtual-cell synthetic-lethality repository."
+config_file = "agents/domain-mapper.toml"
+
+[agents.experiment_planner]
+description = "Read-only planner for experiment, config, and verification designs across the 226-line GeneEffect benchmark and the context_screen_v2 SL split."
+config_file = "agents/experiment-planner.toml"
+
+[agents.implementation_worker]
+description = "Scoped implementation worker for assigned code or config changes after the parent agent defines ownership."
+config_file = "agents/implementation-worker.toml"
+
+[agents.reviewer]
+description = "Reviewer focused on correctness, leakage, silent defaults, data contracts, and missing tests."
+config_file = "agents/reviewer.toml"
+
+[agents.docs_guard]
+description = "Read-only documentation guard for the docs/ research vault, README, and agent instruction files."
+config_file = "agents/docs-guard.toml"
+
+[mcp_servers.codebase-memory-mcp]
+command = "/Users/richardwang/.local/bin/codebase-memory-mcp"
+
+[mcp_servers.codebase-memory-mcp.tools.search_graph]
+approval_mode = "approve"

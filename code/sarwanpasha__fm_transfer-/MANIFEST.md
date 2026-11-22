@@ -1,20 +1,20 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/sarwanpasha/fm_transfer-
-- 快照日期: 2026-11-19
-- 快照 commit: [`061a5d3b4ace`](https://github.com/sarwanpasha/fm_transfer-/commit/061a5d3b4ace4d36590e80bbc5441d2c1bd93b09)
+- 快照日期: 2026-11-22
+- 快照 commit: [`a70df0c9d962`](https://github.com/sarwanpasha/fm_transfer-/commit/a70df0c9d96266f557cec88f6bc8d773064cee1d)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
-## 保留 (57 个文件, 274.4 KB)
+## 保留 (68 个文件, 356.1 KB)
 
 | 类别 | 文件数 | 大小 |
 |---|---:|---:|
-| 源码 | 51 | 264.3 KB |
-| README | 1 | 8.1 KB |
+| 源码 | 62 | 342.9 KB |
+| README | 1 | 11.3 KB |
 | 文档 | 1 | 1.0 KB |
 | 构建/配置 | 4 | 897 B |
 
-按后缀: `.py` 49 (261.1 KB)、`.md` 1 (8.1 KB)、`.sh` 1 (2.5 KB)、`无后缀` 1 (1.0 KB)、`.txt` 4 (897 B)、`.sbatch` 1 (751 B)
+按后缀: `.py` 60 (339.7 KB)、`.md` 1 (11.3 KB)、`.sh` 1 (2.5 KB)、`无后缀` 1 (1.0 KB)、`.txt` 4 (897 B)、`.sbatch` 1 (751 B)
 
 > README / 文档中的相对图片与链接已改写为 GitHub 绝对地址。
 

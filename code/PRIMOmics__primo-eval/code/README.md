@@ -1,0 +1,297 @@
+# 🧬 primo-eval
+
+PRIMO is a benchmark evaluating representations of omics foundation models on
+real-world drug development tasks such as treatment outcome, clinical score,
+endotype and perturbation response.
+
+You embed each sample of the PRIMO datasets with your model. A fixed probe, the same
+for every model, then predicts the target of each task from your embeddings, so the
+score measures the embedding. Most labels stay private: only the leaderboard can
+score these tasks. The labels of the public tasks are downloadable, so you can score
+those on your computer. The leaderboard ranks the models on boards, one per
+modality, therapeutic area and task family. Its
+[Method](https://huggingface.co/spaces/PRIMOmics/primo-eval?tab=method) and
+[Tasks](https://huggingface.co/spaces/PRIMOmics/primo-eval?tab=tasks) pages give the
+details.
+
+This repo holds `primo`, the command line that downloads the data, scores the public
+tasks and submits your embeddings. The Python package is `primomics`.
+
+🏆 [Leaderboard](https://huggingface.co/spaces/PRIMOmics/primo-eval) ·
+📦 [Data](https://huggingface.co/datasets/PRIMOmics/primo)
+
+🚧 Before version 1.0, scores can change from one minor version to the next (0.1 → 0.2).
+
+## 🚀 From install to the leaderboard
+
+1. ⚡ [Install uv](#-1-install-uv)
+2. 📦 [Clone and install primo](#-2-clone-and-install-primo)
+3. 📥 [Download the data](#-3-download-the-data)
+4. 🧠 [Embed the datasets](#-4-embed-the-datasets)
+5. 📊 [Score the public tasks locally](#-5-score-the-public-tasks-locally) (optional)
+6. 🏆 [Submit to the leaderboard](#-6-submit-to-the-leaderboard)
+
+You work in two folders, side by side. The clone of this repo runs `primo`, in its
+own environment. Your repo runs your model, in your environment:
+
+```text
+work/
+├── primo-eval/   this repo: download, score and submit
+└── my-model/     your repo: embed the data with your model
+```
+
+### ⚡ 1. Install uv
+
+The steps below use [uv](https://docs.astral.sh/uv/). It installs Python and the exact
+packages of this repo in one command. `primo` supports macOS and Linux. Install uv
+with the [official installer](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+The same page gives other ways, such as `brew install uv`. Open a new terminal, then
+check that uv works:
+
+```bash
+uv --version
+```
+
+### 📦 2. Clone and install primo
+
+```bash
+git clone https://github.com/PRIMOmics/primo-eval
+cd primo-eval
+uv sync
+uv run primo --help
+```
+
+`uv sync` creates the `.venv` folder, with Python 3.12 and the exact packages of
+`uv.lock`. If Python 3.12 is not on your computer, uv downloads it. `uv run` runs a
+command in this environment, so you never need to activate it. Run every `primo`
+command from this folder.
+
+> [!NOTE]
+> `main` can change scores. For stable scores, use a
+> [release](https://github.com/PRIMOmics/primo-eval/releases): run
+> `git checkout <tag>` before `uv sync`.
+
+Instead of the clone, you can install the latest release from
+[PyPI](https://pypi.org/project/primomics/), in an environment with Python 3.12 or
+later:
+
+```bash
+pip install primomics
+primo --help
+```
+
+Then drop `uv run` from the commands below, and run every `primo` command from the
+same folder: the data goes to `primo-data/` there.
+
+### 📥 3. Download the data
+
+Download the datasets of one modality, `bulk-rna` or `single-cell-rna`:
+
+```bash
+uv run primo download --modality bulk-rna
+```
+
+The data comes from the
+[`PRIMOmics/primo`](https://huggingface.co/datasets/PRIMOmics/primo) dataset on the
+Hugging Face Hub. It is public, so you need no account. `primo download` fetches
+the commit that the leaderboard scores, into `primo-data/` by default. To use
+another folder, pass the same `--data-dir` to every `primo` command:
+
+- `datasets.yaml` lists every dataset, with its `id`, `modality` and `path`;
+- one `expression.h5ad` per dataset;
+- the labels of the public tasks, under `public_tasks/`;
+- `primo-lock.json` records the commit and a hash of every downloaded file.
+
+Use `--public-only` for the datasets that carry a public task, or `--datasets` for a
+comma-separated list of ids. To be ranked on every board, download and embed every
+dataset: a board ranks only the models that cover all its tasks. A new release of
+primo-eval can move to newer data: run the command again after you update.
+
+### 🧠 4. Embed the datasets
+
+Embed the data in your own repo, with your model and your environment. Write all
+the embeddings of one modality to **one** file. The file has one row per sample: a
+`dataset_id` column, a `sample_id` column, then one numeric column per embedding
+dimension (`.parquet`, `.csv` or `.tsv`). A `.npz` file holds three arrays instead:
+`dataset_ids`, `sample_ids` and `embeddings`. Each dataset can have its own number of
+dimensions: leave the extra columns empty.
+
+In bulk datasets, each row of `expression.h5ad` is a sample. In single-cell datasets,
+the rows are cells, and `obs["sample_id"]` gives their sample: submit one embedding
+per sample. The columns are genes: `var_names` holds their NCBI Gene IDs, and
+`var["gene_symbols"]` holds their symbols. `X` holds raw counts, unless the
+`input_normalization` of the dataset in `datasets.yaml` gives another scale.
+
+This example embeds every downloaded bulk dataset with a simple baseline:
+log2(CPM + 1), then PCA. It is adapted from the
+[`quickstart.py`](https://huggingface.co/spaces/PRIMOmics/primo-eval/blob/main/quickstart.py)
+of the leaderboard Space. In your environment, it needs anndata, pandas, pyarrow,
+pyyaml and scikit-learn. Save it as `embed.py` in your repo, then run it from there:
+
+```python
+from pathlib import Path
+
+import anndata as ad
+import numpy as np
+import pandas as pd
+import yaml
+from sklearn.decomposition import PCA
+
+DATA_DIR = Path("../primo-eval/primo-data")
+MODALITY = "bulk RNA"
+
+
+def log_normalize(x, target_sum: float) -> np.ndarray:
+    x = x.toarray() if hasattr(x, "toarray") else np.asarray(x)
+    totals = x.sum(axis=1, keepdims=True)
+    return np.log2(x / np.where(totals == 0, 1, totals) * target_sum + 1)
+
+
+def embed(adata: ad.AnnData, ids, cells: bool) -> np.ndarray:
+    """One row per id, in the same order. Replace this baseline with your model."""
+    if cells:
+        samples = adata.obs["sample_id"].astype(str).to_numpy()
+        x = np.stack([log_normalize(adata.X[samples == i], 1e4).mean(0) for i in ids])
+    else:
+        x = log_normalize(adata.X, 1e6)
+    k = min(50, x.shape[0] - 1, x.shape[1])
+    return PCA(n_components=k, random_state=0).fit_transform(x)
+
+
+blocks = []
+for entry in yaml.safe_load((DATA_DIR / "datasets.yaml").read_text())["datasets"]:
+    path = DATA_DIR / entry["path"]
+    if entry["modality"] != MODALITY or not path.exists():
+        continue
+    adata = ad.read_h5ad(path)
+    cells = entry.get("observation_level") == "cell"
+    ids = pd.unique(adata.obs["sample_id"].astype(str)) if cells else adata.obs_names
+    block = pd.DataFrame(embed(adata, ids, cells)).add_prefix("e")
+    block.insert(0, "sample_id", ids)
+    block.insert(0, "dataset_id", entry["id"])
+    blocks.append(block)
+pd.concat(blocks).to_parquet("submission.parquet", index=False)
+```
+
+Replace `embed` with your model: it gets one dataset and returns one row per id, in
+the order of `ids`. For single-cell data, set `MODALITY = "Single Cell RNA"`, and use
+`--modality single-cell-rna` in steps 3, 5 and 6. The baseline then averages the cells
+of each sample.
+
+### 📊 5. Score the public tasks locally
+
+From the clone:
+
+```bash
+uv run primo evaluate ../my-model/submission.parquet --modality bulk-rna \
+  -o ../my-model/results.json
+```
+
+`primo evaluate` checks every dataset of the file against the downloaded data: each
+sample of `expression.h5ad` needs one finite embedding. It then scores the public
+tasks of those datasets with the leaderboard protocol, and lists the other datasets
+as validated: the leaderboard scores them. Each embedding is put on the unit sphere
+first, as on the leaderboard. The datasets of the modality that are missing from the
+file are listed too: on submit, their tasks count as missing. `results.json` holds
+every score, with the version of `primomics` and the hashes of the data files.
+
+On your computer, an AUROC can differ from the leaderboard by a few thousandths,
+because two computers do not round numbers in exactly the same way.
+
+This step is optional, and it needs no account. It finds the errors in your file
+before you submit: when a check fails, the command says what to fix and exits with
+code 1.
+
+### 🏆 6. Submit to the leaderboard
+
+#### 💻 From the command line
+
+Log in to Hugging Face once, with an access token from your
+[settings](https://huggingface.co/settings/tokens). On a server, you can set the
+`HF_TOKEN` environment variable instead. `primo submit` sends this token to the
+Space, so use a token with read access only. Then, from the clone, check the file
+and send it:
+
+```bash
+uv run hf auth login
+uv run primo submit ../my-model/submission.parquet --modality bulk-rna \
+  --model-name my-model --email me@lab.org --dry-run
+uv run primo submit ../my-model/submission.parquet --modality bulk-rna \
+  --model-name my-model --email me@lab.org
+```
+
+`primo submit` runs the checks of `primo evaluate`, and checks that each dataset of
+the file is still the one that the leaderboard scores. If a dataset changed, download
+it again (step 3), then embed it again. `--dry-run` runs every
+check and sends nothing. Without it, the command sends the file to the
+[leaderboard Space](https://huggingface.co/spaces/PRIMOmics/primo-eval), which scores
+every task, the private ones included, and publishes the scores. Scoring takes a few
+minutes. The Space reads your Hugging Face token only to know who submits, and
+never stores it: a model name stays with the account that first used it. An
+account can publish 4 submissions in 24 hours, and a file can weigh 500 MB at
+most. `--institution`, `--authors`,
+`--paper-link`, `--hf-model` and `--notes` fill the other fields of the web form.
+
+#### 🌐 In the browser
+
+Open the
+[**Submit** tab](https://huggingface.co/spaces/PRIMOmics/primo-eval?tab=submit) of the
+leaderboard Space, and sign in with Hugging Face. Choose the modality, enter a model
+name and a contact email, and upload the file. The other fields are optional. Then
+click **Evaluate**: after a few minutes, your scores show on the boards.
+
+The Submit tab also gives the rules: partial submissions, new submissions under the
+same name, and the `+ HVG` entry that comes with each submission.
+
+## 📏 Reproduce the baseline
+
+The `HVG-1200-genes` entry of the leaderboard is a linear baseline. Its embedding
+is the expression itself: log2(CPM+1) for bulk samples, and the mean of the
+per-cell log2(CP10K+1) profiles for single-cell samples, on the 1,200 genes with
+the highest variance in each dataset. From the clone, after step 3:
+
+```bash
+uv run python scripts/baselines.py --modality bulk-rna --out-dir baselines
+uv run primo evaluate baselines/submission_HVG-1200-genes.parquet \
+  --modality bulk-rna --representation gene_space
+```
+
+`--representation gene_space` scores the genes as they are, as the leaderboard does
+for this baseline, instead of putting each embedding on the unit sphere. If you
+downloaded only some datasets, pass the same `--datasets` list to
+`scripts/baselines.py`.
+
+## 🛠️ Development
+
+In the clone (step 2), run the same checks as the CI:
+
+```bash
+uv run pytest
+uv run ruff check
+uv run ruff format --check
+```
+
+The leaderboard Space lives in `space/`. A merge does not deploy it: admins
+deploy it by hand (see `CONTRIBUTING.md`). Its tests run in a separate environment,
+with the packages of the Space:
+
+```bash
+uv run --isolated --no-project --python 3.13 \
+  --with-requirements space/requirements.txt \
+  --with "gradio[oauth]==6.30.0" --with pytest \
+  pytest space_tests
+```
+
+## 🤝 Contributing
+
+Bug reports, fixes and ideas are welcome: read `CONTRIBUTING.md`. To report a
+security problem, see `SECURITY.md`.
+
+## 📄 License
+
+Apache-2.0, see `LICENSE`.

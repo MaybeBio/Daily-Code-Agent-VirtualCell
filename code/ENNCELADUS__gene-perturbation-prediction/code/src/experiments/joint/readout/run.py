@@ -1,0 +1,279 @@
+"""The readout-head run (``all``'s last step): extract a frozen joint backbone's
+features once, fit the head with the explicit gene-specific context slope, score
+validation."""
+
+import argparse
+import json
+import os
+import shutil
+from contextlib import nullcontext
+from pathlib import Path
+
+import torch
+
+READOUT_ARM = "A2"  # the explicit gene-specific context-slope head
+
+
+def iter_features(model, dataset, *, batch_size=32, precision="bf16"):
+    """Use the real condition-feature boundary, never the checkpoint's head."""
+    if batch_size < 1 or precision not in {"bf16", "no"}:
+        raise ValueError(
+            "positive extraction batch size and bf16/no precision required"
+        )
+    model.requires_grad_(False)
+    model.eval()
+    device = next(model.parameters()).device
+    with torch.no_grad():
+        for start in range(0, len(dataset), batch_size):
+            batch = dataset.collate(
+                range(start, min(start + batch_size, len(dataset)))
+            ).to(device)
+            with (
+                torch.autocast(device.type, dtype=torch.bfloat16)
+                if precision == "bf16"
+                else nullcontext()
+            ):
+                features = model.condition_features(batch.conditions)
+            # The cache writer losslessly widens any autocast BF16 outputs to FP32.
+            yield features.to("cpu"), batch.residual.cpu(), batch.gene_mean.cpu()
+
+
+def extract_cache(checkpoint, destination, *, device="cpu", batch_size=32, inputs=None):
+    """Write train/val features of a joint checkpoint; ``inputs`` replaces
+    ``load_inputs`` (synthetic tests)."""
+    from src.data.datasets import DependencyDataset
+    from src.experiments.joint.config import mixed_precision
+    from src.experiments.joint.readout.cache import write_feature_cache
+    from src.experiments.run_dir import git_revision
+    from src.model.initialization import restore_joint_model
+    from src.training.checkpoint import load_checkpoint
+
+    checkpoint = Path(checkpoint)
+    saved = load_checkpoint(checkpoint)
+    if inputs is None:
+        from src.data.prepared import load_inputs
+
+        inputs = load_inputs(
+            saved["config"], preprocessing=saved["preprocessing"], include_test=False
+        )
+    model = restore_joint_model(saved, inputs).to(device)
+    datasets = {
+        split: DependencyDataset(inputs, split, device=device)
+        for split in ("train", "val")
+    }
+    provenance = {
+        "checkpoint": str(checkpoint.resolve()),
+        "checkpoint_train_state": saved["train_state"],
+        "revision": git_revision(),
+        "precision": mixed_precision(),
+        "extraction_batch_size": batch_size,
+        "config": saved["config"],
+    }
+    cache = write_feature_cache(
+        destination,
+        {
+            split: iter_features(
+                model,
+                data,
+                batch_size=batch_size,
+                precision=mixed_precision(),
+            )
+            for split, data in datasets.items()
+        },
+        row_counts={split: len(data) for split, data in datasets.items()},
+        split_lines={
+            "train": list(inputs.split.supervised_train),
+            "val": list(inputs.split.val),
+        },
+        genes=list(inputs.genes),
+        variable_genes=[g for g in inputs.genes if g in inputs.variable_genes],
+        selective_genes=[g for g in inputs.genes if g in inputs.selective_genes],
+        provenance=provenance,
+    )
+    torch.save(
+        {
+            "standardizer": saved["normalization_state"],
+            "projection": saved["projection_state"],
+            "preprocessing": saved["preprocessing"],
+        },
+        cache.root / "source_state.pt",
+    )
+    return cache
+
+
+def run_readout(checkpoint, out_dir, *, device, inputs=None):
+    """Write ``out_dir/metrics.json`` (validation, head seed 0) and return it; at once
+    when it already exists. Features are cached in ``out_dir/features``."""
+    from src.experiments.joint.readout.cache import ReadoutCache
+    from src.experiments.joint.readout.heads import fit_readout
+
+    out_dir = Path(out_dir)
+    metrics_path = out_dir / "metrics.json"
+    if metrics_path.exists():
+        return json.loads(metrics_path.read_text())
+    features = out_dir / "features"
+    try:
+        cache = ReadoutCache(features)
+    except (FileNotFoundError, ValueError):  # absent or interrupted extraction
+        shutil.rmtree(features, ignore_errors=True)
+        cache = extract_cache(checkpoint, features, device=device, inputs=inputs)
+    arm_dir = out_dir / READOUT_ARM
+    shutil.rmtree(arm_dir, ignore_errors=True)  # an interrupted earlier fit
+    fit_readout(cache, READOUT_ARM, arm_dir, device=device, head_seed=0)
+    metrics = json.loads((arm_dir / "evaluation/best/val/metrics.json").read_text())
+    metrics_path.write_text(json.dumps(metrics, indent=2, allow_nan=False) + "\n")
+    return metrics
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    extract = sub.add_parser(
+        "extract",
+        help="Extract train/val features once from the joint-backbone checkpoint",
+    )
+    extract.add_argument("--checkpoint", type=Path, required=True)
+    extract.add_argument("--out-dir", type=Path, required=True)
+    extract.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="Extraction batch only; head global batch stays 1024",
+    )
+    train = sub.add_parser(
+        "train", help="Train seed-0 heads using the approved settings"
+    )
+    train.add_argument("--cache", type=Path, required=True)
+    train.add_argument("--out-dir", type=Path, required=True)
+    train.add_argument(
+        "--arms",
+        nargs="+",
+        choices=["A0", "A1", "A2", "A3"],
+        default=["A0", "A1", "A2", "A3"],
+        help=(
+            "Heads to train: A0 = shared MLP head, A1 = shared MLP head plus "
+            "response block, A2 = explicit context-slope head, A3 = explicit "
+            "context-slope head plus response block"
+        ),
+    )
+    train.add_argument(
+        "--old-scaler",
+        action="store_true",
+        help=(
+            "Optional contrast using the source scaler; shared MLP head plus "
+            "response block only (A1)"
+        ),
+    )
+    train.add_argument(
+        "--resume",
+        type=Path,
+        help="Resume one arm from its last.pt in the same run directory",
+    )
+    train.add_argument(
+        "--head-seed",
+        type=int,
+        default=0,
+        help="Head initialisation seed shared by every arm in this run",
+    )
+    evaluate = sub.add_parser(
+        "evaluate", help="Re-export a trained head without fitting"
+    )
+    evaluate.add_argument("--cache", type=Path, required=True)
+    evaluate.add_argument("--checkpoint", type=Path, required=True)
+    compare = sub.add_parser(
+        "compare",
+        help="Compare the four completed heads on aligned train/validation exports",
+    )
+    compare.add_argument("--cache", type=Path, required=True)
+    compare.add_argument("--runs", type=Path, required=True)
+    compare.add_argument("--out-dir", type=Path, required=True)
+    compare.add_argument(
+        "--context-map",
+        type=Path,
+        default=Path("configs/benchmarks/cell_line_geneeffect_split.csv"),
+    )
+    compare.add_argument("--bootstrap-repeats", type=int, default=1000)
+    compare.add_argument(
+        "--reference-val",
+        type=Path,
+        action="append",
+        default=[],
+        help="Existing single-method baseline predictions.parquet for alignment",
+    )
+    for command in (extract, train, evaluate):
+        command.add_argument(
+            "--device", default="cuda:0" if torch.cuda.is_available() else "cpu"
+        )
+    args = parser.parse_args(argv)
+    if int(os.environ.get("WORLD_SIZE", "1")) != 1:
+        parser.error(
+            "The fixed-backbone head diagnostic runs one process per head; "
+            "do not launch it with distributed workers"
+        )
+    if args.command == "extract":
+        extract_cache(
+            args.checkpoint,
+            args.out_dir,
+            device=args.device,
+            batch_size=args.batch_size,
+        )
+    else:
+        from src.experiments.joint.readout.cache import ReadoutCache
+        from src.experiments.joint.readout.heads import export_checkpoint, fit_readout
+
+        cache = ReadoutCache(args.cache)
+        if args.command == "compare":
+            import pandas as pd
+
+            from src.experiments.joint.readout.compare import compare_runs
+
+            mapping = pd.read_csv(args.context_map).set_index("model_id")
+            ids = cache.metadata["split_lines"]["val"]
+            if mapping.index.has_duplicates or set(ids) - set(mapping.index):
+                parser.error("context map must contain one row per validation ModelID")
+            groups = {
+                line: str(mapping.loc[line, "patient_id"])
+                if pd.notna(mapping.loc[line, "patient_id"])
+                else f"line:{line}"
+                for line in ids
+            }
+            compare_runs(
+                cache,
+                args.runs,
+                args.out_dir,
+                groups=groups,
+                repeats=args.bootstrap_repeats,
+                references=args.reference_val,
+            )
+        elif args.command == "train":
+            if len(set(args.arms)) != len(args.arms):
+                parser.error("arms must be unique")
+            if args.resume is not None and len(args.arms) != 1:
+                parser.error("--resume requires exactly one --arms entry")
+            scaler = None
+            if args.old_scaler:
+                if args.arms != ["A1"]:
+                    parser.error(
+                        "--old-scaler requires --arms A1 "
+                        "(shared MLP head plus response block)"
+                    )
+                from src.model.normalization import BlockStandardizer
+
+                source = torch.load(cache.root / "source_state.pt", weights_only=True)
+                scaler = BlockStandardizer.from_state(source["standardizer"])
+            for arm in args.arms:
+                fit_readout(
+                    cache,
+                    arm,
+                    args.out_dir / ("A1-old-scaler" if args.old_scaler else arm),
+                    device=args.device,
+                    standardizer=scaler,
+                    resume=args.resume,
+                    head_seed=args.head_seed,
+                )
+        else:
+            export_checkpoint(cache, args.checkpoint, device=args.device)
+
+
+if __name__ == "__main__":
+    main()

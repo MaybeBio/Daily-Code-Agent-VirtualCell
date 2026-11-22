@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    # Open GitHub Actions update PRs against main (the default branch is release).
+    target-branch: "main"
+    schedule:
+      interval: "weekly"
+    # Wait 7 days before proposing updates to newly published versions so
+    # freshly released (possibly malicious or unstable) packages have time to
+    # be vetted. Security updates are not affected by cooldown.
+    cooldown:
+      default-days: 7
+    assignees:
+      - "oriolpetithelical"
+      - "briannejati"
+      - "bputzeys"
+      - "jonAtHelical"
+      - "priyankvyas"
+      - "dmiv-helical"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

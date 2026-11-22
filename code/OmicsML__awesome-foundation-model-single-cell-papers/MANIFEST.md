@@ -1,18 +1,18 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/OmicsML/awesome-foundation-model-single-cell-papers
-- 快照日期: 2026-11-19
-- 快照 commit: [`8b7483989a97`](https://github.com/OmicsML/awesome-foundation-model-single-cell-papers/commit/8b7483989a97e68bf86a7f1538a500b6189d5eef)
+- 快照日期: 2026-11-22
+- 快照 commit: [`dec49ff04e08`](https://github.com/OmicsML/awesome-foundation-model-single-cell-papers/commit/dec49ff04e087af3566bbfebef185d7a1615daaa)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
-## 保留 (2 个文件, 72.7 KB)
+## 保留 (2 个文件, 167.4 KB)
 
 | 类别 | 文件数 | 大小 |
 |---|---:|---:|
-| README | 1 | 71.7 KB |
+| README | 1 | 166.4 KB |
 | 文档 | 1 | 1.0 KB |
 
-按后缀: `.md` 1 (71.7 KB)、`无后缀` 1 (1.0 KB)
+按后缀: `.md` 1 (166.4 KB)、`无后缀` 1 (1.0 KB)
 
 > README / 文档中的相对图片与链接已改写为 GitHub 绝对地址。
 

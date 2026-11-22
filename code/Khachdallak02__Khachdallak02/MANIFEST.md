@@ -1,17 +1,17 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/Khachdallak02/Khachdallak02
-- 快照日期: 2026-11-19
-- 快照 commit: [`efc312d77e24`](https://github.com/Khachdallak02/Khachdallak02/commit/efc312d77e24f6ae198f5116664dc4844147a292)
+- 快照日期: 2026-11-22
+- 快照 commit: [`3d157cabaf50`](https://github.com/Khachdallak02/Khachdallak02/commit/3d157cabaf508714ac12e173949182af7d51ee02)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
-## 保留 (1 个文件, 5.3 KB)
+## 保留 (1 个文件, 5.1 KB)
 
 | 类别 | 文件数 | 大小 |
 |---|---:|---:|
-| README | 1 | 5.3 KB |
+| README | 1 | 5.1 KB |
 
-按后缀: `.md` 1 (5.3 KB)
+按后缀: `.md` 1 (5.1 KB)
 
 > README / 文档中的相对图片与链接已改写为 GitHub 绝对地址。
 

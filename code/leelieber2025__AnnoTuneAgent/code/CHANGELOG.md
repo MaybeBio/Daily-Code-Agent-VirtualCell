@@ -2,6 +2,77 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+## [0.1.8] - 2026-11-20
+
+### Changed
+
+- A check-accepted fibroblast, smooth muscle cell, macrophage, or monocyte
+  yields to a program-specific marker on another lineage, and to a
+  program-specific descendant. One broad title does not replace another.
+  Any check-accepted name yields when its own program is off and the marker
+  is program-specific on another lineage.
+- A name the check rule accepted stays when no dictionary panel is on.
+  The same keep applies when the name model and the marker score agree,
+  unless an ML call is on another lineage. The hint lists the uncovered genes.
+- Tongue maps to the skin page. An author tissue that matches one page,
+  such as large intestine, uses that page's aliases.
+- Dictionary panels with one positive gene now have a second, except human
+  juxtaglomerular cells (`REN`). Prostate basal cells add KRT14 and KRT15.
+  Non-keratinized squamous epithelium is KRT4 and KRT13. Tenocytes add COMP
+  and CILP. Lyve1-positive macrophages use LYVE1 and F13A1, with PRG4 as a
+  negative. Mouse pericytes include Notch3. Superficial-zone chondrocytes
+  use PRG4, SFRP1, and COL2A1. Mammary basal cells use KRT5, KRT14, and
+  ACTA2. Smooth muscle treats KRT5 and KRT14 as negatives. Luminal mammary
+  epithelium adds KRT19.
+- Marker dot plots use square cells. The load-model tutorial downloads the
+  one merged GGUF. Docs include the Bioconda install and weekly download
+  badges.
+
+## [0.1.7] - 2026-11-19
+
+### Fixed
+
+- Remove the unused merged-id list in `merge_same_labels`. `ruff` failed the
+  0.1.6 tests job on that assignment. Annotation behavior matches 0.1.6.
+
+## [0.1.6] - 2026-11-19
+
+### Changed
+
+- `run` calls the name model only. The check rule keeps that name, replaces
+  it with the one other supported candidate, or drops it. A supporting marker
+  has logfc above 0.5 and pct_in of at least 0.25. A blocking negative has
+  pct_in of at least 0.25 and logfc of at least 1. A cluster whose name the
+  check rule accepted is not split.
+- The name prompt lists the top 35 Wilcoxon genes. An enriched support gene
+  is appended only after a positive marker already qualifies. Low or
+  undetected genes stay out.
+- The name weight is one merged GGUF,
+  `Qwen3.5-4B-annotune-v9k-name.Q6_K.gguf`. Pass it as `TaskEndpoint(base=...)`
+  or `--base`. The server context for that call is 2048.
+- `adata` gains `annotune_label`, and `annotune_sub` only when a cluster
+  stays split. Status, hints, and merged cluster ids stay on the report.
+- `write_h5ad` is no longer part of the public API. `--output-h5ad` still
+  writes the file and stores the QC report as JSON.
+- The marker dictionary adds rare types, including plasmablast,
+  myofibroblast, BEST4+ enterocyte, mouse ILC1, muscle fiber subtypes,
+  bone-marrow stroma, juxtaglomerular cells, urothelial basal and umbrella
+  cells, spermatogenic stages, mammary luminal subsets, adrenal zones,
+  decidual stroma, mouse trophoblast, and thymic epithelium. Human prostate
+  luminal cells use ACP3. Human non-peptidergic nociceptors no longer treat
+  CALCA as a negative. Mouse corneal epithelium uses Krt12 and Krt5.
+  Colonocyte keeps CL:1000347.
+
+### Fixed
+
+- A cluster removed as `ribosomal genes only` still prints its enriched-gene
+  paragraph.
+- A later split can write `parent.child` ids after the subcluster column has
+  been turned into a categorical.
+- Subcluster PCA on a sparse matrix uses `arpack`.
+
 ## [0.1.5] - 2026-11-17
 
 ### Changed

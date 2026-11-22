@@ -1,0 +1,503 @@
+"""PARIS (Benfatto et al. 2021, Molecular Cancer), ported from the official R code
+(``third_party/paris/R``, ``RF_exp``). For each dependency gene B a random forest
+predicts B's GeneEffect across cell lines from the expression of the other genes; the
+features A the forest finds important are reported with the Pearson r between B's
+dependency and A's expression. Stage two reads these pairs as SL evidence. With an
+``sl_split``, PARIS fits DepMap's GeneEffect on its bulk expression in the SL split's
+training-side lines and also scores each pair of the multi-study SL benchmark in the
+held-out lines and, in sample, in the training lines (``benchmark_scores``).
+
+``raw``: Boruta (Kursa & Rudnicki) with ranger's raw out-of-bag permutation importance.
+``Ginicorrected``: ranger ``importance = "impurity_corrected"`` (Nembrini et al. 2018)
+with ``importance_pvalues`` (Janitza), keeping p-value 0. Deviations from R (RNG, trees,
+the OOB estimator) are listed in ``third_party/paris/PROVENANCE.md``."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import time
+from collections.abc import Iterator, Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from src.data.io import read_json, write_json, write_parquet
+from src.experiments.config import read_yaml, require_keys
+from src.experiments.run_dir import bind
+from src.experiments.sl.slidr import FIT_SIDES, HELD_SIDES, SCORED_SIDES
+
+MODES = ("raw", "Ginicorrected")
+COLUMNS = ["dependency_gene", "feature_gene", "importance", "r", "r_pvalue", "mode"]
+TREES = 500  # ranger's default num.trees
+MAX_RUNS = 500  # run_PARIS: Boruta(maxRuns = 500)
+P_VALUE = 0.01  # Boruta's default
+MIN_NODE_SIZE = 5  # ranger's default for regression
+MIN_LINES = 10  # fewer labelled lines than this cannot run Boruta; the gene is skipped
+
+
+# --- forests --------------------------------------------------------------------
+
+
+def _trees(
+    x: np.ndarray,
+    y: np.ndarray,
+    mtry: int,
+    rng: np.random.Generator,
+    copy: bool = False,
+) -> Iterator[tuple[Any, np.ndarray]]:
+    """Bootstrap trees ``(tree, in-bag counts)``: ranger draws n rows with replacement,
+    and a node of at most ``MIN_NODE_SIZE`` rows is not split. ``copy`` grows each tree
+    on the features plus a copy with the rows permuted (one permutation per tree)."""
+    from sklearn.tree import DecisionTreeRegressor
+
+    n = len(y)
+    for _ in range(TREES):
+        counts = rng.multinomial(n, np.full(n, 1.0 / n)).astype(np.float64)
+        grown = np.concatenate([x, x[rng.permutation(n)]], axis=1) if copy else x
+        tree = DecisionTreeRegressor(
+            max_features=mtry,
+            min_samples_split=MIN_NODE_SIZE + 1,  # deviation: distinct rows, not draws
+            random_state=int(rng.integers(2**31)),
+        )
+        yield tree.fit(grown, y, sample_weight=counts), counts
+
+
+def permutation_importance(
+    x: np.ndarray, y: np.ndarray, rng: np.random.Generator
+) -> np.ndarray:
+    """ranger ``importance = "permutation"``, ``scale.permutation.importance = FALSE``:
+    per tree, the rise in out-of-bag MSE when one feature's out-of-bag values are
+    permuted, averaged over all trees (a feature a tree never splits on adds 0)."""
+    m = x.shape[1]
+    mtry = max(1, int(np.sqrt(m)))
+    importance = np.zeros(m)
+    for tree, counts in _trees(x, y, mtry, rng):
+        oob = np.flatnonzero(counts == 0)
+        t = tree.tree_
+        split = t.children_left != -1
+        if len(oob) == 0 or not split.any():
+            continue
+        used = np.unique(t.feature[split])
+        k = len(used)
+        column = np.full(t.node_count, -1)
+        column[split] = np.searchsorted(used, t.feature[split])
+        xo, yo = x[np.ix_(oob, used)], y[oob]
+        # Variant v < k permutes used feature v among the OOB rows; variant k is the
+        # unpermuted baseline. One permutation per variant, as ranger draws per feature.
+        rows = np.arange(len(oob))[None, :]
+        source = np.argsort(rng.random((k + 1, len(oob))), axis=1)
+        variant = np.arange(k + 1)[:, None]
+        node = np.zeros((k + 1, len(oob)), dtype=np.intp)
+        while True:
+            left = t.children_left[node]
+            internal = left != -1
+            if not internal.any():
+                break
+            col = np.where(internal, column[node], 0)
+            row = np.where(col == variant, source, rows)
+            go_left = xo[row, col] <= t.threshold[node]
+            node = np.where(
+                internal, np.where(go_left, left, t.children_right[node]), node
+            )
+        error = ((yo[None, :] - t.value[node, 0, 0]) ** 2).mean(axis=1)
+        importance[used] += error[:k] - error[k]
+    return importance / TREES
+
+
+def corrected_impurity(
+    x: np.ndarray, y: np.ndarray, rng: np.random.Generator
+) -> np.ndarray:
+    """ranger ``importance = "impurity_corrected"``: every tree grows on the features
+    plus a copy of them with the rows permuted (one permutation per tree), ``mtry``
+    drawn from both; a feature's importance is the SSE decrease of its splits minus
+    its copy's, averaged over trees."""
+    m = x.shape[1]
+    mtry = max(1, int(np.sqrt(m)))
+    importance = np.zeros(m)
+    for tree, _ in _trees(x, y, mtry, rng, copy=True):
+        t = tree.tree_
+        split = np.flatnonzero(t.children_left != -1)
+        sse = t.weighted_n_node_samples * t.impurity
+        gain = sse[split] - sse[t.children_left[split]] - sse[t.children_right[split]]
+        feature = t.feature[split]
+        np.add.at(importance, feature % m, np.where(feature < m, gain, -gain))
+    return importance / TREES
+
+
+# --- selection ------------------------------------------------------------------
+
+
+def boruta(
+    x: np.ndarray, y: np.ndarray, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """R ``Boruta(maxRuns = 500, getImp = getImpRfRaw)`` (pValue 0.01, Bonferroni):
+    each run permutes the not-yet-rejected features into shadows (at least five),
+    scores a feature a hit when its importance beats the best shadow, and tests the
+    hits against Binomial(runs, 1/2). Returns the confirmed mask and every feature's
+    median importance over the runs it took part in (``attStats``' ``medianImp``)."""
+    from scipy.stats import binom
+
+    m = x.shape[1]
+    tentative, confirmed, rejected = 0, 1, 2
+    decision = np.zeros(m, dtype=np.int8)
+    hits = np.zeros(m)
+    history: list[np.ndarray] = []
+    runs = 0
+    while (decision == tentative).any() and runs + 1 < MAX_RUNS:
+        runs += 1
+        active = np.flatnonzero(decision != rejected)
+        real = x[:, active]
+        source = real
+        while source.shape[1] < 5:
+            source = np.concatenate([source, source], axis=1)
+        shadow = rng.permuted(source, axis=0)  # every column permuted on its own
+        imp = permutation_importance(np.concatenate([real, shadow], axis=1), y, rng)
+        full = np.full(m, -np.inf)
+        full[active] = imp[: len(active)]
+        history.append(full)
+        hits[full > imp[len(active) :].max()] += 1
+        accept = binom.sf(hits - 1, runs, 0.5) * m < P_VALUE
+        reject = binom.cdf(hits, runs, 0.5) * m < P_VALUE
+        open_ = decision == tentative
+        decision[open_ & accept] = confirmed
+        decision[open_ & reject] = rejected
+    stack = np.array(history)
+    stack[~np.isfinite(stack)] = np.nan
+    return decision == confirmed, np.nanmedian(stack, axis=0)
+
+
+def janitza_selected(importance: np.ndarray) -> np.ndarray | None:
+    """ranger ``importance_pvalues(method = "janitza")``: the null mirrors the
+    negative importances (zeros included); p-value 0 is a value above all of it.
+    ``None`` when no importance is negative (ranger raises, R skips the gene)."""
+    negative = importance[importance < 0]
+    if len(negative) == 0:
+        return None
+    return importance > (-negative).max()
+
+
+# --- the method -----------------------------------------------------------------
+
+
+def _gene(
+    gene: str,
+    y: np.ndarray,
+    x: np.ndarray,
+    names: np.ndarray,
+    mode: str,
+    seed: int,
+) -> tuple[str, pd.DataFrame, float]:
+    """One dependency gene: its NaN lines dropped (R ``na.omit``), its own expression
+    never a feature."""
+    from threadpoolctl import threadpool_limits
+
+    start = time.perf_counter()
+    keep = np.isfinite(y)
+    y, x = y[keep], x[keep][:, names != gene]
+    names = names[names != gene]
+    rng = np.random.default_rng(seed)  # R: set.seed(43) before every gene
+    with threadpool_limits(1):
+        if len(y) < MIN_LINES:
+            selected, importance = np.zeros(len(names), bool), np.zeros(len(names))
+        elif mode == "raw":
+            selected, importance = boruta(x, y, rng)
+        else:
+            importance = corrected_impurity(x, y, rng)
+            selected = janitza_selected(importance)
+            if selected is None:
+                selected = np.zeros(len(names), bool)
+    from scipy.stats import pearsonr
+
+    rows = []
+    for j in np.flatnonzero(selected):
+        # constant features give NaN, as cor.test errors there
+        result = pearsonr(y, x[:, j]) if x[:, j].std() > 0 else (np.nan, np.nan)
+        rows.append((gene, names[j], importance[j], result[0], result[1], mode))
+    return gene, pd.DataFrame(rows, columns=COLUMNS), time.perf_counter() - start
+
+
+def iter_paris(
+    dependency: pd.DataFrame,
+    expression: pd.DataFrame,
+    mode: str,
+    seed: int,
+    n_jobs: int,
+) -> Iterator[tuple[str, pd.DataFrame, float]]:
+    """``(dependency gene, its selected pairs, seconds)`` as each gene finishes. The
+    genes run on ``n_jobs`` processes, each forest on one thread."""
+    from joblib import Parallel, delayed
+
+    if mode not in MODES:
+        raise ValueError(f"mode {mode!r} is not one of {MODES}")
+    if not dependency.index.equals(expression.index):
+        raise ValueError("dependency and expression must be on the same lines")
+    if not np.isfinite(expression.to_numpy()).all():
+        raise ValueError("expression has missing values")
+    x = np.ascontiguousarray(expression.to_numpy(dtype=np.float32))
+    names = expression.columns.to_numpy(dtype=object)
+    y = dependency.to_numpy(dtype=np.float64)
+    jobs = (
+        delayed(_gene)(g, y[:, i], x, names, mode, seed)
+        for i, g in enumerate(dependency.columns)
+    )
+    yield from Parallel(n_jobs=n_jobs, return_as="generator_unordered")(jobs)
+
+
+def stack(parts: Sequence[pd.DataFrame]) -> pd.DataFrame:
+    full = [p for p in parts if len(p)] or [pd.DataFrame(columns=COLUMNS)]
+    out = pd.concat(full, ignore_index=True)
+    return out.sort_values(["dependency_gene", "feature_gene"], ignore_index=True)
+
+
+def paris(
+    dependency: pd.DataFrame,
+    expression: pd.DataFrame,
+    mode: str,
+    seed: int,
+    n_jobs: int,
+) -> pd.DataFrame:
+    """Selected ``(dependency_gene, feature_gene)`` pairs with their importance and
+    the Pearson r (and p-value) between the gene's dependency and the feature's
+    expression. Both inputs are lines x genes on the same lines."""
+    results = iter_paris(dependency, expression, mode, seed, n_jobs)
+    parts = [rows for _, rows, _ in results]
+    return stack(parts)
+
+
+# --- the command ----------------------------------------------------------------
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    """The stage-two config (``ladder_config``), or with ``sl_split`` the benchmark
+    config, which reads DepMap's tables."""
+    config = read_yaml(path)
+    keys = {"benchmark", "output_root", "task", "mode", "seed", "n_jobs"} | (
+        {"sl_split", "gene_effect", "expression"}
+        if "sl_split" in config
+        else {"ladder_config"}
+    )
+    require_keys(config, keys, "config")
+    if config["mode"] not in MODES:
+        raise ValueError(f"{path}: mode {config['mode']!r} is not one of {MODES}")
+    return config
+
+
+def reference_lines(ladder: Any, pairs: pd.DataFrame) -> list[str]:
+    """The stage-one frame minus every line of the SL benchmark: PARIS fits on them,
+    and stage two's context-ablated control averages over them."""
+    screened = set(pairs["model_id"].dropna())
+    return [m for m in ladder.frame if m not in screened]
+
+
+def sl_split_lines(path: Path) -> tuple[set[str], set[str]]:
+    """The SL split's training-side lines and its held-out lines."""
+    sides = json.loads(Path(path).read_text())
+    return (
+        {m for s in FIT_SIDES for m in sides[s]},
+        {m for s in HELD_SIDES for m in sides[s]},
+    )
+
+
+def labelled_pairs(labels: pd.DataFrame, lines: set[str]) -> pd.DataFrame:
+    """The benchmark's labelled (gene_a, gene_b) pairs in ``lines``."""
+    rows = labels[labels["label"].notna() & labels["model_id"].isin(lines)]
+    return rows[["gene_a", "gene_b"]].drop_duplicates().reset_index(drop=True)
+
+
+def benchmark_scores(
+    selected: pd.DataFrame,
+    pairs: pd.DataFrame,
+    dependency_genes: set[str],
+    feature_genes: set[str],
+) -> pd.DataFrame:
+    """Per (gene_a, gene_b): the largest importance of a selected pair with r > 0
+    (lower expression of the feature gene, stronger dependency) with either gene as
+    the dependency gene, else 0. ``covered``: a forest could select the pair (one gene
+    a dependency gene, the other a feature gene)."""
+    positive = selected[selected["r"] > 0]
+    importance = positive.groupby(["dependency_gene", "feature_gene"])[
+        "importance"
+    ].max()
+    a, b = pairs["gene_a"], pairs["gene_b"]
+    value = np.fmax(
+        importance.reindex(pd.MultiIndex.from_arrays([a, b])).to_numpy(np.float64),
+        importance.reindex(pd.MultiIndex.from_arrays([b, a])).to_numpy(np.float64),
+    )
+    covered = (a.isin(dependency_genes) & b.isin(feature_genes)) | (
+        b.isin(dependency_genes) & a.isin(feature_genes)
+    )
+    return pairs.assign(score=np.nan_to_num(value, nan=0.0), covered=covered)
+
+
+def benchmark_inputs(config: Mapping[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """DepMap's GeneEffect (the genes of the benchmark's held-out pairs) and bulk
+    expression (log2 TPM + 1, every protein-coding gene) on the SL split's
+    training-side lines that have both. No validation or test line enters."""
+    from src.data.depmap import read_depmap_matrix
+
+    fit, held = sl_split_lines(config["sl_split"])
+    effect = read_depmap_matrix(Path(config["gene_effect"]))
+    expression = read_depmap_matrix(Path(config["expression"]))
+    lines = sorted(fit & set(effect.index) & set(expression.index))
+    if set(lines) & held:
+        raise ValueError("an SL validation or test line is among the fit lines")
+    pairs = labelled_pairs(pd.read_parquet(config["benchmark"]), held)
+    genes = sorted((set(pairs["gene_a"]) | set(pairs["gene_b"])) & set(effect.columns))
+    return effect.loc[lines, genes], expression.loc[lines]
+
+
+def inputs(config: Mapping[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Dependency (GeneEffect units) and expression on the reference lines: the
+    stage-one frame minus every line of the SL screen benchmark, so no validation or
+    test line, and no line an SL row is scored on, enters."""
+    from src.data.ladder_reader import mean_channel
+    from src.experiments.stage_one.setup import load_setup
+
+    if "sl_split" in config:
+        return benchmark_inputs(config)
+    setup = load_setup(config["ladder_config"])
+    ladder = setup.ladder
+    pairs = pd.read_parquet(config["benchmark"])
+    lines = reference_lines(ladder, pairs)
+    if set(lines) & set(ladder.role_lines("val", "test")):
+        raise ValueError("a validation or test line is among the reference lines")
+    labelled = pairs[pairs["label"].notna()]
+    genes = sorted(set(labelled["gene_a"]) | set(labelled["gene_b"]))
+    genes = [g for g in genes if g in ladder.genes.index]
+    units = setup.truth(lines) * ladder.genes["sigma_g"] + ladder.genes["mu_g"]
+    return units[genes], mean_channel(ladder).loc[lines]
+
+
+def write_scores(
+    run_dir: Path,
+    config: Mapping[str, Any],
+    pairs: pd.DataFrame,
+    dependency: pd.DataFrame,
+    expression: pd.DataFrame,
+) -> None:
+    """The benchmark's pair scores (``benchmark_scores``) in the held-out lines and,
+    in sample, the training lines."""
+    labels = pd.read_parquet(
+        config["benchmark"], columns=["model_id", "gene_a", "gene_b", "label"]
+    )
+    sides = json.loads(Path(config["sl_split"]).read_text())
+    scores = benchmark_scores(
+        pairs,
+        labelled_pairs(labels, {m for s in SCORED_SIDES for m in sides[s]}),
+        set(dependency.columns),
+        set(expression.columns),
+    )
+    write_parquet(run_dir / "scores.parquet", scores)
+
+
+def run(
+    config: Mapping[str, Any],
+    run_id: str,
+    genes: int | None = None,
+    shard: tuple[int, int] | None = None,
+) -> Path:
+    """One PARIS run; ``shard`` (i, n) fits the dependency genes i, i + n, ... only,
+    and its pairs wait for ``merge``."""
+    run_dir = Path(config["output_root"]) / config["task"] / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    bound = {**config, "genes": genes}
+    if shard is not None:
+        bound["shard"] = f"{shard[0]}/{shard[1]}"
+    bind(run_dir, bound)
+    dependency, expression = inputs(config)
+    if genes is not None:
+        dependency = dependency.iloc[:, :genes]
+    if shard is not None:
+        dependency = dependency.iloc[:, shard[0] :: shard[1]]
+    start = time.perf_counter()
+    parts, seconds = [], []
+    results = iter_paris(
+        dependency, expression, config["mode"], config["seed"], config["n_jobs"]
+    )
+    for done, (gene, rows, took) in enumerate(results, 1):
+        parts.append(rows)
+        seconds.append(took)
+        print(
+            f"{done}/{dependency.shape[1]} {gene}: {len(rows)} pairs, {took:.1f}s",
+            flush=True,
+        )
+    wall = time.perf_counter() - start
+    pairs = stack(parts)
+    write_parquet(run_dir / "pairs.parquet", pairs)
+    if "sl_split" in config and shard is None:
+        write_scores(run_dir, config, pairs, dependency, expression)
+    write_json(
+        run_dir / "run.json",
+        {
+            "shard": bound.get("shard"),
+            "mode": config["mode"],
+            "n_jobs": config["n_jobs"],
+            "lines": len(dependency),
+            "dependency_genes": dependency.shape[1],
+            "feature_genes": expression.shape[1],
+            "selected_pairs": len(pairs),
+            "genes_with_selection": int(pairs["dependency_gene"].nunique()),
+            "wall_seconds": wall,
+            "wall_seconds_per_gene": wall / dependency.shape[1],
+            "mean_gene_seconds": float(np.mean(seconds)),
+        },
+    )
+    print(f"{run_dir}: done", flush=True)
+    return run_dir
+
+
+def merge(config: Mapping[str, Any], run_id: str, shards: Sequence[str]) -> Path:
+    """The pairs of shard runs i/n for every i < n, stacked, and their benchmark
+    scores, in the run ``run_id``."""
+    root = Path(config["output_root"]) / config["task"]
+    labels = [read_json(root / s / "run.json")["shard"] for s in shards]
+    counts = {label.split("/")[1] for label in labels}
+    expected = [f"{i}/{n}" for n in counts for i in range(int(n))]
+    if len(counts) != 1 or sorted(labels) != sorted(expected):
+        raise ValueError(f"shards {labels} are not every shard i/n of one n")
+    run_dir = root / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    bind(run_dir, {**config, "merged": sorted(shards)})
+    pairs = stack([pd.read_parquet(root / s / "pairs.parquet") for s in shards])
+    write_parquet(run_dir / "pairs.parquet", pairs)
+    dependency, expression = inputs(config)
+    write_scores(run_dir, config, pairs, dependency, expression)
+    write_json(
+        run_dir / "run.json",
+        {"shards": sorted(shards), "selected_pairs": len(pairs),
+         "dependency_genes": dependency.shape[1]},
+    )  # fmt: skip
+    print(f"{run_dir}: done", flush=True)
+    return run_dir
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("config", type=Path)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument(
+        "--genes", type=int, help="the first N dependency genes (pilot)"
+    )
+    parser.add_argument(
+        "--shard", help="I/N: the dependency genes I, I + N, ... (merge them after)"
+    )
+    parser.add_argument(
+        "--merge", nargs="+", metavar="RUN_ID", help="stack these shard runs"
+    )
+    args = parser.parse_args(argv)
+    config = load_config(args.config)
+    if args.merge:
+        merge(config, args.run_id, args.merge)
+        return 0
+    shard = None if args.shard is None else tuple(map(int, args.shard.split("/")))
+    run(config, args.run_id, args.genes, shard)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

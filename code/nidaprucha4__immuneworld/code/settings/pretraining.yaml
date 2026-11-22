@@ -1,0 +1,30 @@
+model:
+  genes: 2000
+  width: 768
+  layers: 12
+  heads: 8
+  expansion: 4
+  dropout: 0.1
+training:
+  epochs: 200
+  batch_size: 128
+  world_size: 4
+  gradient_accumulation: 1
+  effective_batch_size: 512
+  learning_rate: 0.0001
+  minimum_learning_rate: 0.000001
+  warmup_steps: 5000
+  optimizer: adamw
+  precision: fp16
+  seeds: [42, 123, 456]
+loss:
+  trajectory: 1.0
+  reconstruction: 0.5
+  perturbation: 0.3
+  adversarial: 0.1
+hardware:
+  accelerators: 4
+  accelerator: A100
+  memory_gb: 80
+  wall_clock_hours: 72
+  gpu_hours: 288

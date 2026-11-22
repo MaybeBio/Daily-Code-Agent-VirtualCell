@@ -1,0 +1,36 @@
+output_dir: output
+
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  # UC: patient batch by default; alternatives are batch_h (health) / batch_l (location).
+  dataset_batch_keys:
+    uc_epi: batch
+    uc_imm: batch
+  dataset_label_keys: {}
+  num_workers: 1
+  task: "clustering"
+  label_fields: ["celltype"]
+  covariate_fields:
+  ensembl_auto_conversion: True
+  hvg: 3000
+  test_dataset_name: bmmc
+
+model_cfg:
+  model: CellPLM
+  tasks: "annotation"
+
+evaluation_cfg:
+  clustering_mode: fixed
+  clustering_resolution: 1.0
+  n_neighbors: 15
+  correction_mode: native
+  compute_kbet: true
+  split_by: donor
+  perturbation_split: auto
+  strict_optional_metrics: false
+  reconstruction_top_k: 50
+  perturbation_top_k: 50
+  min_effect: 0.0
+  des_fdr: 0.05

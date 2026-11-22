@@ -1,0 +1,24 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: GeneCompass
+  tasks: embedding_extraction
+  variant: Small
+  weights_dir: weights/GeneCompass
+  source_dir: public_code/GeneCompass
+  backend_python: runtime_envs/genecompass/bin/python
+  backend_device: auto
+  inference_batch_size: 1
+  expression_layer: auto
+  max_length: 2048
+  organism: NCBITaxon:9606
+output_dir: output

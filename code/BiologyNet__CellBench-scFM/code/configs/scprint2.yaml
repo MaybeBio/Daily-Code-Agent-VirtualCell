@@ -1,0 +1,26 @@
+data_cfg:
+  dataset_name: bmmc
+  data_path: datasets
+  root_path: datasets
+  num_workers: 1
+  label_fields:
+  - celltype
+  covariate_fields: null
+  ensembl_auto_conversion: true
+  hvg: 3000
+  test_dataset_name: bmmc
+model_cfg:
+  model: scPRINT2
+  tasks: embedding_extraction
+  variant: small-v2
+  weights_dir: weights/scPRINT2
+  source_dir: public_code/scPRINT2
+  backend_python: runtime_envs/scprint2/bin/python
+  backend_device: auto
+  inference_batch_size: 1
+  inference_chunk_size: 256
+  expression_layer: auto
+  max_length: 2000
+  organism: NCBITaxon:9606
+  use_knn: false
+output_dir: output

@@ -1,8 +1,8 @@
 # 代码快照清单
 
 - 上游仓库: https://github.com/marakeby/scfm-benchscope
-- 快照日期: 2026-11-19
-- 快照 commit: [`656854a0b945`](https://github.com/marakeby/scfm-benchscope/commit/656854a0b9451502ccb28411126b8a0d3cd836dc)
+- 快照日期: 2026-11-22
+- 快照 commit: [`6d0f49d73d6c`](https://github.com/marakeby/scfm-benchscope/commit/6d0f49d73d6c49c584d3e927c031af4feac9209d)
 - 归档策略: `repo_copy=code` — **代码摘录,不是完整仓库**。保留源码、构建/配置文件、README、文档;数据、二进制、图片、权重不保留。
 
 ## 保留 (515 个文件, 7.6 MB)
