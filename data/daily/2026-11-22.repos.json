@@ -1,0 +1,236 @@
+[
+  {
+    "full_name": "torvalds/linux",
+    "who": [
+      "torvalds"
+    ],
+    "event": "push",
+    "stars": 256311,
+    "language": "C",
+    "description": "Linux kernel source tree",
+    "url": "https://github.com/torvalds/linux"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "Geraldo-Neto",
+      "Imaibih",
+      "Soujiro17",
+      "ateshakan",
+      "bgitit",
+      "mira-936",
+      "toto45638",
+      "xokacar"
+    ],
+    "event": "mixed",
+    "stars": 55111,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "NixOS/nixpkgs",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "push",
+    "stars": 26916,
+    "language": "Nix",
+    "description": "Nix Packages collection & NixOS",
+    "url": "https://github.com/NixOS/nixpkgs"
+  },
+  {
+    "full_name": "sgl-project/sglang-omni",
+    "who": [
+      "zhaochenyang20"
+    ],
+    "event": "push",
+    "stars": 1886,
+    "language": "Python",
+    "description": "High Performance Serving Runtime For Interactive Super Intelligence System",
+    "url": "https://github.com/sgl-project/sglang-omni"
+  },
+  {
+    "full_name": "bowang-lab/MedRAX",
+    "who": [
+      "asharma391"
+    ],
+    "event": "pr",
+    "stars": 1256,
+    "language": "Python",
+    "description": "MedRAX: Medical Reasoning Agent for Chest X-ray - ICML 2025",
+    "url": "https://github.com/bowang-lab/MedRAX"
+  },
+  {
+    "full_name": "bowang-lab/U-Mamba",
+    "who": [
+      "lneverd"
+    ],
+    "event": "star",
+    "stars": 1035,
+    "language": "Python",
+    "description": "U-Mamba: Enhancing Long-range Dependency for Biomedical Image Segmentation",
+    "url": "https://github.com/bowang-lab/U-Mamba"
+  },
+  {
+    "full_name": "scverse/anndata",
+    "who": [
+      "ilan-gold"
+    ],
+    "event": "other",
+    "stars": 786,
+    "language": "Python",
+    "description": "Annotated data.",
+    "url": "https://github.com/scverse/anndata"
+  },
+  {
+    "full_name": "scverse/squidpy",
+    "who": [
+      "codecov",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 615,
+    "language": "Python",
+    "description": "Spatial Single Cell Analysis in Python",
+    "url": "https://github.com/scverse/squidpy"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "who": [
+      "liujilei2233",
+      "xinghao-1210"
+    ],
+    "event": "star",
+    "stars": 608,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/OmicsML/awesome-foundation-model-single-cell-papers"
+  },
+  {
+    "full_name": "biomap-research/scFoundation",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 434,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/biomap-research/scFoundation"
+  },
+  {
+    "full_name": "scverse/rapids-singlecell",
+    "who": [
+      "Intron7",
+      "coderabbitai",
+      "github-actions"
+    ],
+    "event": "mixed",
+    "stars": 411,
+    "language": "Python",
+    "description": "rapids-singlecell: GPU-accelerated framework for scRNA analysis",
+    "url": "https://github.com/scverse/rapids-singlecell"
+  },
+  {
+    "full_name": "scverse/spatialdata",
+    "who": [
+      "Sizerta"
+    ],
+    "event": "issue",
+    "stars": 408,
+    "language": "Python",
+    "description": "An open and interoperable data framework for spatial omics data",
+    "url": "https://github.com/scverse/spatialdata"
+  },
+  {
+    "full_name": "stjude-rust-labs/sprocket",
+    "who": [
+      "read-the-docs-community"
+    ],
+    "event": "issue",
+    "stars": 223,
+    "language": "Rust",
+    "description": "A bioinformatics workflow engine built on top of the Workflow Description Language (WDL).",
+    "url": "https://github.com/stjude-rust-labs/sprocket"
+  },
+  {
+    "full_name": "scverse/mudata",
+    "who": [
+      "degoldschmidt"
+    ],
+    "event": "star",
+    "stars": 136,
+    "language": "Python",
+    "description": "Multimodal Data (.h5mu) implementation for Python",
+    "url": "https://github.com/scverse/mudata"
+  },
+  {
+    "full_name": "Nanostring-Biostats/CosMx-Analysis-Scratch-Space",
+    "who": [
+      "lidanwu"
+    ],
+    "event": "pr",
+    "stars": 121,
+    "language": "HTML",
+    "description": "This repository is an exploratory resource to accelerate opensource analysis of CosMx® Spatial Molecular Imager (SMI) data. Contained here are and writeups and vignettes addressing a variety of topics discussed when analyzing single-cell spatial data.",
+    "url": "https://github.com/Nanostring-Biostats/CosMx-Analysis-Scratch-Space"
+  },
+  {
+    "full_name": "refgenie/refgenie",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 74,
+    "language": "Python",
+    "description": "Reference genome resource manager",
+    "url": "https://github.com/refgenie/refgenie"
+  },
+  {
+    "full_name": "Lotfollahi-lab/Perturbgen",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 36,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/Perturbgen"
+  },
+  {
+    "full_name": "scverse/mantispy",
+    "who": [
+      "codecov-commenter",
+      "read-the-docs-community",
+      "review-notebook-app",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 18,
+    "language": "Python",
+    "description": "Analysis framework for morphological profiling data",
+    "url": "https://github.com/scverse/mantispy"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "who": [
+      "sebastianbirk"
+    ],
+    "event": "mixed",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the TERRA manuscript",
+    "url": "https://github.com/Lotfollahi-lab/terra-reproducibility"
+  },
+  {
+    "full_name": "sparkycz1/debcontrol",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 2,
+    "language": "Python",
+    "description": "Self-hosted web app for your Debian, Ubuntu and Proxmox fleet over SSH, no agents: updates with rollback, monitoring, Docker, Lynis security audits, uptime checks and status page, browser terminal, full REST API.",
+    "url": "https://github.com/sparkycz1/debcontrol"
+  }
+]

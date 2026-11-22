@@ -1,0 +1,21 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-22 06:33:45 | ⭐️ adRn-s starred Lotfollahi-lab/Perturbgen
+2026-11-22 06:33:25 | ⭐️ adRn-s starred biomap-research/scFoundation
+2026-11-22 02:57:56 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [8110977] (expanded) Merge origin/feat/compact-tokenized-data (silver scripts, checks, cohort links)
+2026-11-22 02:53:55 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [6e8a89d] (expanded) compare_silver_roots.py: meta level compares uns and obsm values
+2026-11-22 00:41:17 | 🔀 asharma391 opened PR in bowang-lab/MedRAX
+2026-11-21 22:15:06 | 🆕 sebastianbirk created branch 'feat/compact-tokenized-data' at Lotfollahi-lab/terra-reproducibility
+2026-11-21 19:57:16 | ⭐️ lneverd starred bowang-lab/U-Mamba
+2026-11-21 17:54:23 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [3fb1e38] (expanded) copy_missing_silver_folders.py: work for any tier, also when the destination tier folder is missing
+2026-11-21 17:50:08 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [97d0bc3] (expanded) prune_nfs_datasets.py: always keep kidney_perturbation
+2026-11-21 17:31:51 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [a26d545] (expanded) prune_nfs_datasets.py: --list prints the candidates only
+2026-11-21 17:11:42 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [755fe79] (expanded) copy_missing_silver_folders.py: parallel rsync streams
+2026-11-21 05:30:04 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [52ae61b] (expanded) Tie-break key from all cells that probe a gene; rows for every vocabulary gene

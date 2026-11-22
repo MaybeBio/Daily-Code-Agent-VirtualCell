@@ -1,0 +1,60 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-22 08:47:35 | 🚀 mweinelt pushed to NixOS/nixpkgs
+    - [2a835c8] (expanded) release-python: bump constituents to python 3.14
+2026-11-22 08:45:47 | 🍴 mira-936 forked alibaba/open-code-review
+2026-11-22 08:45:16 | ⭐️ toto45638 starred alibaba/open-code-review
+2026-11-22 08:40:09 | ⭐️ bgitit starred alibaba/open-code-review
+2026-11-22 08:34:45 | ⭐️ Geraldo-Neto starred alibaba/open-code-review
+2026-11-22 08:31:30 | ⭐️ Soujiro17 starred alibaba/open-code-review
+2026-11-22 08:25:41 | ⭐️ ateshakan starred alibaba/open-code-review
+2026-11-22 08:24:52 | ⭐️ Imaibih starred alibaba/open-code-review
+2026-11-22 08:24:28 | 🍴 Imaibih forked alibaba/open-code-review
+2026-11-22 08:24:01 | ⭐️ xokacar starred alibaba/open-code-review
+2026-11-22 07:50:40 | 💬 read-the-docs-community created issue 'feat: enable WDL v1.4 by default' in stjude-rust-labs/sprocket
+2026-11-22 07:23:34 | 🚀 torvalds pushed to torvalds/linux
+    - [e572847] (expanded) Merge tag 'trace-v7.4-rc3' of git://git.kernel.org/pub/scm/linux/kernel/git/trace/linux-trace
+2026-11-22 06:33:45 | ⭐️ adRn-s starred Lotfollahi-lab/Perturbgen
+2026-11-22 06:33:45 | ⭐️ adRn-s starred Lotfollahi-lab/Perturbgen
+2026-11-22 06:33:45 | ⭐️ adRn-s starred Lotfollahi-lab/Perturbgen
+2026-11-22 06:33:25 | ⭐️ adRn-s starred biomap-research/scFoundation
+2026-11-22 05:49:03 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-22 05:49:03 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-22 05:17:09 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-22 05:17:09 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-22 02:57:56 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [8110977] (expanded) Merge origin/feat/compact-tokenized-data (silver scripts, checks, cohort links)
+2026-11-22 02:53:55 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [6e8a89d] (expanded) compare_silver_roots.py: meta level compares uns and obsm values
+2026-11-22 01:29:08 | ⭐️ xinghao-1210 starred OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-22 00:16:00 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-22 00:15:07 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-22 00:04:44 | 💬 codecov-commenter created issue 'Default bootstrap_features to the weighted Stouffer gene test' in scverse/mantispy
+2026-11-21 23:57:59 | 💬 read-the-docs-community created issue 'Default bootstrap_features to the weighted Stouffer gene test' in scverse/mantispy
+2026-11-21 23:55:58 | 💬 review-notebook-app created issue 'Default bootstrap_features to the weighted Stouffer gene test' in scverse/mantispy
+2026-11-21 23:55:52 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-21 23:22:48 | 💬 codecov created issue 'fix(experimental.im): make weka tissue masks reproducible' in scverse/squidpy
+2026-11-21 23:06:15 | 🔀 timtreis opened PR in scverse/squidpy
+2026-11-21 22:46:52 | 💬 Sizerta created issue 'Categorical aggregate() (transcripts → cells count matrix) stores every (cell, gene) zero explicitly: memory ∝ n_cells × n_genes' in scverse/spatialdata
+2026-11-21 22:17:15 | ⭐️ degoldschmidt starred scverse/mudata
+2026-11-21 22:15:06 | 🆕 sebastianbirk created branch 'feat/compact-tokenized-data' at Lotfollahi-lab/terra-reproducibility
+2026-11-21 22:01:10 | 🔀 Intron7 opened PR in scverse/rapids-singlecell
+2026-11-21 22:01:09 | 🔀 github-actions unlabeled PR in scverse/rapids-singlecell
+2026-11-21 22:01:07 | 🔀 github-actions unlabeled PR in scverse/rapids-singlecell
+2026-11-21 22:01:03 | 💬 coderabbitai created issue 'Update dense and sparse covariance PCA for FP32 and FP64' in scverse/rapids-singlecell
+2026-11-21 22:00:45 | 🔀 Intron7 labeled PR in scverse/rapids-singlecell
+2026-11-21 22:00:44 | 🔀 Intron7 labeled PR in scverse/rapids-singlecell
+2026-11-21 20:22:37 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 20:22:37 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 20:22:37 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 19:33:18 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 19:33:17 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 19:33:17 | 🔹 coderabbitai performed PullRequestReviewCommentEvent on scverse/rapids-singlecell
+2026-11-21 17:34:12 | ⭐️ liujilei2233 starred OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-21 07:39:37 | 🔹 ilan-gold performed PullRequestReviewCommentEvent on scverse/anndata
+2026-11-21 05:36:22 | 🚀 nsheff pushed to refgenie/refgenie
+    - [517c932] (expanded) Require gtars 0.12.0
+2026-11-21 05:30:04 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [52ae61b] (expanded) Tie-break key from all cells that probe a gene; rows for every vocabulary gene
+2026-11-21 05:21:35 | 🚀 zhaochenyang20 pushed to sgl-project/sglang-omni
+    - [905b486] (expanded) [Voxt] Keep the beta green while the update service lacks the Voxt 2 manifest route (#4408)
