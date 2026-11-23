@@ -1,0 +1,354 @@
+[
+  {
+    "full_name": "torvalds/linux",
+    "who": [
+      "torvalds"
+    ],
+    "event": "push",
+    "stars": 256486,
+    "language": "C",
+    "description": "Linux kernel source tree",
+    "url": "https://github.com/torvalds/linux"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "HaiDatCT",
+      "Leoniasha",
+      "Lillian-Yo",
+      "justchillwkaiser",
+      "xtsteven"
+    ],
+    "event": "star",
+    "stars": 55423,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "alibaba/MNN",
+    "who": [
+      "NotK3lv1n27"
+    ],
+    "event": "star",
+    "stars": 16595,
+    "language": "C++",
+    "description": "MNN: A blazing-fast, lightweight inference engine battle-tested by Alibaba, powering high-performance on-device LLMs and Edge AI.",
+    "url": "https://github.com/alibaba/MNN"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "ThalesMMS",
+      "abdou23dz2",
+      "itsnimbus"
+    ],
+    "event": "mixed",
+    "stars": 4456,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "alibaba/MongoShake",
+    "who": [
+      "zhongli-james"
+    ],
+    "event": "issue",
+    "stars": 1824,
+    "language": "Go",
+    "description": "MongoShake is a universal data replication platform based on MongoDB's oplog. Redundant replication and active-active replication are two most important functions. 基于mongodb oplog的集群复制工具，可以满足迁移和同步的需求，进一步实现灾备和多活功能。",
+    "url": "https://github.com/alibaba/MongoShake"
+  },
+  {
+    "full_name": "scverse/scvi-tools",
+    "who": [
+      "LijiayuDeng"
+    ],
+    "event": "star",
+    "stars": 1734,
+    "language": "Python",
+    "description": "Deep probabilistic analysis of single-cell and spatial omics data",
+    "url": "https://github.com/scverse/scvi-tools"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "LijiayuDeng"
+    ],
+    "event": "star",
+    "stars": 1672,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "bowang-lab/MedRAX",
+    "who": [
+      "asharma391"
+    ],
+    "event": "pr",
+    "stars": 1256,
+    "language": "Python",
+    "description": "MedRAX: Medical Reasoning Agent for Chest X-ray - ICML 2025",
+    "url": "https://github.com/bowang-lab/MedRAX"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "manzhouwang"
+    ],
+    "event": "star",
+    "stars": 742,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "leanprover-community/riemann-hypothesis",
+    "who": [
+      "DiDeoxy"
+    ],
+    "event": "star",
+    "stars": 628,
+    "language": "Lean",
+    "description": "Independent Comparator setup for the Lean formalization of the Riemann Hypothesis (Alpöge, 2026-11-20)",
+    "url": "https://github.com/leanprover-community/riemann-hypothesis"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "who": [
+      "KalinNonchev",
+      "cyborgdnx",
+      "xinghao-1210"
+    ],
+    "event": "mixed",
+    "stars": 609,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/OmicsML/awesome-foundation-model-single-cell-papers"
+  },
+  {
+    "full_name": "biomap-research/scFoundation",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 434,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/biomap-research/scFoundation"
+  },
+  {
+    "full_name": "scverse/rapids-singlecell",
+    "who": [
+      "Intron7",
+      "dependabot",
+      "github-actions"
+    ],
+    "event": "pr",
+    "stars": 411,
+    "language": "Python",
+    "description": "rapids-singlecell: GPU-accelerated framework for scRNA analysis",
+    "url": "https://github.com/scverse/rapids-singlecell"
+  },
+  {
+    "full_name": "scverse/liana",
+    "who": [
+      "AtheerAS"
+    ],
+    "event": "issue",
+    "stars": 327,
+    "language": "Python",
+    "description": "LIANA+: an all-in-one framework for cell-cell communication",
+    "url": "https://github.com/scverse/liana"
+  },
+  {
+    "full_name": "theislab/chemCPA",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 164,
+    "language": "Jupyter Notebook",
+    "description": "Code for \"Predicting Cellular Responses to Novel Drug Perturbations at a Single-Cell Resolution\", NeurIPS 2022.",
+    "url": "https://github.com/theislab/chemCPA"
+  },
+  {
+    "full_name": "theislab/cpa",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 159,
+    "language": "Python",
+    "description": "The Compositional Perturbation Autoencoder (CPA) is a deep generative framework to learn effects of perturbations at the single-cell level. CPA performs OOD predictions of unseen combinations of drugs, learns interpretable embeddings, estimates dose-response curves, and provides uncertainty estimates.",
+    "url": "https://github.com/theislab/cpa"
+  },
+  {
+    "full_name": "alibaba/pairec",
+    "who": [
+      "TuBoShu-max",
+      "bruceding"
+    ],
+    "event": "mixed",
+    "stars": 159,
+    "language": "Go",
+    "description": "A Go web framework for quickly building recommendation online services based on JSON configuration.",
+    "url": "https://github.com/alibaba/pairec"
+  },
+  {
+    "full_name": "ch-bas/threejs-sims-house-builder",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 125,
+    "language": "TypeScript",
+    "description": "A browser-based 3D house builder inspired by The Sims. Design multi-floor homes with furniture, walls, roofs, and walkthrough mode. Built with Three.js + Next.js. ",
+    "url": "https://github.com/ch-bas/threejs-sims-house-builder"
+  },
+  {
+    "full_name": "Mic92/nix-grpc-store",
+    "who": [
+      "Mic92"
+    ],
+    "event": "other",
+    "stars": 74,
+    "language": "C++",
+    "description": "Nix remote store and build farm over gRPC: faster nix copy than ssh-ng, with mTLS and a scheduler for builders",
+    "url": "https://github.com/Mic92/nix-grpc-store"
+  },
+  {
+    "full_name": "codeling/bfstop",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 38,
+    "language": "PHP",
+    "description": "Brute Force Stop Plugin (for Joomla!)",
+    "url": "https://github.com/codeling/bfstop"
+  },
+  {
+    "full_name": "Lotfollahi-lab/Perturbgen",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 36,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/Perturbgen"
+  },
+  {
+    "full_name": "csoneson/countsimQC",
+    "who": [
+      "github-actions"
+    ],
+    "event": "push",
+    "stars": 31,
+    "language": "R",
+    "description": "countsimQC - Compare characteristic features of count data sets",
+    "url": "https://github.com/csoneson/countsimQC"
+  },
+  {
+    "full_name": "theislab/cpa-reproducibility",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 17,
+    "language": "Jupyter Notebook",
+    "description": "Notebooks for CPA figures",
+    "url": "https://github.com/theislab/cpa-reproducibility"
+  },
+  {
+    "full_name": "weili-lab/scMAGeCK",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 16,
+    "language": "R",
+    "description": "The R Bioconductor package for scMAGeCK.",
+    "url": "https://github.com/weili-lab/scMAGeCK"
+  },
+  {
+    "full_name": "theislab/pertpy-reproducibility",
+    "who": [
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/theislab/pertpy-reproducibility"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "who": [
+      "sebastianbirk"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the TERRA manuscript",
+    "url": "https://github.com/Lotfollahi-lab/terra-reproducibility"
+  },
+  {
+    "full_name": "sparkycz1/debcontrol",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 2,
+    "language": "Python",
+    "description": "Self-hosted web app for your Debian, Ubuntu and Proxmox fleet over SSH, no agents: updates with rollback, monitoring, Docker, Lynis security audits, uptime checks and status page, browser terminal, full REST API.",
+    "url": "https://github.com/sparkycz1/debcontrol"
+  },
+  {
+    "full_name": "pschatzmann/TinyEMail",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 1,
+    "language": "C++",
+    "description": "Header only C++ Arduino E-Mail Client Library",
+    "url": "https://github.com/pschatzmann/TinyEMail"
+  },
+  {
+    "full_name": "Team-6220/team6220.org",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 1,
+    "language": "TypeScript",
+    "description": "team6220.org - Main Public Website & Team Apps (some public, some private)",
+    "url": "https://github.com/Team-6220/team6220.org"
+  },
+  {
+    "full_name": "pkg/log.InitialLogger",
+    "who": [
+      "zhongli-james"
+    ],
+    "event": "issue",
+    "stars": 0,
+    "language": "",
+    "description": "",
+    "url": ""
+  },
+  {
+    "full_name": "Ding-Ding-Projects/home-assistant-material",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Ding-Ding-Projects/home-assistant-material"
+  }
+]
