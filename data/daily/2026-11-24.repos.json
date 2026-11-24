@@ -1,0 +1,882 @@
+[
+  {
+    "full_name": "torvalds/linux",
+    "who": [
+      "torvalds"
+    ],
+    "event": "push",
+    "stars": 256474,
+    "language": "C",
+    "description": "Linux kernel source tree",
+    "url": "https://github.com/torvalds/linux"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "chaojixinren",
+      "nyc-design",
+      "prnvmrli"
+    ],
+    "event": "mixed",
+    "stars": 55783,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "NixOS/nixpkgs",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "mixed",
+    "stars": 26935,
+    "language": "Nix",
+    "description": "Nix Packages collection & NixOS",
+    "url": "https://github.com/NixOS/nixpkgs"
+  },
+  {
+    "full_name": "NVIDIA/garak",
+    "who": [
+      "Zethson"
+    ],
+    "event": "star",
+    "stars": 10149,
+    "language": "Python",
+    "description": "the LLM vulnerability scanner",
+    "url": "https://github.com/NVIDIA/garak"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "abdou23dz2"
+    ],
+    "event": "mixed",
+    "stars": 4455,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "numtide/llm-agents.nix",
+    "who": [
+      "Mic92"
+    ],
+    "event": "mixed",
+    "stars": 2320,
+    "language": "Nix",
+    "description": "Nix packages for AI coding agents and development tools. Automatically updated daily.",
+    "url": "https://github.com/numtide/llm-agents.nix"
+  },
+  {
+    "full_name": "NVIDIA-NeMo/RL",
+    "who": [
+      "yuchenwang3"
+    ],
+    "event": "mixed",
+    "stars": 2152,
+    "language": "Python",
+    "description": "Scalable toolkit for efficient model reinforcement",
+    "url": "https://github.com/NVIDIA-NeMo/RL"
+  },
+  {
+    "full_name": "scverse/scvi-tools",
+    "who": [
+      "Xscienceai"
+    ],
+    "event": "star",
+    "stars": 1735,
+    "language": "Python",
+    "description": "Deep probabilistic analysis of single-cell and spatial omics data",
+    "url": "https://github.com/scverse/scvi-tools"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "jimin-kang-01"
+    ],
+    "event": "star",
+    "stars": 1673,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "rtp-llm-review-bot"
+    ],
+    "event": "mixed",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "theislab/single-cell-best-practices",
+    "who": [
+      "zarabash"
+    ],
+    "event": "star",
+    "stars": 1307,
+    "language": "Jupyter Notebook",
+    "description": "https://www.sc-best-practices.org",
+    "url": "https://github.com/theislab/single-cell-best-practices"
+  },
+  {
+    "full_name": "bowang-lab/U-Mamba",
+    "who": [
+      "Feng2100"
+    ],
+    "event": "star",
+    "stars": 1036,
+    "language": "Python",
+    "description": "U-Mamba: Enhancing Long-range Dependency for Biomedical Image Segmentation",
+    "url": "https://github.com/bowang-lab/U-Mamba"
+  },
+  {
+    "full_name": "COMBINE-lab/salmon",
+    "who": [
+      "rob-p"
+    ],
+    "event": "issue",
+    "stars": 946,
+    "language": "Rust",
+    "description": "🐟 🍣 🍱 Highly-accurate & wicked fast transcript-level quantification from RNA-seq reads using selective alignment",
+    "url": "https://github.com/COMBINE-lab/salmon"
+  },
+  {
+    "full_name": "leanprover-community/riemann-hypothesis",
+    "who": [
+      "DiDeoxy"
+    ],
+    "event": "star",
+    "stars": 899,
+    "language": "Lean",
+    "description": "Independent Comparator setup for the Lean formalization of the Riemann Hypothesis (Alpöge, 2026-11-20)",
+    "url": "https://github.com/leanprover-community/riemann-hypothesis"
+  },
+  {
+    "full_name": "OmicsML/awesome-foundation-model-single-cell-papers",
+    "who": [
+      "KalinNonchev"
+    ],
+    "event": "pr",
+    "stars": 609,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/OmicsML/awesome-foundation-model-single-cell-papers"
+  },
+  {
+    "full_name": "lucidrains/rectified-flow-pytorch",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 490,
+    "language": "Python",
+    "description": "Implementation of rectified flow and some of its followup research / improvements in Pytorch",
+    "url": "https://github.com/lucidrains/rectified-flow-pytorch"
+  },
+  {
+    "full_name": "alibaba/UnifiedModel",
+    "who": [
+      "qiansheng91"
+    ],
+    "event": "pr",
+    "stars": 467,
+    "language": "Go",
+    "description": "The semantic layer that makes enterprise data understandable to AI agents — model entities and relations once, query through SPL/MCP/REST, and connect telemetry, services, and business objects in one object graph.",
+    "url": "https://github.com/alibaba/UnifiedModel"
+  },
+  {
+    "full_name": "biomap-research/scFoundation",
+    "who": [
+      "Karashan"
+    ],
+    "event": "star",
+    "stars": 435,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/biomap-research/scFoundation"
+  },
+  {
+    "full_name": "scverse/spatialdata",
+    "who": [
+      "Zethson"
+    ],
+    "event": "other",
+    "stars": 408,
+    "language": "Python",
+    "description": "An open and interoperable data framework for spatial omics data",
+    "url": "https://github.com/scverse/spatialdata"
+  },
+  {
+    "full_name": "theislab/ehrapy",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 374,
+    "language": "Python",
+    "description": "Electronic Health Record Analysis with Python.",
+    "url": "https://github.com/theislab/ehrapy"
+  },
+  {
+    "full_name": "Genentech/gReLU",
+    "who": [
+      "avantikalal",
+      "github-actions"
+    ],
+    "event": "mixed",
+    "stars": 367,
+    "language": "Python",
+    "description": "gReLU is a python library to train, interpret, and apply deep learning models to DNA sequences.",
+    "url": "https://github.com/Genentech/gReLU"
+  },
+  {
+    "full_name": "scverse/pertpy",
+    "who": [
+      "Zethson"
+    ],
+    "event": "push",
+    "stars": 362,
+    "language": "Python",
+    "description": "Single-cell perturbation analysis",
+    "url": "https://github.com/scverse/pertpy"
+  },
+  {
+    "full_name": "alibaba/loongsuite-pilot",
+    "who": [
+      "linrunqi08"
+    ],
+    "event": "mixed",
+    "stars": 267,
+    "language": "TypeScript",
+    "description": "Local-first telemetry collector for AI coding agents — unified OpenTelemetry events for Claude Code, Codex, Cursor and more. Token usage, cost, traces and security audit, exported anywhere.",
+    "url": "https://github.com/alibaba/loongsuite-pilot"
+  },
+  {
+    "full_name": "stjude-rust-labs/sprocket",
+    "who": [
+      "claymcleod",
+      "peterhuene"
+    ],
+    "event": "other",
+    "stars": 223,
+    "language": "Rust",
+    "description": "A bioinformatics workflow engine built on top of the Workflow Description Language (WDL).",
+    "url": "https://github.com/stjude-rust-labs/sprocket"
+  },
+  {
+    "full_name": "numtide/iets",
+    "who": [
+      "Mic92"
+    ],
+    "event": "other",
+    "stars": 217,
+    "language": "Rust",
+    "description": "Fast Nix evaluator and remote-build client in Rust",
+    "url": "https://github.com/numtide/iets"
+  },
+  {
+    "full_name": "theislab/regvelo",
+    "who": [
+      "sachha-naksha"
+    ],
+    "event": "star",
+    "stars": 202,
+    "language": "Python",
+    "description": "inferring regulatory cellular dynamics",
+    "url": "https://github.com/theislab/regvelo"
+  },
+  {
+    "full_name": "theislab/cpa",
+    "who": [
+      "SugarfreeSoda",
+      "adRn-s"
+    ],
+    "event": "star",
+    "stars": 160,
+    "language": "Python",
+    "description": "The Compositional Perturbation Autoencoder (CPA) is a deep generative framework to learn effects of perturbations at the single-cell level. CPA performs OOD predictions of unseen combinations of drugs, learns interpretable embeddings, estimates dose-response curves, and provides uncertainty estimates.",
+    "url": "https://github.com/theislab/cpa"
+  },
+  {
+    "full_name": "theislab/anndata2ri",
+    "who": [
+      "flying-sheep"
+    ],
+    "event": "mixed",
+    "stars": 154,
+    "language": "Python",
+    "description": "Convert between AnnData and SingleCellExperiment",
+    "url": "https://github.com/theislab/anndata2ri"
+  },
+  {
+    "full_name": "bowang-lab/Orthrus",
+    "who": [
+      "czhang-cs"
+    ],
+    "event": "star",
+    "stars": 135,
+    "language": "Python",
+    "description": "  Orthrus is a mature RNA model for RNA property prediction. It uses a mamba encoder backbone, a variant of state-space models specifically designed for long-sequence data, such as RNA.",
+    "url": "https://github.com/bowang-lab/Orthrus"
+  },
+  {
+    "full_name": "hyparam/icebird",
+    "who": [
+      "megahall"
+    ],
+    "event": "pr",
+    "stars": 131,
+    "language": "JavaScript",
+    "description": "Icebird: JavaScript Iceberg Client",
+    "url": "https://github.com/hyparam/icebird"
+  },
+  {
+    "full_name": "scverse/spatialdata-io",
+    "who": [
+      "codecov-commenter",
+      "dependabot"
+    ],
+    "event": "mixed",
+    "stars": 108,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/scverse/spatialdata-io"
+  },
+  {
+    "full_name": "moo-man/WFRP4e-FoundryVTT",
+    "who": [
+      "kasperdanielhansen"
+    ],
+    "event": "mixed",
+    "stars": 106,
+    "language": "JavaScript",
+    "description": "The premiere system for running grim and perilous games of Warhammer Fantasy Role-play in the Foundry VTT environment.",
+    "url": "https://github.com/moo-man/WFRP4e-FoundryVTT"
+  },
+  {
+    "full_name": "scverse/cookiecutter-scverse",
+    "who": [
+      "Zethson"
+    ],
+    "event": "mixed",
+    "stars": 91,
+    "language": "Python",
+    "description": "Cookiecutter template for scverse",
+    "url": "https://github.com/scverse/cookiecutter-scverse"
+  },
+  {
+    "full_name": "scverse/spatialdata-plot",
+    "who": [
+      "jan-glx",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 89,
+    "language": "Python",
+    "description": "Static plotting for spatialdata",
+    "url": "https://github.com/scverse/spatialdata-plot"
+  },
+  {
+    "full_name": "theislab/DRVI",
+    "who": [
+      "codecov",
+      "moinfar",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 84,
+    "language": "Python",
+    "description": "Unsupervised Deep Disentangled Representation of Single-Cell Omics",
+    "url": "https://github.com/theislab/DRVI"
+  },
+  {
+    "full_name": "Mic92/nix-grpc-store",
+    "who": [
+      "Mic92"
+    ],
+    "event": "mixed",
+    "stars": 75,
+    "language": "C++",
+    "description": "Nix remote store and build farm over gRPC: faster nix copy than ssh-ng, with mTLS and a scheduler for builders",
+    "url": "https://github.com/Mic92/nix-grpc-store"
+  },
+  {
+    "full_name": "hyparam/hyparquet-writer",
+    "who": [
+      "megahall"
+    ],
+    "event": "mixed",
+    "stars": 68,
+    "language": "JavaScript",
+    "description": "Apache Parquet file writer in JavaScript",
+    "url": "https://github.com/hyparam/hyparquet-writer"
+  },
+  {
+    "full_name": "TUM-DSE/doctor-cluster-config",
+    "who": [
+      "Mic92"
+    ],
+    "event": "other",
+    "stars": 55,
+    "language": "Nix",
+    "description": "The servers configurations of https://dse.in.tum.de/",
+    "url": "https://github.com/TUM-DSE/doctor-cluster-config"
+  },
+  {
+    "full_name": "lucidrains/torch-einops-utils",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 55,
+    "language": "Python",
+    "description": "Some utility functions to help myself (and perhaps others) go faster with ML/AI work",
+    "url": "https://github.com/lucidrains/torch-einops-utils"
+  },
+  {
+    "full_name": "theislab/multigrate",
+    "who": [
+      "EfraMP",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 36,
+    "language": "Python",
+    "description": "Multigrate: multiomic data integration for single-cell genomics",
+    "url": "https://github.com/theislab/multigrate"
+  },
+  {
+    "full_name": "Lotfollahi-lab/Perturbgen",
+    "who": [
+      "delshadv"
+    ],
+    "event": "pr",
+    "stars": 36,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/Perturbgen"
+  },
+  {
+    "full_name": "Genentech/CLADD",
+    "who": [
+      "Siyang054"
+    ],
+    "event": "star",
+    "stars": 34,
+    "language": "Python",
+    "description": "The official source code for \"RAG-Enhanced Collaborative LLM Agents for Drug Discovery\"",
+    "url": "https://github.com/Genentech/CLADD"
+  },
+  {
+    "full_name": "COMBINE-lab/spearfish",
+    "who": [
+      "rob-p"
+    ],
+    "event": "push",
+    "stars": 30,
+    "language": "Rust",
+    "description": "Fast long-read RNA-seq mapping to a transcriptome with locally consistent parsing",
+    "url": "https://github.com/COMBINE-lab/spearfish"
+  },
+  {
+    "full_name": "BiocPy/genomicranges",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 28,
+    "language": "Python",
+    "description": "Container class to represent genomic locations and support genomic analysis",
+    "url": "https://github.com/BiocPy/genomicranges"
+  },
+  {
+    "full_name": "sokrypton/aoe",
+    "who": [
+      "sokrypton"
+    ],
+    "event": "push",
+    "stars": 25,
+    "language": "JavaScript",
+    "description": "Age of Epochs",
+    "url": "https://github.com/sokrypton/aoe"
+  },
+  {
+    "full_name": "scverse/mantispy",
+    "who": [
+      "codecov-commenter",
+      "read-the-docs-community",
+      "review-notebook-app",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 18,
+    "language": "Python",
+    "description": "Analysis framework for morphological profiling data",
+    "url": "https://github.com/scverse/mantispy"
+  },
+  {
+    "full_name": "fmicompbio/eisaR",
+    "who": [
+      "csoneson"
+    ],
+    "event": "push",
+    "stars": 18,
+    "language": "R",
+    "description": "Exon-Intron Split Analysis (EISA) in R",
+    "url": "https://github.com/fmicompbio/eisaR"
+  },
+  {
+    "full_name": "weili-lab/scMAGeCK",
+    "who": [
+      "adRn-s",
+      "davidliwei"
+    ],
+    "event": "mixed",
+    "stars": 16,
+    "language": "R",
+    "description": "The R Bioconductor package for scMAGeCK.",
+    "url": "https://github.com/weili-lab/scMAGeCK"
+  },
+  {
+    "full_name": "Genentech/scallops",
+    "who": [
+      "joshua-gould",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 16,
+    "language": "Python",
+    "description": "SCALLOPS (Scalable Library for Optical Pooled Screens) is a comprehensive Python package designed to streamline and scale the analysis of Optical Pooled Screens (OPS) for biological data. ",
+    "url": "https://github.com/Genentech/scallops"
+  },
+  {
+    "full_name": "theislab/ehrdata",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "pr",
+    "stars": 16,
+    "language": "Python",
+    "description": "A datastructure for EHR data",
+    "url": "https://github.com/theislab/ehrdata"
+  },
+  {
+    "full_name": "lucidrains/supermimic-pytorch",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 15,
+    "language": "Python",
+    "description": "Unofficial implementation of Supermimic, Scaling Humanoid Whole-Body Control with One Differentiable World Model, from Qiayuan Liao et al. of Berkeley",
+    "url": "https://github.com/lucidrains/supermimic-pytorch"
+  },
+  {
+    "full_name": "theislab/interscale",
+    "who": [
+      "flying-sheep",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 14,
+    "language": "Python",
+    "description": "InterScale: multi-scale cellular interaction analysis model for spatial transcriptomics",
+    "url": "https://github.com/theislab/interscale"
+  },
+  {
+    "full_name": "fmicompbio/mutscan",
+    "who": [
+      "csoneson"
+    ],
+    "event": "push",
+    "stars": 14,
+    "language": "R",
+    "description": "Software to process, statistically analyse and visualise deep mutational scanning data",
+    "url": "https://github.com/fmicompbio/mutscan"
+  },
+  {
+    "full_name": "theislab/mapqc",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 12,
+    "language": "Python",
+    "description": "MapQC - a metric for the evaluation of single-cell query-to-reference mappings",
+    "url": "https://github.com/theislab/mapqc"
+  },
+  {
+    "full_name": "Bioconductor/BiocContributions",
+    "who": [
+      "davidliwei"
+    ],
+    "event": "issue",
+    "stars": 9,
+    "language": "Python",
+    "description": "Bioconductor new package submission using GitHub Actions and R-universe",
+    "url": "https://github.com/Bioconductor/BiocContributions"
+  },
+  {
+    "full_name": "NixOS/nixos-status",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "other",
+    "stars": 9,
+    "language": "CSS",
+    "description": "The website showing an overview status of NixOS infra and CI.",
+    "url": "https://github.com/NixOS/nixos-status"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "who": [
+      "sebastianbirk"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the TERRA manuscript",
+    "url": "https://github.com/Lotfollahi-lab/terra-reproducibility"
+  },
+  {
+    "full_name": "Sentieon/mosaic",
+    "who": [
+      "brentp"
+    ],
+    "event": "star",
+    "stars": 7,
+    "language": "Python",
+    "description": "Scalable gVCF storage and joint calling",
+    "url": "https://github.com/Sentieon/mosaic"
+  },
+  {
+    "full_name": "acceleratescience/acceleratescience.github.io",
+    "who": [
+      "lawrennd",
+      "netlify"
+    ],
+    "event": "mixed",
+    "stars": 6,
+    "language": "HTML",
+    "description": "Website of the Accelerate Science Initiative",
+    "url": "https://github.com/acceleratescience/acceleratescience.github.io"
+  },
+  {
+    "full_name": "theislab/hidata",
+    "who": [
+      "LArnoldt",
+      "read-the-docs-community",
+      "review-notebook-app"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "Python",
+    "description": "Single-cell experiments measure cells but are designed around donors: patients, samples, guides, compounds. DonorData keeps these levels together in one object and aligned under every operation.",
+    "url": "https://github.com/theislab/hidata"
+  },
+  {
+    "full_name": "pepkit/pephubclient",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 3,
+    "language": "Python",
+    "description": "A tool to provide Python and CLI interface and Python API for PEPhub.",
+    "url": "https://github.com/pepkit/pephubclient"
+  },
+  {
+    "full_name": "lucidrains/SEA-pytorch",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 3,
+    "language": "Python",
+    "description": "Explorations into Scaling Empowered Agents, from Catherine Ji et al. of Eysenbach's group",
+    "url": "https://github.com/lucidrains/SEA-pytorch"
+  },
+  {
+    "full_name": "immcantation/alakazam",
+    "who": [
+      "colejensen",
+      "ggabernet",
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "R",
+    "description": "Alakazam is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq) and provides a set of tools to investigate lymphocyte receptor clonal lineages, diversity, gene usage, and other repertoire level properties, with a focus on high-throughput immunoglobulin (Ig) sequencing.",
+    "url": "https://github.com/immcantation/alakazam"
+  },
+  {
+    "full_name": "BiocPy/scrnaseq",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 3,
+    "language": "Python",
+    "description": "Collection of public single-cell RNA-seq datasets",
+    "url": "https://github.com/BiocPy/scrnaseq"
+  },
+  {
+    "full_name": "Genentech/DuckDBSpatial",
+    "who": [
+      "aboyounp-gne"
+    ],
+    "event": "push",
+    "stars": 2,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/DuckDBSpatial"
+  },
+  {
+    "full_name": "sparkycz1/debcontrol",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 2,
+    "language": "Python",
+    "description": "Self-hosted web app for your Debian, Ubuntu and Proxmox fleet over SSH, no agents: updates with rollback, monitoring, Docker, Lynis security audits, uptime checks and status page, browser terminal, full REST API.",
+    "url": "https://github.com/sparkycz1/debcontrol"
+  },
+  {
+    "full_name": "refgenie/refgenconf",
+    "who": [
+      "nsheff"
+    ],
+    "event": "push",
+    "stars": 2,
+    "language": "Python",
+    "description": "A Python object for standardized reference genome assets.",
+    "url": "https://github.com/refgenie/refgenconf"
+  },
+  {
+    "full_name": "bowang-lab/CryoDINO",
+    "who": [
+      "AAttarpour",
+      "charlesgchen"
+    ],
+    "event": "mixed",
+    "stars": 1,
+    "language": "Jupyter Notebook",
+    "description": "  3DINO pretraining on Cryo-electron tomograms with fine-tuning for particle and organelle identification using cutting-edge decoders.                                                                                          ",
+    "url": "https://github.com/bowang-lab/CryoDINO"
+  },
+  {
+    "full_name": "scverse/sp-ops",
+    "who": [
+      "dependabot"
+    ],
+    "event": "pr",
+    "stars": 1,
+    "language": "Python",
+    "description": "Prototype schema and APIs for OPS support in SpatialData",
+    "url": "https://github.com/scverse/sp-ops"
+  },
+  {
+    "full_name": "BiocPy/tiledbarray",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 1,
+    "language": "Python",
+    "description": "TileDB backed delayed arrays for Python",
+    "url": "https://github.com/BiocPy/tiledbarray"
+  },
+  {
+    "full_name": "immcantation/enchantr",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "other",
+    "stars": 1,
+    "language": "R",
+    "description": "enchantR provides additional quality control and reporting functions for other R packages in the Immcantation framework and is part of the magic behind nf-co.re/airrflow, a start-to-finish Nextflow pipeline to analyze AIRR-seq data.",
+    "url": "https://github.com/immcantation/enchantr"
+  },
+  {
+    "full_name": "scverse/gpu-ci-config",
+    "who": [
+      "Zethson"
+    ],
+    "event": "mixed",
+    "stars": 1,
+    "language": "Shell",
+    "description": "Update and Deploy GPU-CI AMI on AWS",
+    "url": "https://github.com/scverse/gpu-ci-config"
+  },
+  {
+    "full_name": "Genentech/basicBulk",
+    "who": [
+      "ben-laufer"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "R",
+    "description": "Repository for the basicBulk package",
+    "url": "https://github.com/Genentech/basicBulk"
+  },
+  {
+    "full_name": "Genentech/DuckDBGRanges",
+    "who": [
+      "aboyounp-gne"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/DuckDBGRanges"
+  },
+  {
+    "full_name": "slowkow/hmftools",
+    "who": [
+      "slowkow"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "Java",
+    "description": "Various algorithms for analysing genomics data",
+    "url": "https://github.com/slowkow/hmftools"
+  },
+  {
+    "full_name": "BiocPy/compressed-lists",
+    "who": [
+      "pre-commit-ci"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "Python",
+    "description": "Memory-efficient container for list-like objects",
+    "url": "https://github.com/BiocPy/compressed-lists"
+  },
+  {
+    "full_name": "immcantation/scoper",
+    "who": [
+      "ggabernet"
+    ],
+    "event": "mixed",
+    "stars": 0,
+    "language": "R",
+    "description": "SCOPer is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq). SCOPer provides a computational framework for the identification of B cell clonal relationships from Adaptive Immune Receptor Repertoire sequencing (AIRR-Seq) data.",
+    "url": "https://github.com/immcantation/scoper"
+  },
+  {
+    "full_name": "kkkklck/pertpy",
+    "who": [
+      "Zethson"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "Python",
+    "description": "Single-cell perturbation analysis",
+    "url": "https://github.com/kkkklck/pertpy"
+  }
+]

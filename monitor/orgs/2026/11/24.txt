@@ -1,0 +1,85 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-24 12:58:25 | ⭐️ sachha-naksha starred theislab/regvelo
+2026-11-24 11:57:26 | ⭐️ EfraMP starred theislab/multigrate
+2026-11-24 10:31:13 | ⭐️ Siyang054 starred Genentech/CLADD
+2026-11-24 08:54:42 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [72501e0] (expanded) Keep only the per-dataset DeePiCt/MemBrain sbatch restore
+2026-11-24 07:45:31 | 🔀 AAttarpour merged PR in bowang-lab/CryoDINO
+2026-11-24 07:43:03 | 🔀 AAttarpour opened PR in bowang-lab/CryoDINO
+2026-11-24 07:27:25 | 🚀 github-actions pushed to Genentech/gReLU
+    - [00e9dee] (expanded) deploy: 082d84cbff1ad7bdca1d0261cdf8ee9e9fabb9e4
+2026-11-24 07:22:44 | 🏷️  avantikalal published release v1.2.0 in Genentech/gReLU
+2026-11-24 07:20:17 | 🔹 avantikalal performed DeleteEvent on Genentech/gReLU
+2026-11-24 07:17:52 | 🚀 avantikalal pushed to Genentech/gReLU
+    - [082d84c] (expanded) Merge pull request #211 from Genentech/fix-docs-build
+2026-11-24 07:17:51 | 🔀 avantikalal merged PR in Genentech/gReLU
+2026-11-24 07:15:45 | 🔀 avantikalal opened PR in Genentech/gReLU
+2026-11-24 07:03:53 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [baea06c] (expanded) Merge pull request #306 from Genentech/pre-commit-ci-update-config
+2026-11-24 07:03:52 | 🔀 pre-commit-ci merged PR in Genentech/scallops
+2026-11-24 06:51:34 | 🔹 avantikalal performed DeleteEvent on Genentech/gReLU
+2026-11-24 06:51:16 | 🔀 avantikalal merged PR in Genentech/gReLU
+2026-11-24 06:38:14 | 🔀 avantikalal opened PR in Genentech/gReLU
+2026-11-24 06:20:56 | 🔹 moinfar performed DeleteEvent on theislab/DRVI
+2026-11-24 06:20:53 | 🔀 pre-commit-ci merged PR in theislab/DRVI
+2026-11-24 06:02:17 | 💬 read-the-docs-community created issue 'Rename donordata to hidata' in theislab/hidata
+2026-11-24 06:00:29 | 💬 review-notebook-app created issue 'Rename donordata to hidata' in theislab/hidata
+2026-11-24 06:00:22 | 🔀 LArnoldt opened PR in theislab/hidata
+2026-11-24 04:32:41 | 💬 codecov created issue ' pre-commit autoupdate' in theislab/DRVI
+2026-11-24 04:32:02 | 🚀 pre-commit-ci pushed to theislab/multigrate
+    - [638b9df] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 04:31:26 | 🚀 pre-commit-ci pushed to theislab/interscale
+    - [a5710d9] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 04:31:13 | 🚀 pre-commit-ci pushed to theislab/mapqc
+    - [c831aa1] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 04:30:28 | 🚀 pre-commit-ci pushed to theislab/multigrate
+    - [7d77c4b] (expanded)  pre-commit autoupdate
+2026-11-24 04:30:28 | 🚀 pre-commit-ci pushed to theislab/ehrapy
+    - [2e1cf59] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 04:30:16 | 🔀 pre-commit-ci opened PR in theislab/ehrdata
+2026-11-24 04:30:12 | 🚀 pre-commit-ci pushed to theislab/DRVI
+    - [af842a1] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 04:29:53 | 🆕 pre-commit-ci created branch 'pre-commit-ci-update-config' at theislab/ehrapy
+2026-11-24 04:29:53 | 🆕 pre-commit-ci created branch 'pre-commit-ci-update-config' at theislab/DRVI
+2026-11-24 04:29:53 | 🔀 pre-commit-ci opened PR in theislab/DRVI
+2026-11-24 04:29:53 | 🔀 pre-commit-ci opened PR in theislab/ehrapy
+2026-11-24 04:26:05 | 🔹 ben-laufer performed PublicEvent on Genentech/basicBulk
+2026-11-24 04:06:49 | 🆕 pre-commit-ci created branch 'pre-commit-ci-update-config' at Genentech/scallops
+2026-11-24 04:06:49 | 🔀 pre-commit-ci opened PR in Genentech/scallops
+2026-11-24 03:37:08 | 🔹 joshua-gould performed DeleteEvent on Genentech/scallops
+2026-11-24 03:37:06 | 🔀 joshua-gould merged PR in Genentech/scallops
+2026-11-24 03:00:20 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [fca9255] (expanded) Updated theme to furo
+2026-11-24 02:57:29 | ⭐️ SugarfreeSoda starred theislab/cpa
+2026-11-24 02:37:32 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [51f8d1b] (expanded) filelock==4.3.1
+2026-11-24 00:56:14 | 🚀 aboyounp-gne pushed to Genentech/DuckDBSpatial
+    - [82fec83] (expanded) add Spatial to biocViews
+2026-11-24 00:55:09 | 🚀 aboyounp-gne pushed to Genentech/DuckDBGRanges
+    - [477490d] (expanded) Add the Coverage biocView (0.99.14)
+2026-11-23 23:29:32 | ⭐️ Karashan starred biomap-research/scFoundation
+2026-11-23 23:26:04 | 🚀 delshadv pushed to Lotfollahi-lab/Perturbgen
+    - [3d94d7b] (expanded) Merge pull request #103 from Lotfollahi-lab/docs/tutorial-structure
+2026-11-23 23:23:18 | 🆕 delshadv created branch 'docs/tutorial-structure' at Lotfollahi-lab/Perturbgen
+2026-11-23 22:49:42 | 🔀 joshua-gould opened PR in Genentech/scallops
+2026-11-23 22:49:24 | 🆕 joshua-gould created branch 'reqs-11-23-26' at Genentech/scallops
+2026-11-23 21:53:15 | ⭐️ zarabash starred theislab/single-cell-best-practices
+2026-11-23 20:26:39 | 🚀 flying-sheep pushed to theislab/anndata2ri
+    - [d7f2136] (expanded) docs: fix badge
+2026-11-23 20:25:33 | 🏷️  flying-sheep published release v3.0.0 in theislab/anndata2ri
+2026-11-23 20:23:19 | 🐛 flying-sheep closed issue in theislab/anndata2ri: 'Support DelayedMatrix assays'
+2026-11-23 20:23:17 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-23 20:23:16 | 🚀 flying-sheep pushed to theislab/anndata2ri
+    - [7642680] (expanded) feat: DelayedMatrix / H5ADMatrix / LowRankMatrix support (#321)
+2026-11-23 19:46:20 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-23 19:34:49 | 🆕 flying-sheep created branch 'fix-dia' at theislab/anndata2ri
+2026-11-23 18:52:58 | 🔹 flying-sheep performed DeleteEvent on theislab/anndata2ri
+2026-11-23 18:38:32 | 🔹 flying-sheep performed DeleteEvent on theislab/interscale
+2026-11-23 18:06:21 | ⭐️ czhang-cs starred bowang-lab/Orthrus
+2026-11-23 15:53:55 | ⭐️ Feng2100 starred bowang-lab/U-Mamba
+2026-11-23 15:53:01 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [39140b9] (expanded) Concatenation and part checks: handle full-corpus sizes, write the corpus atomically
+2026-11-23 14:37:36 | ⭐️ jimin-kang-01 starred bowang-lab/scGPT
+2026-11-23 05:16:15 | ⭐️ abdou23dz2 starred bowang-lab/MedSAM
+2026-11-23 05:16:03 | 🐛 abdou23dz2 opened issue in bowang-lab/MedSAM: 'Médical'

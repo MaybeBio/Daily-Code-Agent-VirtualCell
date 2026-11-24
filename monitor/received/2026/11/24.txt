@@ -1,0 +1,194 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-24 13:04:52 | ⭐️ prnvmrli starred alibaba/open-code-review
+2026-11-24 13:03:02 | 🔹 chaojixinren performed PullRequestReviewEvent on alibaba/open-code-review
+2026-11-24 13:02:51 | 🔹 linrunqi08 performed PullRequestReviewEvent on alibaba/loongsuite-pilot
+2026-11-24 13:02:48 | 💬 linrunqi08 created issue 'fix(installer): accept PowerShell True for hook tamper protection' in alibaba/loongsuite-pilot
+2026-11-24 13:02:39 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 13:02:20 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:59:59 | 🔀 qiansheng91 opened PR in alibaba/UnifiedModel
+2026-11-24 12:59:43 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:58:31 | 💬 yuchenwang3 created issue 'refactor(workers)!: unify worker class selection through config' in NVIDIA-NeMo/RL
+2026-11-24 12:57:48 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:57:34 | 🔹 yuchenwang3 performed PullRequestReviewEvent on NVIDIA-NeMo/RL
+2026-11-24 12:57:27 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:57:27 | ⭐️ nyc-design starred alibaba/open-code-review
+2026-11-24 12:57:03 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:57:00 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:56:36 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:56:08 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-24 12:55:48 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:55:36 | 🔹 yuchenwang3 performed PullRequestReviewCommentEvent on NVIDIA-NeMo/RL
+2026-11-24 12:54:04 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:51:40 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:51:24 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 12:50:32 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-24 11:55:03 | 💬 codecov-commenter created issue 'List the covariance errors in hit_calling's Raises' in scverse/mantispy
+2026-11-24 11:52:15 | ⭐️ brentp starred Sentieon/mosaic
+2026-11-24 11:47:50 | 💬 read-the-docs-community created issue 'List the covariance errors in hit_calling's Raises' in scverse/mantispy
+2026-11-24 11:46:14 | 🐛 timtreis closed issue in scverse/mantispy: 'Backlog: agreed method work packages not yet filed as issues'
+2026-11-24 11:46:12 | 💬 timtreis created issue 'Backlog: agreed method work packages not yet filed as issues' in scverse/mantispy
+2026-11-24 11:46:10 | 🐛 timtreis closed issue in scverse/mantispy: 'tl.map: n_jobs=None still uses every core'
+2026-11-24 11:46:08 | 💬 timtreis created issue 'tl.map: n_jobs=None still uses every core' in scverse/mantispy
+2026-11-24 11:46:07 | 🐛 timtreis closed issue in scverse/mantispy: 'Migrate pp.harmony to scanpy's core harmony_integrate once 1.13 is stable'
+2026-11-24 11:46:05 | 💬 timtreis created issue 'Migrate pp.harmony to scanpy's core harmony_integrate once 1.13 is stable' in scverse/mantispy
+2026-11-24 11:46:03 | 🐛 timtreis closed issue in scverse/mantispy: 'Publish to PyPI and submit to scverse ecosystem-packages'
+2026-11-24 11:46:01 | 💬 timtreis created issue 'Publish to PyPI and submit to scverse ecosystem-packages' in scverse/mantispy
+2026-11-24 11:45:48 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-24 10:57:06 | 🔀 kasperdanielhansen opened PR in moo-man/WFRP4e-FoundryVTT
+2026-11-24 10:54:47 | 🍴 kasperdanielhansen forked moo-man/WFRP4e-FoundryVTT
+2026-11-24 10:51:10 | 🔀 megahall opened PR in hyparam/hyparquet-writer
+2026-11-24 10:42:11 | 🔀 megahall opened PR in hyparam/icebird
+2026-11-24 10:39:37 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-24 10:38:32 | ⭐️ Xscienceai starred scverse/scvi-tools
+2026-11-24 10:32:13 | 🐛 rob-p opened issue in COMBINE-lab/salmon: '--meta disables range factorization, which costs 15–36× accuracy on strain-level metagenome sims'
+2026-11-24 10:27:14 | 💬 codecov-commenter created issue 'Bump the pre-commit group across 1 directory with 4 updates' in scverse/spatialdata-io
+2026-11-24 10:24:30 | 🔀 dependabot labeled PR in scverse/spatialdata-io
+2026-11-24 10:24:30 | 🔀 dependabot labeled PR in scverse/spatialdata-io
+2026-11-24 10:24:29 | 🔀 dependabot opened PR in scverse/spatialdata-io
+2026-11-24 10:24:21 | 💬 dependabot created issue 'Bump the pre-commit group with 3 updates' in scverse/spatialdata-io
+2026-11-24 10:23:38 | 🔀 dependabot closed PR in scverse/spatialdata-io
+2026-11-24 09:54:04 | 🔹 timtreis performed PullRequestReviewEvent on scverse/spatialdata-plot
+2026-11-24 09:51:12 | 🔀 timtreis merged PR in scverse/mantispy
+2026-11-24 09:40:49 | 🔀 jan-glx merged PR in scverse/spatialdata-plot
+2026-11-24 09:29:10 | 🍴 megahall forked hyparam/hyparquet-writer
+2026-11-24 09:07:01 | 🔹 mweinelt performed DeleteEvent on NixOS/nixpkgs
+2026-11-24 09:06:57 | 🔀 mweinelt merged PR in NixOS/nixpkgs
+2026-11-24 09:02:25 | 💬 codecov-commenter created issue 'Re-execute the docs notebooks for 0.1.0a5 and compare speed with Brieflow' in scverse/mantispy
+2026-11-24 08:58:04 | 💬 mweinelt created issue 'home-assistant: 2026.11.2 -> 2026.11.3' in NixOS/nixpkgs
+2026-11-24 08:56:22 | 💬 read-the-docs-community created issue 'Re-execute the docs notebooks for 0.1.0a5 and compare speed with Brieflow' in scverse/mantispy
+2026-11-24 08:54:18 | 💬 review-notebook-app created issue 'Re-execute the docs notebooks for 0.1.0a5 and compare speed with Brieflow' in scverse/mantispy
+2026-11-24 08:54:10 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-24 08:11:19 | 💬 mweinelt created issue 'nixos/phpfpm: more aggressive hardening' in NixOS/nixpkgs
+2026-11-24 08:09:56 | 🔹 mweinelt performed PullRequestReviewEvent on NixOS/nixos-status
+2026-11-24 08:03:18 | 🔀 dependabot labeled PR in scverse/sp-ops
+2026-11-24 08:03:18 | 🔀 dependabot labeled PR in scverse/sp-ops
+2026-11-24 08:03:16 | 🔀 dependabot opened PR in scverse/sp-ops
+2026-11-24 08:01:27 | 🚀 mweinelt pushed to NixOS/nixpkgs
+    - [38437c2] (expanded) home-assistant-custom-lovelace-modules.windrose-card: 2.7.0 -> 2.8.1
+2026-11-24 07:58:29 | 🔹 mweinelt performed PullRequestReviewEvent on NixOS/nixpkgs
+2026-11-24 07:58:28 | 🔹 mweinelt performed PullRequestReviewCommentEvent on NixOS/nixpkgs
+2026-11-24 07:47:22 | 🔹 claymcleod performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 07:47:22 | 🔹 claymcleod performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 07:47:22 | 🔹 claymcleod performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 07:47:22 | 🔹 claymcleod performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 07:06:57 | 🆕 mweinelt created branch 'wip-home-assistant' at NixOS/nixpkgs
+2026-11-24 05:07:52 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 05:02:01 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 04:50:11 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 04:48:44 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 04:16:27 | 🔹 claude performed GollumEvent on sparkycz1/debcontrol
+2026-11-24 03:47:26 | 🔀 davidliwei opened PR in weili-lab/scMAGeCK
+2026-11-24 03:47:25 | 🆕 davidliwei created branch 'fix/bioc-review-round2-mechanical' at weili-lab/scMAGeCK
+2026-11-24 03:29:53 | 🚀 lucidrains pushed to lucidrains/supermimic-pytorch
+    - [3296544] (expanded) toy experiment section in readme
+2026-11-24 03:20:43 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 03:17:08 | 🔹 peterhuene performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 02:57:29 | ⭐️ SugarfreeSoda starred theislab/cpa
+2026-11-24 02:53:16 | 🚀 nsheff pushed to refgenie/refgenconf
+    - [2d2a8fe] (expanded) Run full ruff lint in CI
+2026-11-24 02:53:15 | 🚀 nsheff pushed to pepkit/pephubclient
+    - [a86e4b9] (expanded) Use shared ruff lint workflow
+2026-11-24 02:15:41 | 🚀 slowkow pushed to slowkow/hmftools
+    - [25aea11] (expanded) esvee-rs: read the BWA image through once on a network file system
+2026-11-24 02:09:21 | 🚀 lucidrains pushed to lucidrains/SEA-pytorch
+    - [77babb4] (expanded) add sample truncated geometric
+2026-11-24 01:45:59 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:44:51 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:44:46 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:43:38 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:42:55 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:42:44 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 01:42:29 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-24 00:59:29 | 🚀 sokrypton pushed to sokrypton/aoe
+    - [f1a94fa] (expanded) The ridden dragon aims its fire at its target, and the flame stays on it (NET 44)
+2026-11-24 00:57:32 | 🔀 ggabernet opened PR in immcantation/alakazam
+2026-11-24 00:55:40 | 🔹 ggabernet performed PullRequestReviewEvent on immcantation/alakazam
+2026-11-24 00:55:38 | 🔹 claymcleod performed PullRequestReviewCommentEvent on stjude-rust-labs/sprocket
+2026-11-24 00:55:36 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-24 00:55:29 | 🔹 ggabernet performed PullRequestReviewEvent on immcantation/alakazam
+2026-11-24 00:55:24 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-24 00:35:01 | 🚀 pre-commit-ci pushed to BiocPy/tiledbarray
+    - [7bdb54b] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 00:34:04 | 🚀 lucidrains pushed to lucidrains/rectified-flow-pytorch
+    - [5dbc05d] (expanded) oops
+2026-11-24 00:33:59 | 🚀 pre-commit-ci pushed to BiocPy/scrnaseq
+    - [cbf1d29] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 00:32:27 | 🚀 pre-commit-ci pushed to BiocPy/compressed-lists
+    - [0a2d14b] (expanded)  auto fixes from pre-commit.com hooks
+2026-11-24 00:31:52 | 🚀 pre-commit-ci pushed to BiocPy/genomicranges
+    - [b98aca2] (expanded)  pre-commit autoupdate
+2026-11-24 00:14:52 | ⭐️ Zethson starred NVIDIA/garak
+2026-11-24 00:05:48 | 🔀 colejensen merged PR in immcantation/alakazam
+2026-11-24 00:02:40 | 🔹 ssnn-airr performed PullRequestReviewEvent on immcantation/enchantr
+2026-11-23 23:57:53 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/enchantr
+2026-11-23 23:55:31 | 💬 ggabernet created issue 'Reimplemented split_light' in immcantation/scoper
+2026-11-23 23:54:40 | 🚀 ggabernet pushed to immcantation/scoper
+    - [c08e96a] (expanded) Update R/Functions.R
+2026-11-23 23:54:18 | 🔹 ggabernet performed PullRequestReviewEvent on immcantation/scoper
+2026-11-23 23:54:18 | 🔹 ggabernet performed PullRequestReviewEvent on immcantation/scoper
+2026-11-23 23:49:27 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/enchantr
+2026-11-23 23:47:54 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/enchantr
+2026-11-23 23:26:03 | 🔀 delshadv merged PR in Lotfollahi-lab/Perturbgen
+2026-11-23 23:26:03 | 🔀 delshadv merged PR in Lotfollahi-lab/Perturbgen
+2026-11-23 23:23:31 | 🔀 delshadv opened PR in Lotfollahi-lab/Perturbgen
+2026-11-23 23:23:31 | 🔀 delshadv opened PR in Lotfollahi-lab/Perturbgen
+2026-11-23 23:21:21 | 🚀 Zethson pushed to scverse/pertpy
+    - [a38f406] (expanded) Exclude control from DistanceTest multiple-testing correction (#1200)
+2026-11-23 23:20:36 | 🚀 Zethson pushed to kkkklck/pertpy
+    - [1c720bc] (expanded) Merge branch 'main' into fix/distance-test-exclude-control
+2026-11-23 23:16:14 | 🔹 ssnn-airr performed PullRequestReviewEvent on immcantation/alakazam
+2026-11-23 23:16:08 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-23 22:38:31 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/scoper
+2026-11-23 22:35:25 | 💬 netlify created issue 'Add Six Years of AI in Science scroll-story' in acceleratescience/acceleratescience.github.io
+2026-11-23 22:35:09 | 🔀 lawrennd opened PR in acceleratescience/acceleratescience.github.io
+2026-11-23 22:31:46 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/scoper
+2026-11-23 22:29:19 | 💬 ggabernet created issue 'Reimplemented split_light' in immcantation/alakazam
+2026-11-23 22:27:58 | 🔹 ggabernet performed PullRequestReviewEvent on immcantation/alakazam
+2026-11-23 22:27:50 | 🔹 ggabernet performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-23 21:53:15 | ⭐️ zarabash starred theislab/single-cell-best-practices
+2026-11-23 20:49:30 | 🔹 Zethson performed PullRequestReviewEvent on scverse/spatialdata
+2026-11-23 20:48:41 | 💬 Zethson created issue 'docs: take the Python requirement on the installation page from Requires-Python' in scverse/cookiecutter-scverse
+2026-11-23 20:48:02 | 🔹 Zethson performed PullRequestReviewEvent on scverse/cookiecutter-scverse
+2026-11-23 20:48:00 | 🔹 Zethson performed PullRequestReviewEvent on scverse/cookiecutter-scverse
+2026-11-23 20:47:29 | 🔹 Zethson performed PullRequestReviewCommentEvent on scverse/cookiecutter-scverse
+2026-11-23 20:46:04 | 🔹 Zethson performed PullRequestReviewEvent on scverse/spatialdata
+2026-11-23 20:46:04 | 🔹 Zethson performed PullRequestReviewEvent on scverse/spatialdata
+2026-11-23 20:45:43 | 🔹 Zethson performed PullRequestReviewCommentEvent on scverse/spatialdata
+2026-11-23 20:42:20 | 🔹 ssnn-airr performed PullRequestReviewEvent on immcantation/alakazam
+2026-11-23 20:42:02 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-23 20:32:25 | 🔹 ssnn-airr performed PullRequestReviewCommentEvent on immcantation/alakazam
+2026-11-23 18:19:39 | 🔹 Zethson performed DeleteEvent on scverse/gpu-ci-config
+2026-11-23 18:19:38 | 🚀 Zethson pushed to scverse/gpu-ci-config
+    - [50d2d0d] (expanded) Bump aws-actions/configure-aws-credentials from 6.2.3 to 6.3.0 (#17)
+2026-11-23 16:23:10 | 🔹 Mic92 performed DeleteEvent on TUM-DSE/doctor-cluster-config
+2026-11-23 15:55:20 | 🔹 Mic92 performed DeleteEvent on Mic92/nix-grpc-store
+2026-11-23 15:53:01 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [39140b9] (expanded) Concatenation and part checks: handle full-corpus sizes, write the corpus atomically
+2026-11-23 14:37:36 | ⭐️ jimin-kang-01 starred bowang-lab/scGPT
+2026-11-23 12:29:14 | 🚀 lucidrains pushed to lucidrains/rectified-flow-pytorch
+    - [2692580] (expanded) fix citation
+2026-11-23 09:50:03 | 🔀 KalinNonchev merged PR in OmicsML/awesome-foundation-model-single-cell-papers
+2026-11-23 04:21:39 | ⭐️ adRn-s starred weili-lab/scMAGeCK
+2026-11-23 04:21:38 | ⭐️ adRn-s starred theislab/cpa
+2026-11-23 03:56:45 | 🚀 slowkow pushed to slowkow/hmftools
+    - [5cd881f] (expanded) esvee-rs: prep, corrected claiming of cached reads without per-read bookkeeping
+2026-11-23 03:15:58 | 🔹 Mic92 performed DeleteEvent on numtide/llm-agents.nix
+2026-11-23 03:14:14 | 🆕 Mic92 created branch 'codex-serial' at numtide/llm-agents.nix
+2026-11-23 02:32:39 | 🚀 Mic92 pushed to Mic92/nix-grpc-store
+    - [1602786] (expanded) client: a fitting hint when the server asks who we are
+2026-11-23 02:26:34 | 🚀 torvalds pushed to torvalds/linux
+    - [2dc60bd] (expanded) Merge tag 'rust-fixes-7.4-4' of git://git.kernel.org/pub/scm/linux/kernel/git/ojeda/linux
+2026-11-23 02:23:30 | 🚀 csoneson pushed to fmicompbio/eisaR
+    - [0c80adb] (expanded) Merge pull request #45 from fmicompbio/fix-gha
+2026-11-23 02:22:38 | 🚀 csoneson pushed to fmicompbio/mutscan
+    - [6f51a00] (expanded) Use codecov token via env variable
+2026-11-23 01:57:53 | 🚀 Mic92 pushed to Mic92/nix-grpc-store
+    - [fc3c327] (expanded) scheduler: write log lines after releasing the mutex
+2026-11-23 01:56:00 | 🚀 slowkow pushed to slowkow/hmftools
+    - [0c6f752] (expanded) esvee-rs: correct 61 Java findings by default, -java_compat for Java behaviour
+2026-11-23 01:49:37 | 🚀 rob-p pushed to COMBINE-lab/spearfish
+    - [264f637] (expanded) splice: one solve bounds both strands at a read end; a gene against its processed pseudogenes
+2026-11-23 01:34:46 | 🚀 lucidrains pushed to lucidrains/torch-einops-utils
+    - [54823d0] (expanded) add a device dtype helper
+2026-11-23 01:00:34 | 🔹 Mic92 performed DeleteEvent on numtide/iets
