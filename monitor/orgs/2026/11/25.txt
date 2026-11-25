@@ -1,0 +1,48 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-25 05:54:14 | 🔀 jshleap opened PR in Genentech/scallops
+2026-11-25 01:29:00 | 🔀 joshua-gould opened PR in Genentech/scallops
+2026-11-25 00:48:04 | ⭐️ jinhapark086 starred bowang-lab/MedSAM
+2026-11-24 23:10:18 | 🆕 aboyounp-gne created branch 'RELEASE_3_24' at Genentech/DuckDBDataFrame
+2026-11-24 23:10:09 | 🚀 aboyounp-gne pushed to Genentech/DuckDBDataFrame
+    - [1bd25f4] (expanded) bump x.y.z version to odd y following creation of RELEASE_3_24 branch
+2026-11-24 22:58:10 | 🔀 joshua-gould merged PR in Genentech/scallops
+2026-11-24 22:01:44 | ⭐️ VinyehShaw starred bowang-lab/CryoDINO
+2026-11-24 21:25:54 | 🔀 joshua-gould opened PR in Genentech/scallops
+2026-11-24 20:56:17 | 🚀 github-actions pushed to Genentech/midasHLA
+    - [275bb7e] (expanded) Built site for midasHLA@1.21.1: 6a11d6d
+2026-11-24 20:50:17 | 🔹 mcjmigdal performed DeleteEvent on Genentech/midasHLA
+2026-11-24 20:50:13 | 🐛 mcjmigdal closed issue in Genentech/midasHLA: 'how to use Match_kir_nomenclature_gene.txt?'
+2026-11-24 20:50:11 | 🚀 mcjmigdal pushed to Genentech/midasHLA
+    - [6a11d6d] (expanded) Merge pull request #51 from Genentech/remove-unused-kir-match-files
+2026-11-24 20:50:11 | 🔀 mcjmigdal merged PR in Genentech/midasHLA
+2026-11-24 20:50:09 | 🔀 mcjmigdal merged PR in Genentech/midasHLA
+2026-11-24 19:54:47 | ⭐️ kaojay starred bowang-lab/MedSAM
+2026-11-24 19:44:12 | ⭐️ zrenjun starred bowang-lab/ecg-fm
+2026-11-24 19:31:24 | ⭐️ Changed-cc starred Lotfollahi-lab/MUSS_neurips26
+2026-11-24 18:16:24 | ⭐️ drhmoosavi starred bowang-lab/BioReason-Pro
+2026-11-24 16:44:48 | ⭐️ amni880 starred bowang-lab/MedSAM
+2026-11-24 15:50:02 | ⭐️ liubyang630susn-netizen starred bowang-lab/scGPT
+2026-11-24 14:59:34 | ⭐️ WenzyWong starred bowang-lab/scGPT
+2026-11-24 14:23:34 | ⭐️ nimeyer22 starred bowang-lab/ecg-fm
+2026-11-24 08:54:42 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [72501e0] (expanded) Keep only the per-dataset DeePiCt/MemBrain sbatch restore
+2026-11-24 07:57:55 | 🚀 AAttarpour pushed to bowang-lab/CryoDINO
+    - [d4f4486] (expanded)  escape asterisks in README author line
+2026-11-24 07:45:32 | 🚀 AAttarpour pushed to bowang-lab/CryoDINO
+    - [4ac6ce8] (expanded) Clean release of CryoDINO (#1)
+2026-11-24 07:45:31 | 🔀 AAttarpour merged PR in bowang-lab/CryoDINO
+2026-11-24 07:43:03 | 🔀 AAttarpour opened PR in bowang-lab/CryoDINO
+2026-11-24 07:41:40 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [3f17e7a] (expanded) revert changes, add back filler paths
+2026-11-24 07:40:05 | 🆕 AAttarpour created branch 'release-clean' at bowang-lab/CryoDINO
+2026-11-24 07:17:10 | 🚀 avantikalal pushed to Genentech/gReLU
+    - [ec9a941] (expanded) Revert workflow split; keep docs and PyPI publish in a single job
+2026-11-24 07:15:43 | 🆕 avantikalal created branch 'fix-docs-build' at Genentech/gReLU
+2026-11-24 07:03:55 | 🔹 joshua-gould performed DeleteEvent on Genentech/scallops
+2026-11-24 05:50:58 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [1133cc4] (expanded) add hf placehodler link
+2026-11-24 03:37:07 | 🚀 joshua-gould pushed to Genentech/scallops
+    - [ad3b9d1] (expanded) Merge pull request #305 from Genentech/reqs-11-23-26
+2026-11-24 03:20:05 | 🚀 charlesgchen pushed to bowang-lab/CryoDINO
+    - [9cc4a4b] (expanded) add logo
