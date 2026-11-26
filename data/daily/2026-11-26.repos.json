@@ -1,0 +1,612 @@
+[
+  {
+    "full_name": "Leonxlnx/taste-skill",
+    "who": [
+      "huangy10"
+    ],
+    "event": "star",
+    "stars": 121612,
+    "language": "JavaScript",
+    "description": "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages",
+    "url": "https://github.com/Leonxlnx/taste-skill"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "404-deprecated",
+      "dang1104363663",
+      "fxia0018",
+      "iluv7",
+      "lhm166",
+      "ridixcr",
+      "sodri126"
+    ],
+    "event": "mixed",
+    "stars": 56403,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "alibaba/spring-cloud-alibaba",
+    "who": [
+      "wrm244"
+    ],
+    "event": "star",
+    "stars": 29158,
+    "language": "Java",
+    "description": "Spring Cloud Alibaba provides a one-stop solution for application development for the distributed solutions of Alibaba middleware.",
+    "url": "https://github.com/alibaba/spring-cloud-alibaba"
+  },
+  {
+    "full_name": "NixOS/nixpkgs",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "push",
+    "stars": 26958,
+    "language": "Nix",
+    "description": "Nix Packages collection & NixOS",
+    "url": "https://github.com/NixOS/nixpkgs"
+  },
+  {
+    "full_name": "alibaba/Sentinel",
+    "who": [
+      "ahuiiiiiii"
+    ],
+    "event": "star",
+    "stars": 23146,
+    "language": "Java",
+    "description": "A powerful flow control component enabling reliability, resilience and monitoring for microservices. (面向云原生微服务的高可用流控防护组件)",
+    "url": "https://github.com/alibaba/Sentinel"
+  },
+  {
+    "full_name": "bloomberg/memray",
+    "who": [
+      "mweinelt"
+    ],
+    "event": "pr",
+    "stars": 15424,
+    "language": "Python",
+    "description": "Memray is a memory profiler for Python",
+    "url": "https://github.com/bloomberg/memray"
+  },
+  {
+    "full_name": "THUDM/slime",
+    "who": [
+      "bodhiyang"
+    ],
+    "event": "star",
+    "stars": 8872,
+    "language": "Python",
+    "description": "slime is an LLM training framework for RL Scaling.",
+    "url": "https://github.com/THUDM/slime"
+  },
+  {
+    "full_name": "alibaba/jvm-sandbox",
+    "who": [
+      "wardforce"
+    ],
+    "event": "star",
+    "stars": 6959,
+    "language": "Java",
+    "description": "Real - time non-invasive AOP framework container based on JVM",
+    "url": "https://github.com/alibaba/jvm-sandbox"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "alexiaherlea"
+    ],
+    "event": "star",
+    "stars": 4459,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "alibaba/ROLL",
+    "who": [
+      "tardis-key"
+    ],
+    "event": "issue",
+    "stars": 3459,
+    "language": "Python",
+    "description": "An Efficient and User-Friendly Scaling Library for Reinforcement Learning with Large Language Models",
+    "url": "https://github.com/alibaba/ROLL"
+  },
+  {
+    "full_name": "scverse/scanpy",
+    "who": [
+      "Copilot",
+      "codecov",
+      "himavanthkar",
+      "maceradario15-hub"
+    ],
+    "event": "mixed",
+    "stars": 2624,
+    "language": "Python",
+    "description": "Single-cell analysis in Python. Scales to >100M cells.",
+    "url": "https://github.com/scverse/scanpy"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "DanaA66",
+      "Lan-xm",
+      "xwyj060520"
+    ],
+    "event": "star",
+    "stars": 1678,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/skill-up",
+    "who": [
+      "chatgpt-codex-connector",
+      "karanb192"
+    ],
+    "event": "mixed",
+    "stars": 1522,
+    "language": "Go",
+    "description": "Evaluate Agent Skills and environments. Evolve Skills with evidence.",
+    "url": "https://github.com/alibaba/skill-up"
+  },
+  {
+    "full_name": "alibaba/lumenx",
+    "who": [
+      "gaopsyche-manman"
+    ],
+    "event": "star",
+    "stars": 1510,
+    "language": "TypeScript",
+    "description": "LumenX Studio，AI 短漫剧一站式生产平台。它能够将小说文本转化为动态视频，打通了从剧本分析、角色定制、分镜绘制到视频合成的完整创作链路。",
+    "url": "https://github.com/alibaba/lumenx"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "qyinf",
+      "rtp-llm-review-bot"
+    ],
+    "event": "pr",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "harbor-framework/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "pr",
+    "stars": 972,
+    "language": "Python",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/harbor-framework/terminal-bench-science"
+  },
+  {
+    "full_name": "macs3-project/MACS",
+    "who": [
+      "mg-200"
+    ],
+    "event": "star",
+    "stars": 791,
+    "language": "Python",
+    "description": "MACS -- Model-based Analysis of ChIP-Seq",
+    "url": "https://github.com/macs3-project/MACS"
+  },
+  {
+    "full_name": "scverse/anndata",
+    "who": [
+      "codecov",
+      "dependabot",
+      "read-the-docs-community"
+    ],
+    "event": "mixed",
+    "stars": 788,
+    "language": "Python",
+    "description": "Annotated data.",
+    "url": "https://github.com/scverse/anndata"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "nldhuyen0047"
+    ],
+    "event": "star",
+    "stars": 743,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "lucidrains/rectified-flow-pytorch",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 490,
+    "language": "Python",
+    "description": "Implementation of rectified flow and some of its followup research / improvements in Pytorch",
+    "url": "https://github.com/lucidrains/rectified-flow-pytorch"
+  },
+  {
+    "full_name": "theislab/ehrapy",
+    "who": [
+      "1511878618",
+      "eroell",
+      "pre-commit-ci"
+    ],
+    "event": "mixed",
+    "stars": 375,
+    "language": "Python",
+    "description": "Electronic Health Record Analysis with Python.",
+    "url": "https://github.com/theislab/ehrapy"
+  },
+  {
+    "full_name": "numtide/iets",
+    "who": [
+      "Mic92"
+    ],
+    "event": "issue",
+    "stars": 217,
+    "language": "Rust",
+    "description": "Fast Nix evaluator and remote-build client in Rust",
+    "url": "https://github.com/numtide/iets"
+  },
+  {
+    "full_name": "alibaba/neug",
+    "who": [
+      "longbinlai",
+      "neug-agent"
+    ],
+    "event": "mixed",
+    "stars": 182,
+    "language": "C++",
+    "description": "The one data index for your agentic applications",
+    "url": "https://github.com/alibaba/neug"
+  },
+  {
+    "full_name": "lucidrains/x-ppo",
+    "who": [
+      "lucidrains"
+    ],
+    "event": "push",
+    "stars": 132,
+    "language": "Python",
+    "description": "An implementation of PPO in Pytorch",
+    "url": "https://github.com/lucidrains/x-ppo"
+  },
+  {
+    "full_name": "334456777/WeFlow",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 58,
+    "language": "Rust",
+    "description": "WeChat data export & analysis tool with Rust CLI（WeFlow Fork）",
+    "url": "https://github.com/334456777/WeFlow"
+  },
+  {
+    "full_name": "NygenAnalytics/CyteArc",
+    "who": [
+      "crazyhottommy"
+    ],
+    "event": "star",
+    "stars": 50,
+    "language": "Python",
+    "description": "Fast, out-of-core single-cell analysis in Python for RNA, ATAC, protein, and multi-omic data, scaling to 100M+ cells. Mount remote datasets, work within a memory budget, and trace every result through built-in provenance.",
+    "url": "https://github.com/NygenAnalytics/CyteArc"
+  },
+  {
+    "full_name": "theislab/scConcept",
+    "who": [
+      "yifdai"
+    ],
+    "event": "star",
+    "stars": 44,
+    "language": "Python",
+    "description": "Contrastive pre-training for technology-agnostic single-cell representations beyond reconstruction",
+    "url": "https://github.com/theislab/scConcept"
+  },
+  {
+    "full_name": "csoneson/countsimQC",
+    "who": [
+      "csoneson",
+      "github-actions"
+    ],
+    "event": "mixed",
+    "stars": 31,
+    "language": "R",
+    "description": "countsimQC - Compare characteristic features of count data sets",
+    "url": "https://github.com/csoneson/countsimQC"
+  },
+  {
+    "full_name": "COMBINE-lab/spearfish",
+    "who": [
+      "rob-p"
+    ],
+    "event": "push",
+    "stars": 30,
+    "language": "Rust",
+    "description": "Fast long-read RNA-seq mapping to a transcriptome with locally consistent parsing",
+    "url": "https://github.com/COMBINE-lab/spearfish"
+  },
+  {
+    "full_name": "scverse/mantispy",
+    "who": [
+      "codecov-commenter",
+      "read-the-docs-community",
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 18,
+    "language": "Python",
+    "description": "Analysis framework for morphological profiling data",
+    "url": "https://github.com/scverse/mantispy"
+  },
+  {
+    "full_name": "theislab/ehrdata",
+    "who": [
+      "dependabot",
+      "eroell",
+      "pre-commit-ci"
+    ],
+    "event": "pr",
+    "stars": 16,
+    "language": "Python",
+    "description": "A datastructure for EHR data",
+    "url": "https://github.com/theislab/ehrdata"
+  },
+  {
+    "full_name": "Genentech/scallops",
+    "who": [
+      "joshua-gould"
+    ],
+    "event": "branch",
+    "stars": 16,
+    "language": "Python",
+    "description": "SCALLOPS (Scalable Library for Optical Pooled Screens) is a comprehensive Python package designed to streamline and scale the analysis of Optical Pooled Screens (OPS) for biological data. ",
+    "url": "https://github.com/Genentech/scallops"
+  },
+  {
+    "full_name": "immcantation/immcantation",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "push",
+    "stars": 15,
+    "language": "Jupyter Notebook",
+    "description": "The Immcantation Portal",
+    "url": "https://github.com/immcantation/immcantation"
+  },
+  {
+    "full_name": "theislab/interscale",
+    "who": [
+      "LLehner",
+      "read-the-docs-community"
+    ],
+    "event": "issue",
+    "stars": 14,
+    "language": "Python",
+    "description": "InterScale: multi-scale cellular interaction analysis model for spatial transcriptomics",
+    "url": "https://github.com/theislab/interscale"
+  },
+  {
+    "full_name": "Lotfollahi-lab/terra-reproducibility",
+    "who": [
+      "sebastianbirk"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "Jupyter Notebook",
+    "description": "Reproducible analyses for the TERRA manuscript",
+    "url": "https://github.com/Lotfollahi-lab/terra-reproducibility"
+  },
+  {
+    "full_name": "theislab/chimera",
+    "who": [
+      "nhilgert"
+    ],
+    "event": "star",
+    "stars": 7,
+    "language": "Jupyter Notebook",
+    "description": "Cross-species scRNA-seq integration with learnable per-gene evolutionary gating",
+    "url": "https://github.com/theislab/chimera"
+  },
+  {
+    "full_name": "Lotfollahi-lab/MUSS_neurips26",
+    "who": [
+      "sachha-naksha"
+    ],
+    "event": "mixed",
+    "stars": 6,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/MUSS_neurips26"
+  },
+  {
+    "full_name": "Mic92/hestia-beta",
+    "who": [
+      "Mic92"
+    ],
+    "event": "push",
+    "stars": 6,
+    "language": "Rust",
+    "description": "Beta/test release fork of hestia",
+    "url": "https://github.com/Mic92/hestia-beta"
+  },
+  {
+    "full_name": "acceleratescience/acceleratescience.github.io",
+    "who": [
+      "lawrennd"
+    ],
+    "event": "pr",
+    "stars": 6,
+    "language": "HTML",
+    "description": "Website of the Accelerate Science Initiative",
+    "url": "https://github.com/acceleratescience/acceleratescience.github.io"
+  },
+  {
+    "full_name": "Genentech/BiocDuckDB",
+    "who": [
+      "aboyounp-gne"
+    ],
+    "event": "push",
+    "stars": 5,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/BiocDuckDB"
+  },
+  {
+    "full_name": "theislab/hidata",
+    "who": [
+      "LArnoldt"
+    ],
+    "event": "mixed",
+    "stars": 4,
+    "language": "Python",
+    "description": "Single-cell experiments measure cells but are designed around donors: patients, samples, guides, compounds. HiData keeps these levels together in one object and aligned under every operation.",
+    "url": "https://github.com/theislab/hidata"
+  },
+  {
+    "full_name": "theislab/spatialdata-db-client",
+    "who": [
+      "timtreis"
+    ],
+    "event": "mixed",
+    "stars": 3,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/theislab/spatialdata-db-client"
+  },
+  {
+    "full_name": "immcantation/alakazam",
+    "who": [
+      "github-actions",
+      "ssnn-airr"
+    ],
+    "event": "push",
+    "stars": 3,
+    "language": "R",
+    "description": "Alakazam is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq) and provides a set of tools to investigate lymphocyte receptor clonal lineages, diversity, gene usage, and other repertoire level properties, with a focus on high-throughput immunoglobulin (Ig) sequencing.",
+    "url": "https://github.com/immcantation/alakazam"
+  },
+  {
+    "full_name": "Genentech/DuckDBSpatial",
+    "who": [
+      "aboyounp-gne"
+    ],
+    "event": "push",
+    "stars": 2,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/DuckDBSpatial"
+  },
+  {
+    "full_name": "Genentech/DuckDBDataFrame",
+    "who": [
+      "aboyounp-gne"
+    ],
+    "event": "push",
+    "stars": 2,
+    "language": "R",
+    "description": "",
+    "url": "https://github.com/Genentech/DuckDBDataFrame"
+  },
+  {
+    "full_name": "theislab/boundannbatch",
+    "who": [
+      "cvduffy"
+    ],
+    "event": "star",
+    "stars": 1,
+    "language": "Python",
+    "description": "Declarative multi-source streaming over annbatch",
+    "url": "https://github.com/theislab/boundannbatch"
+  },
+  {
+    "full_name": "Lotfollahi-lab/SIGMMA",
+    "who": [
+      "DabinJeong"
+    ],
+    "event": "mixed",
+    "stars": 1,
+    "language": "Python",
+    "description": "SIGMMA: A multi-modal learning framework that integrates H&E histology with spatially resolved single-cell transcriptomics to reveal multi-scale tissue organization and molecular heterogeneity.",
+    "url": "https://github.com/Lotfollahi-lab/SIGMMA"
+  },
+  {
+    "full_name": "theislab/idtrack-reproducibility",
+    "who": [
+      "inecik"
+    ],
+    "event": "push",
+    "stars": 1,
+    "language": "Python",
+    "description": "Benchmarks of idtrack and their results: the accuracy of gene identifier conversion across Ensembl releases, assemblies and databases, against independent truth, with known limitations",
+    "url": "https://github.com/theislab/idtrack-reproducibility"
+  },
+  {
+    "full_name": "theislab/idtrack-web",
+    "who": [
+      "inecik"
+    ],
+    "event": "push",
+    "stars": 1,
+    "language": "TypeScript",
+    "description": "Web app of idtrack: convert gene identifiers across Ensembl releases, genome assemblies and databases from a browser or over HTTP (api and frontend)",
+    "url": "https://github.com/theislab/idtrack-web"
+  },
+  {
+    "full_name": "review/scan",
+    "who": [
+      "lizhengfeng101"
+    ],
+    "event": "issue",
+    "stars": 0,
+    "language": "",
+    "description": "",
+    "url": ""
+  },
+  {
+    "full_name": "ShareMate-Swent/sharemate",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "Kotlin",
+    "description": "SwEnt App of our group",
+    "url": "https://github.com/ShareMate-Swent/sharemate"
+  },
+  {
+    "full_name": "XrxcGH/OpenNote",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "TypeScript",
+    "description": "OpenNote is an open-source note-taking app for Windows. It brings writing, drawing, and recording together in one notebook, for professional and personal use. Windows comes first. macOS, Linux, iOS, and Android follow.",
+    "url": "https://github.com/XrxcGH/OpenNote"
+  },
+  {
+    "full_name": "immcantation/scoper",
+    "who": [
+      "colejensen",
+      "ggabernet",
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 0,
+    "language": "R",
+    "description": "SCOPer is part of the Immcantation analysis framework for Adaptive Immune Receptor Repertoire sequencing (AIRR-seq). SCOPer provides a computational framework for the identification of B cell clonal relationships from Adaptive Immune Receptor Repertoire sequencing (AIRR-Seq) data.",
+    "url": "https://github.com/immcantation/scoper"
+  }
+]

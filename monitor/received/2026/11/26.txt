@@ -1,0 +1,119 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-26 11:18:12 | 🐛 lizhengfeng101 closed issue in alibaba/open-code-review: 'Support --provider flag in ocr review/scan commands for runtime LLM provider override'
+2026-11-26 11:17:49 | ⭐️ sodri126 starred alibaba/open-code-review
+2026-11-26 11:17:20 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-26 11:17:20 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-26 11:17:20 | 🔀 qyinf merged PR in alibaba/rtp-llm
+2026-11-26 11:16:24 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 11:16:24 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 11:15:22 | 💬 chatgpt-codex-connector created issue 'fix(evaluator): reject a repo_fixture that is not a directory' in alibaba/skill-up
+2026-11-26 11:15:07 | 🔀 karanb192 opened PR in alibaba/skill-up
+2026-11-26 11:13:08 | 💬 read-the-docs-community created issue 'Keep CellProfiler identifiers and positions out of X, and keep rowless wells' in scverse/mantispy
+2026-11-26 11:12:29 | 💬 chatgpt-codex-connector created issue 'fix(config): warn when a selected case has no checks' in alibaba/skill-up
+2026-11-26 11:12:20 | 🔀 karanb192 opened PR in alibaba/skill-up
+2026-11-26 11:12:10 | 🔹 longbinlai performed PullRequestReviewEvent on alibaba/neug
+2026-11-26 11:12:09 | 🔹 longbinlai performed PullRequestReviewEvent on alibaba/neug
+2026-11-26 11:12:06 | 🔹 longbinlai performed PullRequestReviewCommentEvent on alibaba/neug
+2026-11-26 11:11:38 | ⭐️ Lan-xm starred bowang-lab/scGPT
+2026-11-26 11:11:38 | ⭐️ Lan-xm starred bowang-lab/scGPT
+2026-11-26 11:10:39 | 💬 fxia0018 created issue 'fix(llmloop): bound the compression request's own input size' in alibaba/open-code-review
+2026-11-26 11:10:31 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-26 11:09:24 | ⭐️ 404-deprecated starred alibaba/open-code-review
+2026-11-26 11:08:05 | ⭐️ ridixcr starred alibaba/open-code-review
+2026-11-26 11:05:40 | ⭐️ bodhiyang starred THUDM/slime
+2026-11-26 11:04:50 | ⭐️ lhm166 starred alibaba/open-code-review
+2026-11-26 11:02:45 | ⭐️ dang1104363663 starred alibaba/open-code-review
+2026-11-26 11:02:33 | ⭐️ wardforce starred alibaba/jvm-sandbox
+2026-11-26 11:02:07 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-26 11:01:05 | ⭐️ ahuiiiiiii starred alibaba/Sentinel
+2026-11-26 11:00:31 | ⭐️ wrm244 starred alibaba/spring-cloud-alibaba
+2026-11-26 10:59:59 | 🐛 longbinlai closed issue in alibaba/neug: '[BUG] v0.3.1 property scans crash after dropping a lower-ID node table'
+2026-11-26 10:59:55 | 🔀 neug-agent merged PR in alibaba/neug
+2026-11-26 10:59:38 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 10:59:38 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 10:58:33 | ⭐️ gaopsyche-manman starred alibaba/lumenx
+2026-11-26 10:57:25 | 💬 tardis-key created issue 'feat(rlvr): add an optional step-aware RL-Insight tracker' in alibaba/ROLL
+2026-11-26 10:56:55 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-26 10:56:44 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-26 10:56:44 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-26 10:43:15 | 💬 Mic92 created issue 'Reuse the output buffer between uncached eval selections' in numtide/iets
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:46:17 | 💬 Mic92 created issue 'Read derivation statistics without cloning the table' in numtide/iets
+2026-11-26 09:46:16 | 💬 Mic92 created issue 'Look up declared flake inputs by their lock keys' in numtide/iets
+2026-11-26 09:16:10 | 💬 timtreis created issue 'Read the single-table CellProfiler tutorial and PERISCOPE exports' in scverse/mantispy
+2026-11-26 08:51:51 | ⭐️ crazyhottommy starred NygenAnalytics/CyteArc
+2026-11-26 08:47:05 | 🔀 mweinelt merged PR in bloomberg/memray
+2026-11-26 08:45:42 | 💬 Mic92 created issue 'Preserve fetched closures when refreshing a build trace' in numtide/iets
+2026-11-26 08:45:41 | 💬 Mic92 created issue 'Count union leaves during the lookup that visits them' in numtide/iets
+2026-11-26 07:45:57 | 💬 codecov created issue 'chore(deps): bump the pre-commit group with 4 updates' in scverse/anndata
+2026-11-26 07:45:30 | 💬 codecov created issue 'chore(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/anndata
+2026-11-26 07:45:21 | 💬 read-the-docs-community created issue 'chore(deps): bump the pre-commit group with 4 updates' in scverse/anndata
+2026-11-26 07:44:43 | 💬 read-the-docs-community created issue 'chore(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/anndata
+2026-11-26 07:44:09 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-26 07:44:09 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-26 07:44:09 | 🔀 dependabot opened PR in scverse/anndata
+2026-11-26 07:43:41 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-26 07:43:41 | 🔀 dependabot labeled PR in scverse/anndata
+2026-11-26 07:43:41 | 🔀 dependabot opened PR in scverse/anndata
+2026-11-26 07:43:29 | 💬 Mic92 created issue 'build: allow a batch to retry after preflight fails' in numtide/iets
+2026-11-26 07:43:28 | 💬 Mic92 created issue 'Keep pre-run evaluation counters out of helper fibers' in numtide/iets
+2026-11-26 07:23:14 | 🔹 claude performed GollumEvent on ShareMate-Swent/sharemate
+2026-11-26 07:23:14 | 🔹 claude performed GollumEvent on ShareMate-Swent/sharemate
+2026-11-26 06:56:29 | 🔹 claude performed GollumEvent on XrxcGH/OpenNote
+2026-11-26 06:56:29 | 🔹 claude performed GollumEvent on XrxcGH/OpenNote
+2026-11-26 05:52:53 | ⭐️ maceradario15-hub starred scverse/scanpy
+2026-11-26 05:49:30 | 💬 codecov created issue 'feat: add use parameter to v2 dotplot' in scverse/scanpy
+2026-11-26 05:42:53 | 🔹 Copilot performed PullRequestReviewEvent on scverse/scanpy
+2026-11-26 05:41:04 | 🔀 himavanthkar opened PR in scverse/scanpy
+2026-11-26 05:26:03 | 🍴 himavanthkar forked scverse/scanpy
+2026-11-26 05:17:56 | 💬 himavanthkar created issue 'No option for `use` in `dotplot`' in scverse/scanpy
+2026-11-26 05:03:58 | 🔀 timtreis closed PR in scverse/mantispy
+2026-11-26 05:00:26 | 💬 codecov-commenter created issue 'Read the single-table CellProfiler tutorial and PERISCOPE exports' in scverse/mantispy
+2026-11-26 04:54:34 | 💬 read-the-docs-community created issue 'Read the single-table CellProfiler tutorial and PERISCOPE exports' in scverse/mantispy
+2026-11-26 04:52:25 | 🔀 timtreis opened PR in scverse/mantispy
+2026-11-26 04:51:43 | ⭐️ DanaA66 starred bowang-lab/scGPT
+2026-11-26 04:39:19 | 🔀 colejensen merged PR in immcantation/scoper
+2026-11-26 04:39:14 | 💬 ggabernet created issue 'Reimplemented split_light' in immcantation/scoper
+2026-11-25 21:19:41 | 🏷️  DabinJeong published release v0.1.0 in Lotfollahi-lab/SIGMMA
+2026-11-25 21:19:41 | 🏷️  DabinJeong published release v0.1.0 in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:35 | 🔀 DabinJeong merged PR in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:35 | 🔀 DabinJeong merged PR in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:21 | 🔀 DabinJeong opened PR in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:21 | 🔀 DabinJeong opened PR in Lotfollahi-lab/SIGMMA
+2026-11-25 21:03:43 | ⭐️ xwyj060520 starred bowang-lab/scGPT
+2026-11-25 18:30:47 | 🚀 mweinelt pushed to NixOS/nixpkgs
+    - [d0a4cb5] (expanded) python3Packages.pyparsing: pin to flit-core 3.x
+2026-11-25 15:57:11 | 🔹 iluv7 performed PullRequestReviewCommentEvent on alibaba/open-code-review
+2026-11-25 14:47:39 | 🔀 EperLuo opened PR in harbor-framework/terminal-bench-science
+2026-11-25 13:29:32 | 🚀 rob-p pushed to COMBINE-lab/spearfish
+    - [540115e] (expanded) index --genome: build in stages, in memory close to the index size
+2026-11-25 07:24:43 | 🚀 lucidrains pushed to lucidrains/x-ppo
+    - [f03c8b3] (expanded) dogfood torch-population
+2026-11-25 06:22:48 | ⭐️ mg-200 starred macs3-project/MACS
+2026-11-25 05:08:44 | 🚀 Mic92 pushed to Mic92/hestia-beta
+    - [5bf8c9b] (expanded) node: drop the peer announce
+2026-11-25 04:42:33 | 🚀 github-actions pushed to immcantation/alakazam
+    - [8d3b7fd] (expanded)  Auto-render docs.
+2026-11-25 04:33:08 | 🚀 ssnn-airr pushed to immcantation/alakazam
+    - [1930e15] (expanded) release prep bump version and date
+2026-11-25 04:32:34 | 🚀 lucidrains pushed to lucidrains/rectified-flow-pytorch
+    - [ed6c568] (expanded) small change to mgm
+2026-11-25 03:29:13 | 🚀 github-actions pushed to csoneson/countsimQC
+    - [c6a8b4b] (expanded) Built site for countsimQC@1.33.0: 3090357
+2026-11-25 03:21:50 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [a310807] (expanded) Slurm corpus build: tokenize multi-sample h5ad files as a corpus of their own
+2026-11-25 03:16:04 | 🆕 csoneson created branch 'RELEASE_3_24' at csoneson/countsimQC
+2026-11-25 03:15:35 | 🚀 csoneson pushed to csoneson/countsimQC
+    - [3090357] (expanded) Merge remote-tracking branch 'upstream/devel' into devel
+2026-11-25 01:21:21 | ⭐️ huangy10 starred Leonxlnx/taste-skill
+2026-11-25 00:41:20 | 🚀 ssnn-airr pushed to immcantation/immcantation
+    - [171e5a1] (expanded) Merge pull request #188 from immcantation/167-use-cell_id_unique-when-remove-cells-with-multiple-heavy-chains
+2026-11-25 00:17:41 | 🔀 lawrennd merged PR in acceleratescience/acceleratescience.github.io
+2026-11-25 00:07:59 | 🚀 ssnn-airr pushed to immcantation/scoper
+    - [eafb154] (expanded) Fix inter_intra clone ids containing "_"

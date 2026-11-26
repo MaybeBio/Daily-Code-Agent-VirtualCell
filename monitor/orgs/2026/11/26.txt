@@ -1,0 +1,59 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-26 11:11:38 | ⭐️ Lan-xm starred bowang-lab/scGPT
+2026-11-26 10:57:03 | ⭐️ nldhuyen0047 starred bowang-lab/MedSAM2
+2026-11-26 10:05:01 | ⭐️ cvduffy starred theislab/boundannbatch
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:51:12 | ⭐️ 1511878618 starred theislab/ehrapy
+2026-11-26 08:29:21 | ⭐️ nhilgert starred theislab/chimera
+2026-11-26 06:10:48 | 🚀 aboyounp-gne pushed to Genentech/BiocDuckDB
+    - [7dd8ddb] (expanded) Refuse names that writeParquet() changed, check what readParquet() reads, and write packages atomically
+2026-11-26 06:06:41 | ⭐️ yifdai starred theislab/scConcept
+2026-11-26 06:04:59 | 🔀 eroell labeled PR in theislab/ehrapy
+2026-11-26 06:04:59 | 🔀 eroell opened PR in theislab/ehrapy
+2026-11-26 06:03:01 | ⭐️ alexiaherlea starred bowang-lab/MedSAM
+2026-11-26 05:56:14 | 🔀 eroell labeled PR in theislab/ehrapy
+2026-11-26 05:53:57 | 🔀 eroell opened PR in theislab/ehrapy
+2026-11-26 05:41:55 | 🔀 eroell labeled PR in theislab/ehrapy
+2026-11-26 05:41:55 | 🔀 eroell opened PR in theislab/ehrapy
+2026-11-26 05:30:50 | 🚀 aboyounp-gne pushed to Genentech/DuckDBSpatial
+    - [7b9bb41] (expanded) Refuse columns whose names are the same up to case in the spatial Parquet writers
+2026-11-26 05:24:38 | 🔀 dependabot labeled PR in theislab/ehrdata
+2026-11-26 05:24:38 | 🔀 dependabot labeled PR in theislab/ehrdata
+2026-11-26 05:24:38 | 🔀 dependabot opened PR in theislab/ehrdata
+2026-11-26 05:19:35 | 💬 read-the-docs-community created issue 'Add scaled cosine error tracking' in theislab/interscale
+2026-11-26 05:15:26 | 💬 LLehner created issue 'Add scaled cosine error tracking' in theislab/interscale
+2026-11-26 04:51:43 | ⭐️ DanaA66 starred bowang-lab/scGPT
+2026-11-26 04:08:08 | 💬 timtreis created issue 'Why not publishing a snapshot via `lamin io snapshot`?' in theislab/spatialdata-db-client
+2026-11-26 01:35:37 | 🔀 pre-commit-ci merged PR in theislab/ehrapy
+2026-11-26 01:25:20 | 🔀 eroell merged PR in theislab/ehrdata
+2026-11-26 01:22:24 | 🔀 pre-commit-ci merged PR in theislab/ehrdata
+2026-11-26 01:21:36 | 🔀 eroell merged PR in theislab/ehrapy
+2026-11-26 01:04:53 | 🔀 eroell labeled PR in theislab/ehrapy
+2026-11-26 01:04:53 | 🔀 eroell opened PR in theislab/ehrapy
+2026-11-26 01:03:30 | 🔀 eroell merged PR in theislab/ehrdata
+2026-11-25 21:19:41 | 🏷️  DabinJeong published release v0.1.0 in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:35 | 🔀 DabinJeong merged PR in Lotfollahi-lab/SIGMMA
+2026-11-25 21:15:21 | 🔀 DabinJeong opened PR in Lotfollahi-lab/SIGMMA
+2026-11-25 15:11:17 | 🚀 aboyounp-gne pushed to Genentech/DuckDBDataFrame
+    - [fcedbab] (expanded) Refuse names that corrupt a written file, and match base R in the methods a parity matrix checked
+2026-11-25 12:16:44 | 🚀 LArnoldt pushed to theislab/hidata
+    - [04d7be1] (expanded) Merge pull request #15 from theislab/patpy-from-pypi
+2026-11-25 12:09:33 | 🆕 LArnoldt created branch 'patpy-from-pypi' at theislab/hidata
+2026-11-25 07:27:54 | 🚀 inecik pushed to theislab/idtrack-reproducibility
+    - [50677c5] (expanded) Update
+2026-11-25 04:52:19 | 🚀 timtreis pushed to theislab/spatialdata-db-client
+    - [c240f92] (expanded) Merge pull request #92 from theislab/feat/drop-vitessce
+2026-11-25 04:51:51 | 🚀 timtreis pushed to theislab/spatialdata-db-client
+    - [f503836] (expanded) Drop the uv.lock added by mistake; ignore it (library repo, no lockfile)
+2026-11-25 04:40:34 | 🆕 timtreis created branch 'feat/drop-vitessce' at theislab/spatialdata-db-client
+2026-11-25 03:21:50 | 🚀 sebastianbirk pushed to Lotfollahi-lab/terra-reproducibility
+    - [a310807] (expanded) Slurm corpus build: tokenize multi-sample h5ad files as a corpus of their own
+2026-11-25 02:55:02 | 🚀 aboyounp-gne pushed to Genentech/DuckDBSpatial
+    - [6ff37ae] (expanded) Add the arguments of sf::st_buffer() and st_union() with no y (1.0.1)
+2026-11-25 02:45:47 | 🚀 aboyounp-gne pushed to Genentech/DuckDBSpatial
+    - [de67f43] (expanded) Add the arguments of sf::st_buffer() and st_union() with no y (1.1.1)
+2026-11-25 02:18:57 | 🚀 inecik pushed to theislab/idtrack-web
+    - [d9f9557] (expanded) Update
+2026-11-25 01:28:54 | 🆕 joshua-gould created branch 'zernike-test' at Genentech/scallops
