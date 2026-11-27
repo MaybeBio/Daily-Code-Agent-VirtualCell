@@ -1,0 +1,96 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-27 11:22:38 | 🔀 pakkah opened PR in alibaba/PhotonLibOS
+2026-11-27 11:22:17 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-27 11:20:16 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-27 11:20:13 | 🔀 Yanmei-Liu opened PR in alibaba/xquic
+2026-11-27 11:16:23 | ⭐️ mazlov1989 starred alibaba/open-code-review
+2026-11-27 11:11:00 | 🔹 smallmou performed PullRequestReviewEvent on alibaba/atrex-kernel-agent
+2026-11-27 11:10:56 | 🔹 mental2008 performed PullRequestReviewEvent on alibaba/atrex-kernel-agent
+2026-11-27 11:01:44 | ⭐️ lizihanglove starred alibaba/spring-ai-alibaba
+2026-11-27 11:01:06 | 💬 walnut-tom created issue '[Bug] Nacos config-data loading fails in native image: NacosConfigProperties stays unbound and serverAddr falls back to the SCA default 127.0.0.1:8848' in alibaba/spring-cloud-alibaba
+2026-11-27 10:58:45 | 💬 rtp-llm-review-bot created issue 'feat(flexlb): report prefill engine TTFT stages from WorkerStatus' in alibaba/rtp-llm
+2026-11-27 10:58:35 | 🔀 sipercai opened PR in alibaba/loongsuite-pilot
+2026-11-27 10:57:56 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-27 10:57:56 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-27 10:57:56 | 💬 CLAassistant created issue 'feat(flexlb): report prefill engine TTFT stages from WorkerStatus' in alibaba/rtp-llm
+2026-11-27 10:57:50 | 🔀 medcll opened PR in alibaba/rtp-llm
+2026-11-27 10:57:01 | 🔹 yu501954162 performed PullRequestReviewEvent on alibaba/loongsuite-pilot
+2026-11-27 10:57:00 | 🔹 yu501954162 performed PullRequestReviewCommentEvent on alibaba/loongsuite-pilot
+2026-11-27 10:56:39 | 🔀 photonlibos labeled PR in alibaba/PhotonLibOS
+2026-11-27 10:56:39 | 🔀 photonlibos labeled PR in alibaba/PhotonLibOS
+2026-11-27 10:56:39 | 🔀 photonlibos opened PR in alibaba/PhotonLibOS
+2026-11-27 10:56:36 | 🔀 wangzhaode merged PR in alibaba/MNN
+2026-11-27 10:56:34 | 💬 EperLuo created issue '[TASK: Biology] Ovarian spatial deconvolution and joint CD4/CD8 niche mapping' in harbor-framework/terminal-bench-science
+2026-11-27 10:56:33 | 💬 CLAassistant created issue '[CPU:Bugfix] Reset mixed SME/NEON GEMM kernel slots on every resize' in alibaba/MNN
+2026-11-27 10:56:28 | 🔀 wangzhaode opened PR in alibaba/MNN
+2026-11-27 10:54:58 | 💬 EperLuo created issue '[TASK: Biology] Ovarian spatial deconvolution and joint CD4/CD8 niche mapping' in harbor-framework/terminal-bench-science
+2026-11-27 09:17:40 | 💬 codecov-commenter created issue 'build(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/cellrank
+2026-11-27 09:14:02 | 🔀 dependabot labeled PR in scverse/cellrank
+2026-11-27 09:14:02 | 🔀 dependabot labeled PR in scverse/cellrank
+2026-11-27 09:14:02 | 🔀 dependabot opened PR in scverse/cellrank
+2026-11-27 07:19:44 | 💬 kroy3 created issue 'Tools dendogram fails when using categorical obs key where not all categories have values' in scverse/scanpy
+2026-11-27 06:15:39 | 🔀 meeseeksmachine merged PR in scverse/scvi-tools
+2026-11-27 06:13:59 | 💬 codecov created issue 'Backport PR #4124 on branch 1.5.x (  fix(vivs): get_hier_importance works without fastcluster)' in scverse/scvi-tools
+2026-11-27 06:07:58 | 💬 codspeed created issue 'chore(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/fast-array-utils
+2026-11-27 06:07:42 | 💬 codspeed created issue 'chore(deps): bump the pre-commit group with 3 updates' in scverse/fast-array-utils
+2026-11-27 06:04:47 | 🔀 lumberbot-app labeled PR in scverse/scvi-tools
+2026-11-27 06:04:47 | 🔀 meeseeksmachine opened PR in scverse/scvi-tools
+2026-11-27 06:04:39 | 🔀 ori-kron-wis merged PR in scverse/scvi-tools
+2026-11-27 05:56:44 | 🔀 github-actions unlabeled PR in scverse/fast-array-utils
+2026-11-27 05:56:44 | 💬 codecov created issue 'chore(deps): bump the pre-commit group with 3 updates' in scverse/fast-array-utils
+2026-11-27 05:56:10 | 💬 codecov created issue 'chore(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/fast-array-utils
+2026-11-27 05:55:21 | 💬 read-the-docs-community created issue 'chore(deps): bump the pre-commit group with 3 updates' in scverse/fast-array-utils
+2026-11-27 05:54:41 | 🔀 dependabot labeled PR in scverse/fast-array-utils
+2026-11-27 05:54:40 | 🔀 dependabot opened PR in scverse/fast-array-utils
+2026-11-27 05:54:40 | 💬 read-the-docs-community created issue 'chore(deps): bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/fast-array-utils
+2026-11-27 05:54:01 | 🔀 dependabot labeled PR in scverse/fast-array-utils
+2026-11-27 05:54:01 | 🔀 dependabot opened PR in scverse/fast-array-utils
+2026-11-27 05:09:07 | 💬 codecov-commenter created issue 'Bump the pre-commit group with 4 updates' in scverse/liana
+2026-11-27 05:08:56 | 💬 codecov-commenter created issue 'Bump astral-sh/setup-uv from 10.3.3 to 10.4.0 in the actions-deps group' in scverse/liana
+2026-11-27 05:05:30 | 🔀 dependabot labeled PR in scverse/liana
+2026-11-27 05:05:30 | 🔀 dependabot labeled PR in scverse/liana
+2026-11-27 05:05:30 | 🔀 dependabot opened PR in scverse/liana
+2026-11-27 05:05:26 | 🔀 dependabot labeled PR in scverse/liana
+2026-11-27 05:05:26 | 🔀 dependabot labeled PR in scverse/liana
+2026-11-27 05:05:26 | 🔀 dependabot opened PR in scverse/liana
+2026-11-27 04:43:05 | 🔹 claude performed GollumEvent on ShareMate-Swent/sharemate
+2026-11-26 23:00:15 | 🔀 EperLuo opened PR in harbor-framework/terminal-bench-science
+2026-11-26 20:33:14 | 🔹 github-actions performed PullRequestReviewCommentEvent on alibaba/TorchEasyRec
+2026-11-26 20:18:30 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 20:18:27 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 20:18:18 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 20:18:15 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 20:17:57 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 20:01:00 | 🔹 rtp-llm-review-bot performed PullRequestReviewCommentEvent on alibaba/rtp-llm
+2026-11-26 19:34:26 | 🐛 ssnn-airr closed issue in immcantation/immcantation: 'Set a UTF-8 locale in the Docker images'
+2026-11-26 19:34:22 | 🔀 ssnn-airr merged PR in immcantation/immcantation
+2026-11-26 19:33:44 | 🔀 ssnn-airr opened PR in immcantation/immcantation
+2026-11-26 19:28:27 | 🐛 ssnn-airr assigned issue in immcantation/immcantation: 'Set a UTF-8 locale in the Docker images'
+2026-11-26 19:28:27 | 🐛 ssnn-airr opened issue in immcantation/immcantation: 'Set a UTF-8 locale in the Docker images'
+2026-11-26 19:01:55 | 🔹 ilia-kats performed PullRequestReviewCommentEvent on scverse/anndata
+2026-11-26 17:40:16 | 🍴 tangxuan82 forked theislab/cpa
+2026-11-26 17:39:01 | 🍴 tangxuan82 forked bowang-lab/scGPT
+2026-11-26 17:39:01 | 🍴 tangxuan82 forked bowang-lab/scGPT
+2026-11-26 17:32:49 | 🍴 wenhuixie10 forked bowang-lab/scGPT
+2026-11-26 17:32:49 | 🍴 wenhuixie10 forked bowang-lab/scGPT
+2026-11-26 17:26:18 | 🍴 tangxuan82 forked bowang-lab/scGPT
+2026-11-26 17:26:18 | 🍴 tangxuan82 forked bowang-lab/scGPT
+2026-11-26 16:35:01 | ⭐️ ogutsevda starred Lotfollahi-lab/LocoGen
+2026-11-26 16:35:01 | ⭐️ ogutsevda starred Lotfollahi-lab/LocoGen
+2026-11-26 14:00:50 | 🚀 torvalds pushed to torvalds/linux
+    - [25faec9] (expanded) net: dpaa2-eth: fix objtool warning and logic bug
+2026-11-26 11:16:24 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 11:11:38 | ⭐️ Lan-xm starred bowang-lab/scGPT
+2026-11-26 11:11:38 | ⭐️ Lan-xm starred bowang-lab/scGPT
+2026-11-26 10:59:38 | 🔹 claude performed GollumEvent on 334456777/WeFlow
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:14 | 🍴 sachha-naksha forked Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 09:54:04 | ⭐️ sachha-naksha starred Lotfollahi-lab/MUSS_neurips26
+2026-11-26 08:51:51 | ⭐️ crazyhottommy starred NygenAnalytics/CyteArc
+2026-11-26 07:29:47 | 🚀 torvalds pushed to torvalds/linux
+    - [03242d6] (expanded) sched/wait: kill leftover bookmark logic in __wake_up_common()
+2026-11-26 07:23:14 | 🔹 claude performed GollumEvent on ShareMate-Swent/sharemate
+2026-11-26 06:56:29 | 🔹 claude performed GollumEvent on XrxcGH/OpenNote
+2026-11-26 04:51:43 | ⭐️ DanaA66 starred bowang-lab/scGPT

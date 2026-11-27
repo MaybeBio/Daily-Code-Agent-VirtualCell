@@ -1,0 +1,398 @@
+[
+  {
+    "full_name": "torvalds/linux",
+    "who": [
+      "torvalds"
+    ],
+    "event": "push",
+    "stars": 256915,
+    "language": "C",
+    "description": "Linux kernel source tree",
+    "url": "https://github.com/torvalds/linux"
+  },
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "mazlov1989"
+    ],
+    "event": "star",
+    "stars": 56672,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "alibaba/spring-cloud-alibaba",
+    "who": [
+      "walnut-tom"
+    ],
+    "event": "issue",
+    "stars": 29158,
+    "language": "Java",
+    "description": "Spring Cloud Alibaba provides a one-stop solution for application development for the distributed solutions of Alibaba middleware.",
+    "url": "https://github.com/alibaba/spring-cloud-alibaba"
+  },
+  {
+    "full_name": "alibaba/MNN",
+    "who": [
+      "CLAassistant",
+      "wangzhaode"
+    ],
+    "event": "mixed",
+    "stars": 16630,
+    "language": "C++",
+    "description": "MNN: A blazing-fast, lightweight inference engine battle-tested by Alibaba, powering high-performance on-device LLMs and Edge AI.",
+    "url": "https://github.com/alibaba/MNN"
+  },
+  {
+    "full_name": "alibaba/spring-ai-alibaba",
+    "who": [
+      "lizihanglove"
+    ],
+    "event": "star",
+    "stars": 11183,
+    "language": "Java",
+    "description": "Agentic AI Framework for Java Developers",
+    "url": "https://github.com/alibaba/spring-ai-alibaba"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "alexiaherlea"
+    ],
+    "event": "star",
+    "stars": 4459,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "scverse/scanpy",
+    "who": [
+      "kroy3"
+    ],
+    "event": "issue",
+    "stars": 2625,
+    "language": "Python",
+    "description": "Single-cell analysis in Python. Scales to >100M cells.",
+    "url": "https://github.com/scverse/scanpy"
+  },
+  {
+    "full_name": "alibaba/xquic",
+    "who": [
+      "Yanmei-Liu"
+    ],
+    "event": "pr",
+    "stars": 1937,
+    "language": "C",
+    "description": "XQUIC Library released by Alibaba is a cross-platform implementation of QUIC and HTTP/3 protocol.",
+    "url": "https://github.com/alibaba/xquic"
+  },
+  {
+    "full_name": "scverse/scvi-tools",
+    "who": [
+      "codecov",
+      "lumberbot-app",
+      "meeseeksmachine",
+      "ori-kron-wis"
+    ],
+    "event": "mixed",
+    "stars": 1738,
+    "language": "Python",
+    "description": "Deep probabilistic analysis of single-cell and spatial omics data",
+    "url": "https://github.com/scverse/scvi-tools"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "DanaA66",
+      "Lan-xm",
+      "tangxuan82",
+      "wenhuixie10"
+    ],
+    "event": "mixed",
+    "stars": 1678,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "CLAassistant",
+      "medcll",
+      "rtp-llm-review-bot"
+    ],
+    "event": "mixed",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "alibaba/PhotonLibOS",
+    "who": [
+      "pakkah",
+      "photonlibos"
+    ],
+    "event": "pr",
+    "stars": 1242,
+    "language": "C++",
+    "description": "Probably the fastest coroutine lib in the world!",
+    "url": "https://github.com/alibaba/PhotonLibOS"
+  },
+  {
+    "full_name": "harbor-framework/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "mixed",
+    "stars": 979,
+    "language": "Python",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/harbor-framework/terminal-bench-science"
+  },
+  {
+    "full_name": "scverse/anndata",
+    "who": [
+      "ilia-kats"
+    ],
+    "event": "other",
+    "stars": 788,
+    "language": "Python",
+    "description": "Annotated data.",
+    "url": "https://github.com/scverse/anndata"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "PantalQ",
+      "gzanardini",
+      "lbjcelsius",
+      "nldhuyen0047"
+    ],
+    "event": "star",
+    "stars": 746,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "alibaba/TorchEasyRec",
+    "who": [
+      "github-actions"
+    ],
+    "event": "other",
+    "stars": 493,
+    "language": "Python",
+    "description": "An easy-to-use framework for large scale recommendation algorithms.",
+    "url": "https://github.com/alibaba/TorchEasyRec"
+  },
+  {
+    "full_name": "scverse/cellrank",
+    "who": [
+      "codecov-commenter",
+      "dependabot"
+    ],
+    "event": "mixed",
+    "stars": 461,
+    "language": "Python",
+    "description": "CellRank: dynamics from multi-view single-cell data",
+    "url": "https://github.com/scverse/cellrank"
+  },
+  {
+    "full_name": "scverse/liana",
+    "who": [
+      "codecov-commenter",
+      "dependabot"
+    ],
+    "event": "mixed",
+    "stars": 329,
+    "language": "Python",
+    "description": "LIANA+: an all-in-one framework for cell-cell communication",
+    "url": "https://github.com/scverse/liana"
+  },
+  {
+    "full_name": "alibaba/loongsuite-pilot",
+    "who": [
+      "sipercai",
+      "yu501954162"
+    ],
+    "event": "mixed",
+    "stars": 270,
+    "language": "TypeScript",
+    "description": "Local-first telemetry collector for AI coding agents — unified OpenTelemetry events for Claude Code, Codex, Cursor and more. Token usage, cost, traces and security audit, exported anywhere.",
+    "url": "https://github.com/alibaba/loongsuite-pilot"
+  },
+  {
+    "full_name": "alibaba/atrex-kernel-agent",
+    "who": [
+      "mental2008",
+      "smallmou"
+    ],
+    "event": "other",
+    "stars": 223,
+    "language": "Python",
+    "description": "An end-to-end agent project for GPU kernel implementation, analysis, profiling, and iterative optimization. It helps an agent turn PyTorch logic or an existing kernel into a high-performance GPU kernel through a structured, profile-driven workflow.",
+    "url": "https://github.com/alibaba/atrex-kernel-agent"
+  },
+  {
+    "full_name": "theislab/cpa",
+    "who": [
+      "tangxuan82"
+    ],
+    "event": "fork",
+    "stars": 160,
+    "language": "Python",
+    "description": "The Compositional Perturbation Autoencoder (CPA) is a deep generative framework to learn effects of perturbations at the single-cell level. CPA performs OOD predictions of unseen combinations of drugs, learns interpretable embeddings, estimates dose-response curves, and provides uncertainty estimates.",
+    "url": "https://github.com/theislab/cpa"
+  },
+  {
+    "full_name": "bowang-lab/BioReason-Pro",
+    "who": [
+      "chance600"
+    ],
+    "event": "star",
+    "stars": 130,
+    "language": "Jupyter Notebook",
+    "description": "BioReason-Pro: Advancing Protein Function Prediction with Multimodal Biological Reasoning",
+    "url": "https://github.com/bowang-lab/BioReason-Pro"
+  },
+  {
+    "full_name": "334456777/WeFlow",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 59,
+    "language": "Rust",
+    "description": "WeChat data export & analysis tool with Rust CLI（WeFlow Fork）",
+    "url": "https://github.com/334456777/WeFlow"
+  },
+  {
+    "full_name": "NygenAnalytics/CyteArc",
+    "who": [
+      "crazyhottommy"
+    ],
+    "event": "star",
+    "stars": 50,
+    "language": "Python",
+    "description": "Fast, out-of-core single-cell analysis in Python for RNA, ATAC, protein, and multi-omic data, scaling to 100M+ cells. Mount remote datasets, work within a memory budget, and trace every result through built-in provenance. Preprint: https://www.biorxiv.org/content/10.64898/2026.11.24.768888v1",
+    "url": "https://github.com/NygenAnalytics/CyteArc"
+  },
+  {
+    "full_name": "scverse/fast-array-utils",
+    "who": [
+      "codecov",
+      "codspeed",
+      "dependabot",
+      "github-actions",
+      "read-the-docs-community"
+    ],
+    "event": "mixed",
+    "stars": 15,
+    "language": "Python",
+    "description": "Fast array utilities",
+    "url": "https://github.com/scverse/fast-array-utils"
+  },
+  {
+    "full_name": "immcantation/immcantation",
+    "who": [
+      "ssnn-airr"
+    ],
+    "event": "mixed",
+    "stars": 15,
+    "language": "Jupyter Notebook",
+    "description": "The Immcantation Portal",
+    "url": "https://github.com/immcantation/immcantation"
+  },
+  {
+    "full_name": "Lotfollahi-lab/MUSS_neurips26",
+    "who": [
+      "sachha-naksha"
+    ],
+    "event": "mixed",
+    "stars": 6,
+    "language": "Python",
+    "description": "",
+    "url": "https://github.com/Lotfollahi-lab/MUSS_neurips26"
+  },
+  {
+    "full_name": "Lotfollahi-lab/LocoGen",
+    "who": [
+      "ogutsevda"
+    ],
+    "event": "star",
+    "stars": 3,
+    "language": "Python",
+    "description": "[NeurIPS 2026] Generative model for de novo design of regulatory DNA sequences, using property-guided generation to reach out-of-distribution objectives within a lab-in-the-loop design cycle",
+    "url": "https://github.com/Lotfollahi-lab/LocoGen"
+  },
+  {
+    "full_name": "BiocPy/find-supported-python",
+    "who": [
+      "jkanche"
+    ],
+    "event": "star",
+    "stars": 2,
+    "language": "JavaScript",
+    "description": "Find a supported version of Python",
+    "url": "https://github.com/BiocPy/find-supported-python"
+  },
+  {
+    "full_name": "bowang-lab/CryoDINO",
+    "who": [
+      "AAttarpour",
+      "charlesgchen"
+    ],
+    "event": "push",
+    "stars": 2,
+    "language": "Jupyter Notebook",
+    "description": "  3DINO pretraining on Cryo-electron tomograms with fine-tuning for particle and organelle identification using cutting-edge decoders.                                                                                          ",
+    "url": "https://github.com/bowang-lab/CryoDINO"
+  },
+  {
+    "full_name": "BiocPy/.github",
+    "who": [
+      "jkanche"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "",
+    "description": "",
+    "url": "https://github.com/BiocPy/.github"
+  },
+  {
+    "full_name": "BiocPy/biocpy.github.io",
+    "who": [
+      "jkanche"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "HTML",
+    "description": "",
+    "url": "https://github.com/BiocPy/biocpy.github.io"
+  },
+  {
+    "full_name": "ShareMate-Swent/sharemate",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "Kotlin",
+    "description": "SwEnt App of our group",
+    "url": "https://github.com/ShareMate-Swent/sharemate"
+  },
+  {
+    "full_name": "XrxcGH/OpenNote",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "TypeScript",
+    "description": "OpenNote is an open-source note-taking app for Windows. It brings writing, drawing, and recording together in one notebook, for professional and personal use. Windows comes first. macOS, Linux, iOS, and Android follow.",
+    "url": "https://github.com/XrxcGH/OpenNote"
+  }
+]
