@@ -1,0 +1,13 @@
+Fetching events for target(s): theislab, bowang-lab, biomap-research, Genentech, Lotfollahi-lab...
+
+2026-11-28 09:51:50 | 🍴 vasymusprime forked bowang-lab/EchoJEPA
+2026-11-28 09:03:03 | 🐛 ddsjoberg opened issue in Genentech/checked: '`run()` errors with "duplicate 'row.names'" when a package lists a dependency twice in one field'
+2026-11-28 06:05:13 | 💬 arashmparsa created issue 'Gene locations don't seem to update with reference genome' in Genentech/decima
+2026-11-28 02:24:43 | ⭐️ laxswami starred bowang-lab/MedSAM
+2026-11-28 00:55:21 | ⭐️ Albert3363733956 starred bowang-lab/MedRAX
+2026-11-27 22:49:56 | ⭐️ blackmammoth starred bowang-lab/scGPT
+2026-11-27 22:21:17 | ⭐️ myousaf64 starred bowang-lab/MedRAX
+2026-11-27 18:59:04 | 🔀 chhayankjain opened PR in bowang-lab/MedRAX
+2026-11-27 18:38:52 | 🐛 chhayankjain opened issue in bowang-lab/MedRAX: 'A tool call with invalid arguments ends the run and leaves the thread with an unanswered tool call'
+2026-11-27 18:37:09 | 🍴 chhayankjain forked bowang-lab/MedRAX
+2026-11-27 18:26:24 | ⭐️ Dorothy336 starred bowang-lab/MedSAM2

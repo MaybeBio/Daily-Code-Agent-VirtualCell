@@ -1,0 +1,283 @@
+[
+  {
+    "full_name": "alibaba/open-code-review",
+    "who": [
+      "Alina06320",
+      "GavinGe-GC",
+      "KUNTING0701",
+      "Valyrox",
+      "Zaynex",
+      "deviousprophet",
+      "justinbounds",
+      "liuzhiyuan011215-cmyk",
+      "ravinggenius",
+      "tremvv",
+      "vect0orxp4-code",
+      "wsongtao9642-wq",
+      "zgsinks-hue"
+    ],
+    "event": "mixed",
+    "stars": 56920,
+    "language": "Go",
+    "description": "Secure, fast, efficient, battle-tested at Alibaba's scale. Hybrid architecture code review tool: deterministic pipelines + LLM Agent, precise line-level comments, built-in multi-language ruleset (NPE, thread-safety, XSS, SQL injection), OpenAI & Anthropic compatible.",
+    "url": "https://github.com/alibaba/open-code-review"
+  },
+  {
+    "full_name": "alibaba/nacos",
+    "who": [
+      "topbat"
+    ],
+    "event": "star",
+    "stars": 33548,
+    "language": "Java",
+    "description": "an easy-to-use dynamic service discovery, configuration and service management platform for building AI cloud native applications.",
+    "url": "https://github.com/alibaba/nacos"
+  },
+  {
+    "full_name": "alibaba/MNN",
+    "who": [
+      "darktwh"
+    ],
+    "event": "star",
+    "stars": 16637,
+    "language": "C++",
+    "description": "MNN: A blazing-fast, lightweight inference engine battle-tested by Alibaba, powering high-performance on-device LLMs and Edge AI.",
+    "url": "https://github.com/alibaba/MNN"
+  },
+  {
+    "full_name": "alibaba/spring-ai-alibaba",
+    "who": [
+      "chatgpt-codex-connector",
+      "chickenlj",
+      "github-actions"
+    ],
+    "event": "mixed",
+    "stars": 11187,
+    "language": "Java",
+    "description": "Agentic AI Framework for Java Developers",
+    "url": "https://github.com/alibaba/spring-ai-alibaba"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM",
+    "who": [
+      "laxswami"
+    ],
+    "event": "star",
+    "stars": 4459,
+    "language": "Jupyter Notebook",
+    "description": "Segment Anything in Medical Images",
+    "url": "https://github.com/bowang-lab/MedSAM"
+  },
+  {
+    "full_name": "scverse/scanpy",
+    "who": [
+      "vvnnif"
+    ],
+    "event": "star",
+    "stars": 2626,
+    "language": "Python",
+    "description": "Single-cell analysis in Python. Scales to >100M cells.",
+    "url": "https://github.com/scverse/scanpy"
+  },
+  {
+    "full_name": "bowang-lab/scGPT",
+    "who": [
+      "blackmammoth"
+    ],
+    "event": "star",
+    "stars": 1679,
+    "language": "Jupyter Notebook",
+    "description": "",
+    "url": "https://github.com/bowang-lab/scGPT"
+  },
+  {
+    "full_name": "alibaba/rtp-llm",
+    "who": [
+      "rtp-llm-review-bot"
+    ],
+    "event": "pr",
+    "stars": 1402,
+    "language": "Python",
+    "description": "RTP-LLM: Alibaba's high-performance LLM inference engine for diverse applications.",
+    "url": "https://github.com/alibaba/rtp-llm"
+  },
+  {
+    "full_name": "bowang-lab/MedRAX",
+    "who": [
+      "Albert3363733956",
+      "chhayankjain",
+      "myousaf64"
+    ],
+    "event": "mixed",
+    "stars": 1256,
+    "language": "Python",
+    "description": "MedRAX: Medical Reasoning Agent for Chest X-ray - ICML 2025",
+    "url": "https://github.com/bowang-lab/MedRAX"
+  },
+  {
+    "full_name": "harbor-framework/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "issue",
+    "stars": 986,
+    "language": "Python",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/harbor-framework/terminal-bench-science"
+  },
+  {
+    "full_name": "bowang-lab/MedSAM2",
+    "who": [
+      "Dorothy336"
+    ],
+    "event": "star",
+    "stars": 747,
+    "language": "Python",
+    "description": "MedSAM2: Segment Anything in 3D Medical Images and Videos",
+    "url": "https://github.com/bowang-lab/MedSAM2"
+  },
+  {
+    "full_name": "davidliwei/awesome-CRISPR",
+    "who": [
+      "javi77pineda"
+    ],
+    "event": "fork",
+    "stars": 586,
+    "language": "",
+    "description": "List of software/websites/databases/other stuff for genome engineering",
+    "url": "https://github.com/davidliwei/awesome-CRISPR"
+  },
+  {
+    "full_name": "bowang-lab/EchoJEPA",
+    "who": [
+      "vasymusprime"
+    ],
+    "event": "fork",
+    "stars": 357,
+    "language": "Python",
+    "description": "EchoJEPA: A Latent Predictive Foundation Model for Echocardiography",
+    "url": "https://github.com/bowang-lab/EchoJEPA"
+  },
+  {
+    "full_name": "alibaba/tair-kvcache",
+    "who": [
+      "PerryZZ",
+      "charpty"
+    ],
+    "event": "mixed",
+    "stars": 287,
+    "language": "C++",
+    "description": "Alibaba Cloud's high-performance KVCache system for LLM inference, with components for global cache management, inference simulation(HiSim), and more.",
+    "url": "https://github.com/alibaba/tair-kvcache"
+  },
+  {
+    "full_name": "scverse/muon",
+    "who": [
+      "truong128"
+    ],
+    "event": "fork",
+    "stars": 279,
+    "language": "Python",
+    "description": "muon is a multimodal omics Python framework",
+    "url": "https://github.com/scverse/muon"
+  },
+  {
+    "full_name": "numtide/iets",
+    "who": [
+      "Mic92"
+    ],
+    "event": "issue",
+    "stars": 219,
+    "language": "Rust",
+    "description": "Fast Nix evaluator and remote-build client in Rust",
+    "url": "https://github.com/numtide/iets"
+  },
+  {
+    "full_name": "Genentech/decima",
+    "who": [
+      "arashmparsa"
+    ],
+    "event": "issue",
+    "stars": 89,
+    "language": "Python",
+    "description": "Decima is a Python library to train sequence models on single-cell RNA-seq data.",
+    "url": "https://github.com/Genentech/decima"
+  },
+  {
+    "full_name": "Genentech/checked",
+    "who": [
+      "ddsjoberg"
+    ],
+    "event": "issue",
+    "stars": 9,
+    "language": "R",
+    "description": "batch R CMD check management",
+    "url": "https://github.com/Genentech/checked"
+  },
+  {
+    "full_name": "michaelliao/serial-debugger",
+    "who": [
+      "michaelliao"
+    ],
+    "event": "push",
+    "stars": 8,
+    "language": "C#",
+    "description": "A serial port debug tool.",
+    "url": "https://github.com/michaelliao/serial-debugger"
+  },
+  {
+    "full_name": "sthamann/makera-pcb",
+    "who": [
+      "torvalds"
+    ],
+    "event": "mixed",
+    "stars": 5,
+    "language": "JavaScript",
+    "description": "Turn KiCad Gerber + drill files into ready-to-mill G-code for the Makera Carvera Air. Isolation milling, drilling & outline cutting with 2D/3D preview, tool library, AI config check, guided workflow & direct machine control — no FlatCAM needed.",
+    "url": "https://github.com/sthamann/makera-pcb"
+  },
+  {
+    "full_name": "Lotfollahi-lab/SIGMMA",
+    "who": [
+      "DabinJeong"
+    ],
+    "event": "mixed",
+    "stars": 2,
+    "language": "Python",
+    "description": "SIGMMA: Multi-scale multi-modal model to link H&E image and spatial transcriptome",
+    "url": "https://github.com/Lotfollahi-lab/SIGMMA"
+  },
+  {
+    "full_name": "JR91387/THE_INDEX_FILE_SEARCH",
+    "who": [
+      "claude"
+    ],
+    "event": "other",
+    "stars": 0,
+    "language": "Python",
+    "description": "A catalog your AI can search: what is on your machines and what changed (folders, documents, jobs, containers, backups). Python standard library only, stays on your machine.",
+    "url": "https://github.com/JR91387/THE_INDEX_FILE_SEARCH"
+  },
+  {
+    "full_name": "EperLuo/terminal-bench-science",
+    "who": [
+      "EperLuo"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "",
+    "description": "Terminal-Bench-Science: Evaluating AI agents on research workflows across scientific domains",
+    "url": "https://github.com/EperLuo/terminal-bench-science"
+  },
+  {
+    "full_name": "slowkow/oncoanalyser",
+    "who": [
+      "slowkow"
+    ],
+    "event": "push",
+    "stars": 0,
+    "language": "",
+    "description": "A comprehensive cancer DNA/RNA analysis and reporting pipeline",
+    "url": "https://github.com/slowkow/oncoanalyser"
+  }
+]

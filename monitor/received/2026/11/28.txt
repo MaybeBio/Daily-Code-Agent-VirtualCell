@@ -1,0 +1,62 @@
+Fetching events for target(s): AnnaChristina, AlejandroTL, subercui, moritzschaefer, davidliwei, lidanwu, WhirlFirst, HelloWorldLTY, ChloeXWang, javh, tony-kuo, jkanche, DiDeoxy, JackieHanLab, kchl5, AdibMiraki, M0hammadL...
+
+2026-11-28 10:57:59 | 🔀 PerryZZ merged PR in alibaba/tair-kvcache
+2026-11-28 10:56:10 | 🔹 charpty performed PullRequestReviewEvent on alibaba/tair-kvcache
+2026-11-28 10:54:22 | ⭐️ ravinggenius starred alibaba/open-code-review
+2026-11-28 10:54:20 | 🍴 tremvv forked alibaba/open-code-review
+2026-11-28 10:52:30 | 🔀 chickenlj merged PR in alibaba/spring-ai-alibaba
+2026-11-28 10:50:35 | 🍴 truong128 forked scverse/muon
+2026-11-28 10:50:07 | ⭐️ Valyrox starred alibaba/open-code-review
+2026-11-28 10:48:30 | ⭐️ justinbounds starred alibaba/open-code-review
+2026-11-28 10:48:16 | 💬 chatgpt-codex-connector created issue 'docs(agent): describe tool permissions in project terms' in alibaba/spring-ai-alibaba
+2026-11-28 10:48:07 | 🔀 chickenlj opened PR in alibaba/spring-ai-alibaba
+2026-11-28 10:45:42 | 💬 Mic92 created issue 'compile: mark enclosing with captures only for dynamic lookups' in numtide/iets
+2026-11-28 10:45:40 | 💬 Mic92 created issue 'Size file builtin reads from the opened file' in numtide/iets
+2026-11-28 10:45:27 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-28 10:44:20 | 🔀 chickenlj merged PR in alibaba/spring-ai-alibaba
+2026-11-28 10:42:54 | ⭐️ KUNTING0701 starred alibaba/open-code-review
+2026-11-28 10:42:52 | ⭐️ deviousprophet starred alibaba/open-code-review
+2026-11-28 10:42:44 | ⭐️ topbat starred alibaba/nacos
+2026-11-28 10:40:45 | 🍴 GavinGe-GC forked alibaba/open-code-review
+2026-11-28 10:39:49 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-28 10:39:46 | 🔀 rtp-llm-review-bot unlabeled PR in alibaba/rtp-llm
+2026-11-28 10:37:26 | ⭐️ Zaynex starred alibaba/open-code-review
+2026-11-28 10:36:07 | ⭐️ Alina06320 starred alibaba/open-code-review
+2026-11-28 10:35:50 | ⭐️ liuzhiyuan011215-cmyk starred alibaba/open-code-review
+2026-11-28 10:35:00 | ⭐️ darktwh starred alibaba/MNN
+2026-11-28 10:34:31 | ⭐️ zgsinks-hue starred alibaba/open-code-review
+2026-11-28 10:34:09 | 🔀 rtp-llm-review-bot labeled PR in alibaba/rtp-llm
+2026-11-28 10:28:33 | ⭐️ vect0orxp4-code starred alibaba/open-code-review
+2026-11-28 10:26:30 | 🔹 chatgpt-codex-connector performed PullRequestReviewEvent on alibaba/spring-ai-alibaba
+2026-11-28 10:26:27 | 🔹 chatgpt-codex-connector performed PullRequestReviewCommentEvent on alibaba/spring-ai-alibaba
+2026-11-28 10:24:16 | 💬 chatgpt-codex-connector created issue 'feat(agent): add scoped memory and versioned preferences' in alibaba/spring-ai-alibaba
+2026-11-28 10:23:58 | 🔀 github-actions labeled PR in alibaba/spring-ai-alibaba
+2026-11-28 10:23:58 | 🔀 chickenlj opened PR in alibaba/spring-ai-alibaba
+2026-11-28 10:23:42 | ⭐️ wsongtao9642-wq starred alibaba/open-code-review
+2026-11-28 10:12:49 | 💬 EperLuo created issue '[TASK: Biology] Predict hematopoietic descendant compositions from RNA snapshots' in harbor-framework/terminal-bench-science
+2026-11-28 09:44:54 | 💬 Mic92 created issue 'Avoid constructing unused source-filter paths' in numtide/iets
+2026-11-28 09:44:52 | 💬 Mic92 created issue 'bench: distinguish unchanged counts from increases after zero' in numtide/iets
+2026-11-28 09:26:56 | ⭐️ vvnnif starred scverse/scanpy
+2026-11-28 09:20:28 | 🔹 claude performed GollumEvent on JR91387/THE_INDEX_FILE_SEARCH
+2026-11-28 09:20:28 | 🔹 claude performed GollumEvent on JR91387/THE_INDEX_FILE_SEARCH
+2026-11-28 06:13:57 | 💬 torvalds created issue 'Upstream fixes for Makera Z1 and some minor other issues' in sthamann/makera-pcb
+2026-11-28 06:09:41 | 🔀 torvalds opened PR in sthamann/makera-pcb
+2026-11-28 06:03:03 | 🍴 torvalds forked sthamann/makera-pcb
+2026-11-28 05:13:37 | 🍴 javi77pineda forked davidliwei/awesome-CRISPR
+2026-11-28 00:48:50 | 🔀 DabinJeong merged PR in Lotfollahi-lab/SIGMMA
+2026-11-28 00:48:50 | 🔀 DabinJeong merged PR in Lotfollahi-lab/SIGMMA
+2026-11-28 00:48:37 | 🔀 DabinJeong opened PR in Lotfollahi-lab/SIGMMA
+2026-11-28 00:48:37 | 🔀 DabinJeong opened PR in Lotfollahi-lab/SIGMMA
+2026-11-28 00:48:29 | ⭐️ DabinJeong starred Lotfollahi-lab/SIGMMA
+2026-11-28 00:48:29 | ⭐️ DabinJeong starred Lotfollahi-lab/SIGMMA
+2026-11-27 22:49:56 | ⭐️ blackmammoth starred bowang-lab/scGPT
+2026-11-27 22:37:58 | 🚀 EperLuo pushed to EperLuo/terminal-bench-science
+    - [d55b4f0] (expanded) Fix task README structure and required canary markers
+2026-11-27 22:28:35 | 💬 EperLuo created issue 'Add RNA sister-cell pairing task' in harbor-framework/terminal-bench-science
+2026-11-27 22:28:25 | 💬 EperLuo created issue 'Add RNA sister-cell pairing task' in harbor-framework/terminal-bench-science
+2026-11-27 19:17:33 | 🚀 slowkow pushed to slowkow/oncoanalyser
+    - [c8e38e2] (expanded) cuppa.native.config: put the folder's cuppa-shim/ (python stand-in) first on PATH for CUPPA only
+2026-11-27 19:03:29 | 🚀 michaelliao pushed to michaelliao/serial-debugger
+    - [a115c4e] (expanded) only create logs when received data for first time
+2026-11-27 10:56:34 | 💬 EperLuo created issue '[TASK: Biology] Ovarian spatial deconvolution and joint CD4/CD8 niche mapping' in harbor-framework/terminal-bench-science
+2026-11-27 10:54:58 | 💬 EperLuo created issue '[TASK: Biology] Ovarian spatial deconvolution and joint CD4/CD8 niche mapping' in harbor-framework/terminal-bench-science
